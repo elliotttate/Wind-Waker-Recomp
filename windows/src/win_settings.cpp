@@ -93,6 +93,7 @@ struct Settings {
     int smooth_steps = 1;       // in-between frames per game frame: 1 (60 FPS), 3 (120 FPS) or
                                 // kStepsDisplay (as many as the display shows, shown_steps)
     bool show_fps = false;
+    int fps_position = FPS_OVERLAY_TOP_CENTER;  // where the counter is (kFpsPositions)
     bool pause_unfocused = false;
     bool fast_forward = true;  // skip through the black while loading (fast_load.h)
     bool quick_doors = true;   // no walk-in or door closing behind Link (quick_doors.h)
@@ -138,10 +139,22 @@ const char* const kScaleNames[] = {"The window's own pixels", "1x (640x480)", "2
 const int kAnisotropy[] = {1, 2, 4, 8, 16};
 const char* const kAnisotropyNames[] = {"The game's own", "2x anisotropic", "4x anisotropic", "8x anisotropic",
                                         "16x anisotropic"};
+// Where the frame rate counter can be, in AuroraFpsOverlayPosition's order: as
+// the menu shows them, and as the file and DOL_AURORA_FPS_POSITION spell them.
+const char* const kFpsPositionNames[] = {"Top Center", "Top Left", "Top Right", "Bottom Left", "Bottom Right"};
+const char* const kFpsPositions[] = {"top-center", "top-left", "top-right", "bottom-left", "bottom-right"};
 
 // --- the file ---------------------------------------------------------------
 
 bool parse_bool(const std::string& v) { return v == "1" || v == "true" || v == "on" || v == "yes"; }
+
+// Top center unless it names a corner.
+int parse_fps_position(const std::string& v) {
+    for (int i = 0; i < IM_ARRAYSIZE(kFpsPositions); i++)
+        if (v == kFpsPositions[i])
+            return i;
+    return FPS_OVERLAY_TOP_CENTER;
+}
 
 void load_file() {
     FILE* f = std::fopen(g_path.c_str(), "r");
@@ -170,6 +183,7 @@ void load_file() {
         else if (k == "climb") d.climb = parse_bool(v);
         else if (k == "climb_stamina") d.climb_stamina = std::clamp(std::atoi(v.c_str()), 4, 30);
         else if (k == "show_fps") d.show_fps = parse_bool(v);
+        else if (k == "fps_position") d.fps_position = parse_fps_position(v);
         else if (k == "pause_unfocused") d.pause_unfocused = parse_bool(v);
         else if (k == "mouse_camera") d.mouse_camera = parse_bool(v);
         else if (k == "mouse_sensitivity") d.mouse_sensitivity = std::clamp(std::atof(v.c_str()), 0.1, 10.0);
@@ -204,6 +218,7 @@ void save_file() {
         std::fprintf(f, "window_position=%d,%d\n", d.window_x, d.window_y);
     std::fprintf(f, "render_scale=%d\nanisotropy=%d\nsmooth_motion=%d\nshow_fps=%d\npause_unfocused=%d\n",
                  d.render_scale, d.anisotropy, d.smooth_motion, d.show_fps, d.pause_unfocused);
+    std::fprintf(f, "fps_position=%s\n", kFpsPositions[d.fps_position]);
     std::fprintf(f, "smooth_motion_fps=%s\nfast_forward=%d\nquick_doors=%d\n",
                  d.smooth_steps == kStepsDisplay ? "display" : d.smooth_steps >= 3 ? "120" : "60",
                  d.fast_forward, d.quick_doors);
@@ -421,6 +436,7 @@ void apply_live() {
     aurora_set_frame_interp_steps(shown_steps());
     aurora_set_frame_interpolation(d.smooth_motion && !bluewake_simulation_enabled());
     aurora_set_fps_overlay(d.show_fps);
+    aurora_set_fps_overlay_position(static_cast<AuroraFpsOverlayPosition>(d.fps_position));
     aurora_set_pause_on_focus_lost(d.pause_unfocused);
     bluewake_mouse_camera_configure(d.mouse_camera, d.mouse_sensitivity, d.mouse_invert_y);
     apply_controller();
@@ -550,6 +566,13 @@ void tab_display(SDL_Window* w) {
         aurora_set_fps_overlay(d.show_fps);
         changed();
     }
+    ImGui::BeginDisabled(!d.show_fps);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16);
+    if (ImGui::Combo("FPS position", &d.fps_position, kFpsPositionNames, IM_ARRAYSIZE(kFpsPositionNames))) {
+        aurora_set_fps_overlay_position(static_cast<AuroraFpsOverlayPosition>(d.fps_position));
+        changed();
+    }
+    ImGui::EndDisabled();
     ImGui::Spacing();
     ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16);
     if (ImGui::Combo("Render resolution", &d.render_scale, kScaleNames, IM_ARRAYSIZE(kScaleNames))) {
@@ -1164,6 +1187,10 @@ extern "C" void bw_settings_apply_launch(void) {
     env_default("DOL_AURORA_RENDER_SCALE", std::to_string(d.render_scale));
     if (d.anisotropy > 1)
         env_default("DOL_AURORA_FORCE_ANISO", std::to_string(d.anisotropy));
+    if (env_set("DOL_AURORA_FPS_POSITION"))
+        d.fps_position = parse_fps_position(std::getenv("DOL_AURORA_FPS_POSITION"));
+    else
+        env_default("DOL_AURORA_FPS_POSITION", kFpsPositions[d.fps_position]);
     if (!d.mouse_camera)
         env_default("BLUEWAKE_MOUSE_CAMERA", "0");
     char sensitivity[32];

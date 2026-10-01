@@ -695,7 +695,8 @@ by rewriting vertices on the CPU (particles, the logo swirls) stays at 30.
   and presents the kept copy half a game frame later from its idle loop.
 - Off by default: `aurora_set_frame_interpolation`, `DOL_AURORA_FRAME_INTERP=1`; iOS Display >
   Smooth Motion (60 FPS). FPS counter: `aurora_set_fps_overlay` / `DOL_AURORA_SHOW_FPS=1` (top centre,
-  "60 FPS (game 30)"); the iOS Show FPS label gives the display rate too.
+  or a corner with `aurora_set_fps_overlay_position` / `DOL_AURORA_FPS_POSITION`; "60 FPS (game
+  30)"); the iOS Show FPS label gives the display rate too.
 - Debug: `DOL_AURORA_FRAME_INTERP_LOG`, `_TRACE=<game frame>` (per-draw outcome), `_DUMP=dir` with
   `_FROM`/`_TO` (real and in-between images), `_DUMP_PASSES`, `_T=<weight>`.
 
