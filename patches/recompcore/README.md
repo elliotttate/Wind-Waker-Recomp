@@ -8,11 +8,13 @@ The build uses a fork instead. BlueWake's is https://github.com/chrissotraidis/R
 `bluewake`, commit 2d6063614a9bc899f6b4d11c7e7b3cd66e4d96f3: it contains the changes here through 0097
 (some were revised by later ones), the files that were never committed on the development Mac, and the
 DolRecomp submodule pointing at https://github.com/chrissotraidis/DolRecomp (5c91d6e). Wind Waker Recomp
-builds from its own copy, https://github.com/elliotttate/RecompCore, commit 7c62903 (branch
+builds from its own copy, https://github.com/elliotttate/RecompCore, commit b4e4d03 (branch
 `windows-release`): 8ab24da (branch `bluewake`) plus 0117, the render worker paused while the
 swapchain changes (a fullscreen crash), 0118, guest MEM1 through a global array where the module
-provides one, 0119, up to 7 in-between frames and none while the game runs slow, and 0120, the
-dual-texture post transform (the lava's colour). 8ab24da is branch `bluewake`'s 6892947 (that tree plus 0098
+provides one, 0119, up to 7 in-between frames and none while the game runs slow, 0120, the
+dual-texture post transform (the lava's colour), and 0121, the window position passed through the
+Aurora backend config (RecompCore#2; until it merges, the commit is fetched from the pull request's
+ref). 8ab24da is branch `bluewake`'s 6892947 (that tree plus 0098
 to 0110), the Windows port's 0111 to 0116
 (the shader and pipeline caches where the host says, gather-pipe writes as a run of bytes, the GX stall
 watchdog on Mac and Linux only, constant blocks compared against a copy where staging is upload memory,
