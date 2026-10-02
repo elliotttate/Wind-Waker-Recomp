@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "gxruntime/aurora_backend.h"
+#include <aurora/gfx.h>
 
 extern "C" {
 // runtime/host/src/mouse_camera.h and game_options.h, declared here with plain
@@ -97,6 +98,9 @@ struct Settings {
                                 // kStepsDisplay (as many as the display shows, shown_steps)
     bool show_fps = false;
     bool pause_unfocused = false;
+    // At start, the game waits until the pipelines saved from earlier play
+    // (and the bundled seed) are compiled (shader_wait_hold).
+    bool shaders_first = false;
     bool fast_forward = true;  // skip through the black while loading (fast_load.h)
     bool quick_doors = true;   // no walk-in or door closing behind Link (quick_doors.h)
     bool climb = false;        // climb any wall on a stamina wheel (climb.h)
@@ -179,6 +183,7 @@ void load_file() {
         else if (k == "climb_stamina") d.climb_stamina = std::clamp(std::atoi(v.c_str()), 4, 30);
         else if (k == "show_fps") d.show_fps = parse_bool(v);
         else if (k == "pause_unfocused") d.pause_unfocused = parse_bool(v);
+        else if (k == "compile_shaders_first") d.shaders_first = parse_bool(v);
         else if (k == "mouse_camera") d.mouse_camera = parse_bool(v);
         else if (k == "mouse_sensitivity") d.mouse_sensitivity = std::clamp(std::atof(v.c_str()), 0.1, 10.0);
         else if (k == "mouse_invert_y") d.mouse_invert_y = parse_bool(v);
@@ -215,6 +220,7 @@ void save_file() {
         std::fprintf(f, "window_position=%d,%d\n", d.window_x, d.window_y);
     std::fprintf(f, "render_scale=%d\nanisotropy=%d\nsmooth_motion=%d\nshow_fps=%d\npause_unfocused=%d\n",
                  d.render_scale, d.anisotropy, d.smooth_motion, d.show_fps, d.pause_unfocused);
+    std::fprintf(f, "compile_shaders_first=%d\n", d.shaders_first);
     std::fprintf(f, "smooth_motion_fps=%s\nfast_forward=%d\nquick_doors=%d\n",
                  d.smooth_steps == kStepsDisplay ? "display" : d.smooth_steps >= 3 ? "120" : "60",
                  d.fast_forward, d.quick_doors);
@@ -599,6 +605,12 @@ void tab_display(SDL_Window* w) {
         aurora_set_pause_on_focus_lost(d.pause_unfocused);
         changed();
     }
+    if (ImGui::Checkbox("Compile shaders before playing", &d.shaders_first))
+        changed();
+    restart_note(d.shaders_first != g_launched.shaders_first);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("At start, wait until the shaders from earlier play are ready, so nothing is missing "
+                          "from the picture the first time it is drawn. Otherwise they are made while you play.");
     ImGui::Spacing();
     if (ImGui::Button("Reset the window"))
         reset_window(w);
@@ -990,6 +1002,58 @@ void draw_climb_wheel() {
     list->PathStroke(color, 0, thick);
 }
 
+// Compile shaders before playing: the game is held at its first present
+// (dol_aurora_set_hold, the picture redrawn under this overlay) until every
+// pipeline the cache queued at start is compiled, or two minutes have passed.
+// They compile on several threads (Aurora's pipeline cache), and while the
+// game is held it asks for nothing new. Otherwise they compile while the game
+// runs, and a draw whose pipeline is not ready yet is left out of its frame.
+bool g_shader_wait;
+Uint64 g_shader_wait_since;
+uint32_t g_shader_wait_first;
+
+bool shader_wait_hold(void*) {
+    if (!g_shader_wait)
+        return false;
+    const AuroraStats* stats = aurora_get_stats();
+    const uint32_t left = stats != nullptr ? stats->queuedPipelines : 0u;
+    if (g_shader_wait_since == 0) {
+        g_shader_wait_since = SDL_GetTicks();
+        g_shader_wait_first = left;
+    }
+    const Uint64 waited = SDL_GetTicks() - g_shader_wait_since;
+    if (left == 0u || waited > 120000) {
+        g_shader_wait = false;
+        std::fprintf(stderr, "[windows] shaders compiled before play: %u in %.1f s%s\n", g_shader_wait_first,
+                     waited / 1000.0, left != 0u ? " (stopped waiting)" : "");
+        return false;
+    }
+    return true;
+}
+
+void draw_shader_wait(SDL_Window* w) {
+    if (!g_shader_wait)
+        return;
+    const AuroraStats* stats = aurora_get_stats();
+    const uint32_t left = stats != nullptr ? stats->queuedPipelines : 0u;
+    ImGuiIO& io = ImGui::GetIO();
+    const float scale = ui_scale(w);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowBgAlpha(0.75f);
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
+                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    if (ImGui::Begin("##bluewake-shaders", nullptr, flags)) {
+        ImGui::SetWindowFontScale(scale / g_font_scale);
+        ImGui::Text("Compiling shaders: %u to go", left);
+        if (g_shader_wait_first > 0u)
+            ImGui::ProgressBar(1.f - static_cast<float>(left) / static_cast<float>(g_shader_wait_first),
+                               ImVec2(260.f * scale, 0.f), "");
+    }
+    ImGui::End();
+}
+
 // For the first few seconds, where the settings and fullscreen are.
 void draw_hint(SDL_Window* w) {
     const Uint64 shown = SDL_GetTicks() - g_first_frame_at;
@@ -1102,6 +1166,7 @@ void frame(void*) {
         }
     }
     draw_climb_wheel();
+    draw_shader_wait(w);
     if (g_menu_open)
         draw_menu(w);
     draw_hint(w);
@@ -1272,6 +1337,13 @@ extern "C" int bw_settings_finish_restart(void) {
 
 extern "C" void bw_settings_install(void) {
     dol_aurora_set_overlay(frame, nullptr);
+    // BLUEWAKE_SHADERS_FIRST=0/1 overrides the setting (testing).
+    const char* first = std::getenv("BLUEWAKE_SHADERS_FIRST");
+    g_shader_wait = first != nullptr && first[0] != '\0' ? first[0] != '0' : g_saved.shaders_first;
+    if (g_shader_wait) {
+        dol_aurora_set_hold(shader_wait_hold, nullptr);
+        dol_aurora_set_hold_redraw(true);
+    }
     std::atexit(save_at_exit);
 }
 
