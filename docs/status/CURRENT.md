@@ -1,3 +1,50 @@
+## 2026-10-02 A crash after a save state loads: Dawn used from several threads without its lock
+
+**What was wrong.** About one boot in ten straight into a save state (`BLUEWAKE_LOAD_STATE`) crashed in the
+first frames after the load: an access violation reading 0x40 inside webgpu_dawn.dll, under the GX worker's
+`wgpuDeviceCreateBindGroup` (gxcore `submit_draw_plan`'s single-texture bind group), and exit 0xC0000374
+(heap corruption). Aurora calls Dawn from three threads: the GX worker makes textures, samplers and bind
+groups; the render worker records, submits and frees each frame's (an EFB copy that is scaled or converted
+makes a bind group with a sampler every frame, freed with the frame); the main thread presents, and when a
+state loads it frees the whole texture cache. The device was created without Dawn's
+`ImplicitDeviceSynchronization` feature, so Dawn took no lock, and its D3D12 backend is not safe that way:
+the sampler descriptors of every bind group live in one `absl::flat_hash_set` (`SamplerHeapCache`, an entry
+inserted with the first bind group of a sampler set and erased with the last), and texture memory is freed
+through plain queues (`ResourceAllocatorManager`). A lookup that reads a slot in the middle of a rehash gets a
+null entry, and an entry's sampler list ends at offset 0x40. After a load every texture is new, so the GX
+worker makes hundreds of bind groups and textures in exactly the frames the render worker's copy bind groups
+come and go. None of the suspects in Aurora's own code was it: texture views are made with their textures,
+samplers and the bind group layout come from caches that hold them, and the GX worker's last-bind memo only
+matches within one frame, while the bind group it names is cached and so holds the view (a window resize,
+which empties that cache, is the one exception; no resize happens in these runs).
+
+**The change** (RecompCore 31401e5, patch 0121): the device asks for `ImplicitDeviceSynchronization`
+where the adapter offers it (Dawn does on every backend). Object creation, queue work, presents and an
+object's last release then take the device's mutex; encoding, pipeline and shader-module creation and
+texture views do not, and Dawn runs callbacks with the mutex released (it asserts so), so the map callbacks'
+own locks cannot deadlock against it. The log says `Device lock (implicit device synchronization): on`;
+`DOL_AURORA_DEVICE_LOCK=0` turns it off for comparison.
+
+**Checked** (i9 + RTX 5090, the 0.3.0 module, two runs at a time, each with a fresh data folder):
+- Booting into `build/windows/test-saves/gohma-lava.bwstate` held to two logical CPUs (affinity 0x3, which
+  makes the race likely): before, 3 of 24 runs crashed (0xC0000374, 2-5 s in, at the first frames after the
+  load); the new app with the lock off, 2 of 32; with it on, 0 of 80. Unheld: before, 1 of 40; lock off,
+  0 of 40; lock on, 0 of 60.
+- Under cdb (`-hd`: the debug heap hid it in 40 runs) one baseline run stopped in the GX worker's
+  `CreateTexture` (`new_dynamic_texture_2d`), in `free` of a heap block whose header held the text
+  "Dawn_Int": the heap was already corrupt, the same race seen from another call.
+- A two-thread program doing what the GX and render workers do (sampler bind groups made and freed on both,
+  release toggles): without the lock 3 of 3 ten-second runs crashed or hung; with it, 3 of 3 ran clean.
+- Speed: the GX worker calls Dawn only when it uploads a texture (263 times on the whole Outset route), and
+  the game thread calls nothing that takes the lock, so in steady play only the render worker takes it.
+  The same app with the lock off and on, interleaved, on four of the i9's E-cores (Outset route, unpaced,
+  `smooth_motion=0`, six runs each): game FPS standing 36.8 off and 35.6 on, running 36.8 and 36.2 (single
+  runs 34-39 either way, with another BlueWake being played on the PC meanwhile); game-thread CPU per game
+  frame 23.4 and 23.4 ms standing, 24.3 and 24.5 running. Smooth Motion 60, paced: 30 game and 60 shown FPS
+  both ways.
+
+The Mac line (RecompCore `bluewake`) creates its device the same way and needs the same commit.
+
 ## 2026-10-01 Controller haptics: the game's vibration shaped, the triggers, and a rumble that never reached a controller
 
 **The rumble never reached a controller.** The host forwards the motor bits the pad library writes to
