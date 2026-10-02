@@ -70,6 +70,9 @@ add_library(${MODULE_NAME} SHARED
   native_j3d.c
   # Certified game math entry hooks (scripts/windows/native_game_math.py).
   native_game_math.c
+  # Certified native entries, the second set (scripts/windows/native_entries.py).
+  native_fifo.c
+  native_bg.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c
