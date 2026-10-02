@@ -188,9 +188,14 @@ target_link_libraries(bluewake_disc_extract PRIVATE bluewake_posix_compat bcrypt
 # The app folder: the executable, its runtime DLLs (SDL3, Dawn and the DXC
 # shader compiler Dawn loads for Direct3D 12) and Aurora's bundled pipeline
 # cache. The builder adds the game module and the prepared game files.
+# The Windows seed (windows/resources) is the Mac's 213 pipelines and those a
+# tour of the game asked for (towns, islands, dungeons and their bosses,
+# interiors, the sea): 513, compiled on several threads at start, so a place's
+# first visit draws everything from its first frame. Its rows are pipeline
+# state keys, not game data.
 include(${GXRUNTIME_DIR}/graphics/aurora/cmake/AuroraCopyRuntimeDLLs.cmake)
 aurora_copy_runtime_dlls(BlueWake)
-set(BLUEWAKE_PIPELINE_SEED "${BLUEWAKE_REPO_ROOT}/apple/ios/resources/initial_pipeline_cache.db")
+set(BLUEWAKE_PIPELINE_SEED "${BLUEWAKE_REPO_ROOT}/windows/resources/initial_pipeline_cache.db")
 add_custom_command(TARGET BlueWake POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${BLUEWAKE_PIPELINE_SEED}" $<TARGET_FILE_DIR:BlueWake>
