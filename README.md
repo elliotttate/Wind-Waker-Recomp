@@ -66,10 +66,12 @@ this is a static recompilation with a hardware compatibility layer, not an "emul
 What Wind Waker Recomp adds to the game. Most of it is an option in the settings (F1), so you can play
 with as much or as little of it as you like.
 
-**New in 0.3.0 (Windows):** the game runs about 13 percent faster, slower CPUs no longer play in slow
-motion with frame interpolation on (it steps aside until the CPU can keep up), and frame interpolation
-can match the display, up to 240 FPS. **New in 0.2.0:** [save states](#save-states) and
-[climbing any wall](#climb-any-wall) on Windows and Mac.
+**New in 0.4.0 (Windows):** the lava in Dragon Roost Cavern glows in its colours again (it drew white),
+and the game's own vibration reaches your controller, shaped by its strength, with Xbox and DualSense
+trigger feedback. **New in 0.3.0 (Windows):** the game runs about 13 percent faster, slower CPUs no
+longer play in slow motion with frame interpolation on, and frame interpolation can match the display,
+up to 240 FPS. **New in 0.2.0:** [save states](#save-states) and [climbing any wall](#climb-any-wall) on
+Windows and Mac.
 
 ### Picture and frame rate
 
@@ -99,7 +101,7 @@ can match the display, up to 240 FPS. **New in 0.2.0:** [save states](#save-stat
 | --- | --- |
 | **Controllers** | Xbox, PlayStation, Switch Pro and other controllers work as a GameCube pad, next to the keyboard and mouse |
 | **Fast right-stick camera** (Windows, Mac) | The right stick turns the view directly, like a mouse, instead of the game's eased C-stick camera, and aims in first person and with items; its click is first person. The left stick zooms the telescope and the Picto Box. The game's own camera is an option |
-| **Controller vibration** (Windows, Mac) | The game's own vibration (hits, falls, explosions, bosses, quakes), felt as it was timed but shaped by its strength on both motors instead of the GameCube's on and off, with Xbox impulse triggers and DualSense trigger vibration on the strong ones. Enhanced (the default), Classic (the game's on and off) or Off, and a strength, under Controls |
+| **Controller vibration** (Windows; the Mac with its next build) | The game's own vibration (hits, falls, explosions, bosses, quakes), felt as it was timed but shaped by its strength on both motors instead of the GameCube's on and off, with Xbox impulse triggers and DualSense trigger vibration on the strong ones. Enhanced (the default), Classic (the game's on and off) or Off, and a strength, under Controls |
 | **Mouse camera** (Windows, Mac) | Click the game and move the mouse to turn the camera; left click is A, the wheel zooms |
 | **Camera that stays out of the ground** | By stick or mouse, the camera stays out of the ground and the water |
 | **Touch controls** (iPhone, iPad) | On-screen controls with a layout editor, plus controllers and keyboards |
@@ -259,7 +261,8 @@ game's code. Details are in [docs/MODS.md](docs/MODS.md).
 - **Laptops with integrated graphics** (such as Intel UHD) can run slowly. Turn Smooth Motion off (F10)
   and set **Render resolution** to 1x: Smooth Motion draws each frame a second time to show 60 FPS.
   Before 0.3.0, Smooth Motion on a CPU with few cores could also slow the game itself down.
-- **Mac:** lava in Dragon Roost Cavern's areas renders as flat orange instead of its bright pattern.
+- **Mac:** lava in Dragon Roost Cavern's areas renders as flat orange instead of its bright pattern. Windows
+  0.4.0 fixes it (it drew white there); the Mac gets the fix with its next build.
 - **120 FPS** needs a display of 100 Hz or more (on a 60 Hz display Windows shows 60 instead), and the
   busiest scenes can dip below 120. **Match the display** (up to 240 FPS) needs a fast PC, and has been
   tested with a simulated 240 Hz display, not yet a real one.
@@ -317,8 +320,9 @@ longer need from the `states` folder.
 Yes. On Windows and Mac, controllers work as a GameCube pad (Xbox, PlayStation, Switch Pro and others),
 next to the keyboard and mouse. The right stick turns the camera directly and aims, its click goes into
 first person and back out, and the left bumper jumps; the game's own eased right-stick camera is an option
-under Controls. The game's vibration is felt on both motors, shaped by how strong the game made it, with
-an Xbox controller's impulse triggers and a DualSense's trigger vibration on strong hits. On iPhone and iPad, controllers that iOS supports work, with camera
+under Controls. On Windows the game's vibration is felt on both motors, shaped by how strong the game
+made it, with an Xbox controller's impulse triggers and a DualSense's trigger vibration on strong hits
+(the Mac gets it with its next build). On iPhone and iPad, controllers that iOS supports work, with camera
 inversion and button remapping under **⋯ › Controller**, and the game's rumble is passed to the controller.
 
 ### Will updates keep my saves?

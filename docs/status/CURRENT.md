@@ -1,3 +1,25 @@
+## 2026-10-02 Windows 0.4.0: the lava's colour and controller vibration
+
+Published as v0.4.0 (tag at main d102695) with the Mac's 0.2.0 build: Windows from windows-release 7ca0cb9,
+RecompCore 7c62903 (the lava fix below and the haptics work above). The builder reused 0.3.0's optimization
+profile (ffd6459b: the parts of RecompCore compiled into the module did not change) and recompiled the
+module in 35 minutes; module 48a97a5d, x64 zip 24dc9703, source zip dc8c57c8.
+
+**Checked** (the release's binaries):
+- The lava in Dragon Roost Cavern's big lava room draws orange with glowing domes and the dark crust.
+- Outset's synchronous captures (`DOL_GX_FIFO_WORKER=0`): 19 of 19 identical to 0.3.0's.
+- Speed, 4 E-cores (`0x000F0000`), unpaced, interpolation off, three runs each: game-thread CPU per game
+  frame 23.0-25.0 ms against 0.3.0's 22.5-24.3, the same within the noise; game frames a second ranged
+  33-38 for both, moved by whatever else the PC ran (one pair of runs came out 32.9/34.2 against
+  34.5/34.0).
+- The zip as a player gets it: first launch from the `.rvz`, full speed with frame interpolation (59.9
+  shown, 30 game), a save state saved and loaded, closed with exit code 0. States made with 0.3.0's module
+  load.
+
+`build\windows\BlueWake` is now 0.4.0; the hard-linked test copies made from it (BlueWake-rc and the
+others) changed with it, since the builder copies over its files in place. `build\windows\Rel030` is 0.3.0
+(from its zip, with the disc files linked in) for comparisons.
+
 ## 2026-10-01 Controller haptics: the game's vibration shaped, the triggers, and a rumble that never reached a controller
 
 **The rumble never reached a controller.** The host forwards the motor bits the pad library writes to
