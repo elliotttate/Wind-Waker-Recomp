@@ -440,14 +440,16 @@ int main(int argc, char** argv) {
             memcpy(at(source, r4), pairs[p][1], strlen(pairs[p][1]) + 1u);
         } else {
             /* A table whose entries differ from the name at the first byte
-             * but for every 16th, "ikada_h" at entry 383; that name, and one
-             * it lacks. */
+             * but for three before entry 383, "ikada_h" (as at Dragon Roost);
+             * that name, and one it lacks. */
             for (u32 e = 0; e < ENTRIES; ++e) {
                 u8* entry = at(source, TABLE + 12u * e);
-                entry[0] = e % 16u == 0u ? 'i' : (u8)('A' + e % 26u);
+                entry[0] = (u8)('A' + e % 26u);
                 for (u32 k = 1; k < 8u; ++k)
                     entry[k] = k < 6u ? (u8)("ab01_"[(e + k) % 5u]) : 0u;
             }
+            for (u32 e = 0; e < 3u; ++e)
+                memcpy(at(source, TABLE + 12u * (100u * e + 7u)), "itemFLY", 8u);
             memcpy(at(source, TABLE + 12u * 383u), "ikada_h", 8u);
             r3 = AREA + 0x300u;
             memcpy(at(source, r3), p == 4u ? "ikada_x" : "ikada_h", 8u);

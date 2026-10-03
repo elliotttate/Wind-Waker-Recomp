@@ -645,20 +645,27 @@ int main(int argc, char** argv) {
             printf("strcmp(\"%s\", \"%s\"): translation %.1f ns/call through the dispatcher, native %.1f ns/call\n",
                    pairs[p][0], pairs[p][1], best_t, best_n);
         }
-        /* dStage_searchName: a table whose entries differ from the name at
-         * the first byte but for every 16th (which shares it), the name at
-         * entry 383 (as "ikada_h" is), and a name it lacks. */
-        build_table(native_ram, 1);
-        for (u32 e = 0; e < ENTRIES; ++e) {
-            u8* entry = at(native_ram, TABLE + 12u * e);
-            entry[0] = e % 16u == 0u ? 'i' : (u8)('A' + e % 26u);
-        }
-        memcpy(at(native_ram, TABLE + 12u * 383u), "ikada_h", 8u);
+        /* dStage_searchName: tables whose entries differ from the name at
+         * the first byte but for three before entry 383 (as at Dragon Roost,
+         * where "ikada_h" is entry 383 and only "item", "itemFLY" and
+         * "itemDek" share its first letter), or for every 16th; the name at
+         * entry 383, and a name the table lacks. */
         const u32 names[2] = {AREA + 0x100u, AREA + 0x200u};
-        memcpy(at(native_ram, names[0]), "ikada_h", 8u);
-        memcpy(at(native_ram, names[1]), "ikada_x", 8u);
-        copy_areas(reference_ram, native_ram);
-        for (unsigned p = 0; p < 2; ++p) {
+        for (unsigned v = 0; v < 3u; ++v) {
+            const bool dense = v == 1u;
+            const unsigned p = v == 2u ? 1u : 0u;
+            build_table(native_ram, 1);
+            for (u32 e = 0; e < ENTRIES; ++e) {
+                u8* entry = at(native_ram, TABLE + 12u * e);
+                entry[0] = dense && e % 16u == 0u ? 'i' : (u8)('A' + e % 26u);
+            }
+            if (!dense)
+                for (u32 e = 0; e < 3u; ++e)
+                    memcpy(at(native_ram, TABLE + 12u * (100u * e + 7u)), "itemFLY", 8u);
+            memcpy(at(native_ram, TABLE + 12u * 383u), "ikada_h", 8u);
+            memcpy(at(native_ram, names[0]), "ikada_h", 8u);
+            memcpy(at(native_ram, names[1]), "ikada_x", 8u);
+            copy_areas(reference_ram, native_ram);
             double best_t = 1e30, best_n = 1e30;
             const unsigned calls = bench_calls / 20u + 1u;
             for (unsigned round = 0; round < 5; ++round) {
@@ -687,9 +694,11 @@ int main(int argc, char** argv) {
                 if (t < best_t) best_t = t;
                 if (n < best_n) best_n = n;
             }
-            printf("dStage_searchName(\"%s\") (%s): translation %.1f ns/call through the dispatcher, native "
+            printf("dStage_searchName(\"%s\") (%s; %s): translation %.1f ns/call through the dispatcher, native "
                    "%.1f ns/call\n",
-                   p == 0 ? "ikada_h" : "ikada_x", p == 0 ? "entry 383" : "not in the table", best_t, best_n);
+                   p == 0 ? "ikada_h" : "ikada_x", p == 0 ? "entry 383" : "not in the table",
+                   dense ? "every 16th entry shares its first letter" : "3 entries share its first letter", best_t,
+                   best_n);
         }
     }
     return 0;

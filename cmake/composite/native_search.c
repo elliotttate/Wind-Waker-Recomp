@@ -1,4 +1,5 @@
-/* The actor search by name (GZLE01 strcmp and dStage_searchName), native.
+/* The actor search by name (GZLE01 strcmp, dStage_searchName, and
+ * cTgIt_JudgeFilter with fopAcM_findObjectCB as its judge), native.
  *
  * fopAcM_searchFromName walks every actor, and for each one its judge,
  * fopAcM_findObjectCB, calls dStage_searchName(name) - the same name every
@@ -49,8 +50,13 @@
  * to asks the host anything, and the result is the same however each call
  * is made.
  *
- * tests/native_search_test.c compares both with the translation, every
- * register and byte. No identifier here may be `ctx`. */
+ * The judge - cTgIt_JudgeFilter's call of fopAcM_findObjectCB, and the walk
+ * over every actor batched for the host - is a separate section at the end,
+ * with its own comment.
+ *
+ * tests/native_search_test.c compares strcmp and dStage_searchName with the
+ * translation, every register and byte; tests/native_search_judge_test.c the
+ * judge. No identifier here may be `ctx`. */
 #include "native_search.h"
 #include "direct_calls.h"
 
@@ -78,7 +84,7 @@ void bluewake_native_search_report(void) {
 #define SEARCH_ENTRIES 0x339u      /* 825 */
 #define SEARCH_ENTRY_BYTES 12u
 #define SEARCH_RETURN 0x80041578u  /* dStage_searchName's return from strcmp */
-/* Every block's suffix stays below this, and so does every block's length. */
+/* Above every suffix on these paths (strcmp's word load, 7, is the largest). */
 #define SEARCH_DEADLINE_MIN 8
 
 static int search_judge_filter(CPUState* cpu); /* the judge's section, below */
@@ -810,12 +816,15 @@ static int search_judge_filter(CPUState* cpu) {
     const u32 limit = search_limit(cpu);
     JudgeSearch s;
     JudgeCall c;
+    if (limit < SEARCH_JUDGE_CALL)
+        return 0;
     s.judge = 0u;
-    if (limit < SEARCH_JUDGE_CALL || !judge_search(cpu, limit, &s) || !judge_call(cpu, &s, cpu->gpr[3], &c) ||
-        c.cycles > limit) {
-        s_judge_other += s.judge != SEARCH_FIND_OBJECT; /* another kind of search */
+    if (!judge_search(cpu, limit, &s)) {
+        s_judge_other += s.judge != SEARCH_FIND_OBJECT; /* not fopAcM_findObjectCB's search */
         return 0;
     }
+    if (!judge_call(cpu, &s, cpu->gpr[3], &c) || c.cycles > limit)
+        return 0;
     const u32 lr = cpu->lr;
     judge_stores(cpu, &s, lr, cpu->gpr[29], cpu->gpr[30], cpu->gpr[31], c.actor);
     cpu->ctr = s.judge;
