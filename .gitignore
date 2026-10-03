@@ -54,3 +54,9 @@ cmake-build-*/
 .vscode/
 *.swp
 *~
+
+# Android: personal builds (translated game code) and signing
+*.apk
+*.so
+*.keystore
+*.jks
