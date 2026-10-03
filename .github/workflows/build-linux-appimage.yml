@@ -1,0 +1,82 @@
+name: build-linux-appimage
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Clang 18 + llvm-profdata for the composite build and PGO training.
+      - name: Install LLVM/Clang
+        run: |
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18 all
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100 \
+            --slave /usr/bin/clang++ clang++ /usr/bin/clang++-18 \
+            --slave /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-18
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config libssl-dev \
+            libx11-dev libxext-dev libxrender-dev libxcursor-dev libxrandr-dev \
+            libxss-dev libxfixes-dev libxi-dev libwayland-dev libasound2-dev \
+            libpulse-dev libudev-dev libdbus-1-dev desktop-file-utils zsync \
+            libfreetype-dev libpng-dev zlib1g-dev libbz2-dev libzstd-dev \
+            libbrotli-dev libsqlite3-dev curl file
+
+      - name: Install appimagetool
+        run: |
+          wget -q -O appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool
+          sudo mv appimagetool /usr/local/bin/
+
+      # The disc is a repo secret (GZLE01 rev 0 .iso). It is used only to
+      # translate the game module; it is never committed or uploaded.
+      - name: Build host + game module + PGO train
+        env:
+          GZLE01_ISO_B64: ${{ secrets.GZLE01_ISO_B64 }}
+        run: |
+          if [ -z "$GZLE01_ISO_B64" ]; then
+            echo "::warning::GZLE01_ISO_B64 secret not set -- building host only (no game module)"
+          else
+            echo "$GZLE01_ISO_B64" | base64 -d > /tmp/GZLE01.iso
+            scripts/linux/build.sh /tmp/GZLE01.iso --no-train
+          fi
+          # Always build the host (asset-independent half) so the job is
+          # exercisable without the secret.
+          if [ ! -f build/host-linux/host/bluewake_host ]; then
+            mkdir -p build/host-linux
+            cmake -S scripts/builder/training -B build/host-linux -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+              -DAURORA_DAWN_PROVIDER=system -DCMAKE_PREFIX_PATH="$PWD/dawn" \
+              -DAURORA_SDL3_PROVIDER=vendor -DAURORA_SDL3_LINKAGE=shared \
+              -DAURORA_DAWN_LINKAGE=static -DBLUEWAKE_ENABLE_DSP_ADAPTER=OFF
+            cmake --build build/host-linux --target bluewake_host -j"$(nproc)"
+          fi
+
+      - name: Package AppImage + zsync
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          scripts/linux/make_appimage.sh --version "$VERSION" \
+            --out "dist/Wind-Waker-Recomp-x86_64.AppImage"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.AppImage
+            dist/*.zsync
+            dist/SHA256SUMS
+          generate_release_notes: true
