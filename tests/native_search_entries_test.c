@@ -289,6 +289,7 @@ static void copy_regions(u8* to, const u8* from) {
  * a chunk left at a boundary goes on in the chunk that has the address, as
  * the chassis loop (its edge filter letting every boundary pass) would. A
  * spent budget ends the run, as it ends the loop's. */
+static bool s_host_walk; /* the timing: the host's service batches the walk */
 static int run_routed(u32 entry) {
     CPUState* c = &bw_guest_cpu;
     c->pc = entry;
@@ -299,6 +300,8 @@ static int run_routed(u32 entry) {
             return 2;
         if (s_stop_address != 0u && c->pc == s_stop_address)
             return 3; /* where the module's run asked its edge service */
+        if (s_host_walk && c->pc == BLUEWAKE_SEARCH_JUDGE_FILTER)
+            bluewake_native_search_judge(c); /* where the host's edge service would call it */
         BwChunkFn fn = bw_find_chunk(c->pc);
         if (fn == NULL) {
             fprintf(stderr, "no linked chunk at %08X\n", c->pc);
@@ -508,6 +511,63 @@ int main(int argc, char** argv) {
             printf("cTgIt_JudgeFilter(a node, fopAcM_findObjectCB's search for \"ikada_h\"): hooked chunks %.1f "
                    "ns/call with the natives off, %.1f on (%.2fx)\n",
                    best[0], best[1], best[0] / best[1]);
+    }
+
+    /* The walk itself: cNdIt_Judge from its loop's call block over 64 nodes
+     * none of whose actors is the one searched for, through the hooked
+     * chunks, with this test's loop between them (no edge service: the
+     * host's would add its own time to each node in the translation), the
+     * natives off, on, and on with the walk batched where the host's edge
+     * service would call it. */
+    {
+        const u32 prm = AREA + 0x5000u, filter = AREA + 0x5020u, nodes = AREA + 0x7000u, actors = AREA + 0x8000u;
+        const unsigned count = 64u;
+        put(source, prm, AREA + 0x300u); /* "ikada_h", entry 383 of the table above */
+        put(source, prm + 4u, 0u);
+        put(source, prm + 8u, 0u);
+        put(source, filter, FIND_OBJECT);
+        put(source, filter + 4u, prm);
+        for (unsigned i = 0; i < count; ++i) {
+            put(source, nodes + 16u * i + 8u, i + 1u < count ? nodes + 16u * (i + 1u) : 0u);
+            put(source, nodes + 16u * i + 12u, actors + 0x200u * (i % 16u));
+        }
+        for (unsigned i = 0; i < 16u; ++i)
+            *at(source, actors + 0x200u * i + 14u) = 0x7Fu; /* never the entry's procname */
+        CPUState walk = start;
+        walk.gpr[1] = AREA + 0xE000u;
+        put(source, walk.gpr[1] + 36u, RETURN_ADDRESS); /* cNdIt_Judge's saved LR */
+        walk.gpr[3] = nodes;
+        walk.gpr[31] = nodes + 16u;
+        walk.gpr[29] = BLUEWAKE_SEARCH_JUDGE_FILTER;
+        walk.gpr[30] = filter;
+        copy_regions(routed_ram, source);
+        double best[3] = {1e30, 1e30, 1e30};
+        for (unsigned round = 0; round < 9u; ++round) {
+            const unsigned mode = round % 3u;
+            bluewake_native_search_enabled = mode != 0u;
+            s_host_walk = mode == 2u;
+            const unsigned walks = 400u;
+            LARGE_INTEGER f, t0, t1;
+            QueryPerformanceFrequency(&f);
+            QueryPerformanceCounter(&t0);
+            for (unsigned k = 0; k < walks; ++k) {
+                bw_guest_cpu = walk;
+                bw_guest_cpu.ram = routed_ram;
+                if (run_routed(0x80244F78u) != 1) {
+                    fprintf(stderr, "the walk did not finish\n");
+                    return 1;
+                }
+            }
+            QueryPerformanceCounter(&t1);
+            const double ns = (double)(t1.QuadPart - t0.QuadPart) * 1e9 / (double)f.QuadPart / walks / count;
+            if (ns < best[mode])
+                best[mode] = ns;
+        }
+        s_host_walk = false;
+        printf("cNdIt_Judge's walk over 64 actors, fopAcM_findObjectCB's search for \"ikada_h\": hooked chunks "
+               "%.1f ns/node with the natives off, %.1f on (%.2fx), %.1f with the walk batched (%.0fx)\n",
+               best[0], best[1], best[0] / best[1], best[2], best[0] / best[2]);
+        bluewake_native_search_judge_report();
     }
     return 0;
 }
