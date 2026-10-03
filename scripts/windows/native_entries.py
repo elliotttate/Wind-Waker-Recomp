@@ -68,7 +68,28 @@ ENTRIES = {
                  "d491b8f1f60e6ad9ae20524d879bb8b1d74d9608e919e6c07601e8dcfa69227f"),
     0x8030DB24: ("PSMTXMultVecSR", "vec_sr", [(0x8030D6E0, 0x8030DB24, 0x8030DB78)],
                  "600139a8e4e0caabf4a3006b3eb737577c0934568e1741186eeec1b9565b7db9"),
+    # The joint matrix calculations, and the callees they stand in for too:
+    # J3DGetTranslateRotateMtx (802DA64C or 802DA724), PSMTXConcat (8030D0FC),
+    # PSMTXCopy (8030D0C8).
+    0x802F5090: ("J3DMtxCalcBasic::calcTransform", "mtxcalc",
+                 [(0x802F16E0, 0x802F5090, 0x802F525C), (0x802D96E0, 0x802DA64C, 0x802DA724),
+                  (0x803096E0, 0x8030D0FC, 0x8030D1C8), (0x803096E0, 0x8030D0C8, 0x8030D0FC)],
+                 "3e442f9bac67c268093ed4abdbcb9c4659fad59339a700282a7eb9e023b11d67"),
+    0x802F52BC: ("J3DMtxCalcSoftimage::calcTransform", "mtxcalc",
+                 [(0x802F16E0, 0x802F52BC, 0x802F5508), (0x802D96E0, 0x802DA724, 0x802DA7E4),
+                  (0x803096E0, 0x8030D0FC, 0x8030D1C8), (0x803096E0, 0x8030D0C8, 0x8030D0FC)],
+                 "7ad20637ab7fb125cfee5c1aa81bd982abfc8bbe5f26747bae359fa320fd56d2"),
+    0x802F5508: ("J3DMtxCalcMaya::calcTransform", "mtxcalc",
+                 [(0x802F16E0, 0x802F5508, 0x802F56E0), (0x802F56E0, 0x802F56E0, 0x802F5724),
+                  (0x802D96E0, 0x802DA64C, 0x802DA724), (0x803096E0, 0x8030D0FC, 0x8030D1C8),
+                  (0x803096E0, 0x8030D0C8, 0x8030D0FC)],
+                 "8df3c54d0620dc3152b7b640038b7637d9514d3e51cd6133f4dfb4b836f9c324"),
 }
+# prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
+# (it runs first): not part of the translation certified here.
+J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"
+                      r"    if \(bluewake_native_j3d_enabled && bluewake_native_j3d_transform\(ctx, 0x[0-9A-F]{8}u\)\)\n"
+                      r"        goto return_dispatch_[0-9A-F]{8};\n")
 
 LABEL = re.compile(r"\n(?:label_([0-9A-F]{8})|return_dispatch_[0-9A-F]{8}):")
 FAST_JUMP = re.compile(r"\bgoto (bwfast_\d+);")
@@ -84,7 +105,7 @@ def hook_text(entry, chunk):
 def strip_hooks(text):
     for entry, (_, _, fragments, _) in ENTRIES.items():
         text = text.replace(hook_text(entry, fragments[0][0]), "")
-    return text
+    return J3D_HOOK.sub("", text)
 
 
 def main_function(text, chunk):
@@ -153,7 +174,11 @@ def entry_hash(texts, entry):
         body, copies = piece
         pieces.append(canonical(body))
         pieces += [canonical(copy) for copy in copies]
-        named |= addresses(strip_hooks(body))
+        # The inline register save and restore's fallback (the routine itself,
+        # 80328Fxx, through the chassis loop) runs only when the turn's budget
+        # is too short for the inline form, which the natives decline: the
+        # translation they replace never reaches it.
+        named |= addresses(re.sub(r"ctx->pc = 0x80328F[0-9A-F]{2}u;", "", strip_hooks(body)))
     return hashlib.sha256("\n".join(pieces).encode()).hexdigest(), named
 
 

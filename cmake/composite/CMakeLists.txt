@@ -73,6 +73,7 @@ add_library(${MODULE_NAME} SHARED
   # Certified native entries, the second set (scripts/windows/native_entries.py).
   native_fifo.c
   native_bg.c
+  native_mtxcalc.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c
