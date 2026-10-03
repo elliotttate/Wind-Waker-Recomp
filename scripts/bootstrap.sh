@@ -40,5 +40,7 @@ if [ -e ref/recompcore/.git ]; then
     git -C ref/recompcore submodule update --init -- DolRecomp
 fi
 
+python3 scripts/apply_recompcore_patches.py
+
 echo "Bootstrap complete."
 echo "For the iPad app, scripts/ios/build_device.sh fetches what it needs on its own (docs/status/DEVICE_BUILD.md)."

@@ -1,0 +1,24 @@
+{
+  "base_sha": "8ab24daee9c641634fda5cac30389ad4b2cfda5e",
+  "patch": "patches/recompcore/0170-mac-water-lava-and-smooth-hud.patch",
+  "sha256": "e1e89b059cd4d175fee78260c3671a3ffdafbbf8d1244e18043c15ba1bd221d5",
+  "includes": [
+    {
+      "patch": "patches/recompcore/0113-interpolate-indexed-cpu-deformed-vertices.patch",
+      "purpose": "smooth water deformation without interpolation flicker"
+    },
+    {
+      "patch": "patches/recompcore/0120-aurora-the-dual-texture-post-transform-so-lava-has-its-colour.patch",
+      "source_commit": "81d7345feef7cc4c3929d5aed1cf850ff8b5340a",
+      "purpose": "dual-texture post transforms for the lava crust and colour ramp"
+    },
+    {
+      "patch": "patches/recompcore/0140-keep-screen-space-hud-out-of-frame-matching.patch",
+      "purpose": "repeat screen-space HUD intact without matching unrelated digits or hearts"
+    },
+    {
+      "patch": "patches/recompcore/0160-interpolate-screen-sprites-by-local-artwork-and-bounds.patch",
+      "purpose": "restore smooth screen sprites with artwork identity and one-to-one local bounds matching, superseding the broad HUD exclusion"
+    }
+  ]
+}

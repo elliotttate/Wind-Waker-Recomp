@@ -7,6 +7,7 @@ extern "C" {
 #include "climb.h"
 #include "fast_load.h"
 #include "game_options.h"
+#include "forest_water.h"
 #include "haptics.h"
 #include "jump_button.h"
 #include "mouse_camera.h"
@@ -55,6 +56,7 @@ const char* const kKeys[] = {
     "BLUEWAKE_STICK_CAMERA_INVERT_X", "BLUEWAKE_STICK_CAMERA_INVERT_Y", "BLUEWAKE_STICK_AIM_SPEED",
     "BLUEWAKE_HAPTICS",         "BLUEWAKE_HAPTICS_STRENGTH", "BLUEWAKE_HAPTICS_TRIGGERS",
     "BLUEWAKE_CLIMB",           "BLUEWAKE_CLIMB_STAMINA",
+    "BLUEWAKE_FOREST_WATER_KEEP_TREES", "BLUEWAKE_FOREST_WATER_30_MINUTES",
 };
 
 std::string g_path;                          // the settings file ("" when none)
@@ -337,6 +339,21 @@ void gameplay_tab() {
         ImGui::Unindent();
         ImGui::EndDisabled();
     }
+
+    ImGui::Separator();
+    ImGui::TextUnformatted("Forest Water Challenge");
+    bool keep_trees = env_on("BLUEWAKE_FOREST_WATER_KEEP_TREES", false);
+    if (ImGui::Checkbox("Keep watered trees when time runs out", &keep_trees)) {
+        set_env("BLUEWAKE_FOREST_WATER_KEEP_TREES", keep_trees ? "1" : "0");
+        bluewake_forest_water_reload();
+    }
+    ImGui::TextWrapped("Forest Water still expires. Refill and continue with the remaining trees.");
+    bool thirty_minutes = env_on("BLUEWAKE_FOREST_WATER_30_MINUTES", false);
+    if (ImGui::Checkbox("30-minute Forest Water timer", &thirty_minutes)) {
+        set_env("BLUEWAKE_FOREST_WATER_30_MINUTES", thirty_minutes ? "1" : "0");
+        bluewake_forest_water_reload();
+    }
+    ImGui::TextWrapped("Applies the next time you collect Forest Water. Both options are off by default.");
 
     ImGui::Separator();
     ImGui::TextUnformatted("Doors and exits");

@@ -1,0 +1,3 @@
+Pillow==12.2.0
+xxhash==3.6.0
+pycryptodome==3.23.0

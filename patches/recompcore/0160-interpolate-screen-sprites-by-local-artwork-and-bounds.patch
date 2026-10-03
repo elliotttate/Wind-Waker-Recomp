@@ -1,0 +1,424 @@
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+index 380735403e7153f174fa4fa84ce90ea38d4350ff..d57ae1e508dfaa2df5fb95a61fdc8257556dc172 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+@@ -77,6 +77,8 @@ struct Record {
+   uint32_t age;
+   uint32_t texcoords = kNoSamples;
+   uint8_t texcoordMask = 0;
++  std::array<float, 2> screenExtent{};
++  bool screenConsumed = false;
+ };
+ struct FrameRecords {
+   std::vector<gxc::VertexShaderConstants> pool;
+@@ -1268,19 +1270,16 @@ void log_counts() {
+ bool enabled() noexcept { return g_enabled.load(std::memory_order_relaxed); }
+ void set_enabled(bool enabled) noexcept { g_enabled.store(enabled, std::memory_order_relaxed); }
+ 
++static bool screen_space_sprite(const gxc::DrawPlan& plan) noexcept {
++  return plan.match_direct_position && plan.constants.projection[3][2] == 0.f &&
++         !plan.pipeline.depth_test && !plan.pipeline.depth_update;
++}
++
+ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+   if (plan.match_payload == nullptr || plan.match_payload_size == 0)
+     return 0;
+-  // Screen-space sprites have no stable object identity. A countdown digit
+-  // can reuse the rupee counter's texture, and a beating heart can add or
+-  // remove a copy: matching by texture and occurrence sends them flying
+-  // between unrelated UI slots. Repeat the current HUD whole in every
+-  // in-between frame. Keep depth-tested orthographic shadow geometry and
+-  // perspective particles/models eligible for their existing interpolation.
+-  if (plan.match_direct_position && plan.constants.projection[3][2] == 0.f &&
+-      !plan.pipeline.depth_test && !plan.pipeline.depth_update)
+-    return 0;
+-  if (plan.match_direct_position && plan.draw_scope_part != 0) {
++  const bool screenSpace = screen_space_sprite(plan);
++  if (!screenSpace && plan.match_direct_position && plan.draw_scope_part != 0) {
+     // One of the draws a wake's emitter makes (its fans and strips), by its
+     // place among them: its vertices are the wake's particles in order (see
+     // blend_positions()).
+@@ -1307,8 +1306,25 @@ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+     // New positions every frame: the same shape with the same texture, and
+     // for a particle the host tagged, that particle (see blend_positions()).
+     h = mix64(h ^ 0xD1u ^ (uint64_t(plan.tex_address) << 8) ^ (uint64_t(plan.texmap_mask) << 40));
+-    if (plan.draw_tag != 0)
++    if (screenSpace) {
++      // Keep atlas regions and vertex RGB tints (not fade alpha) distinct.
++      // Position and scale may animate, so those are compared as bounds by
++      // match_draw(). A particle tag left in GX state is not a UI identity.
++      h = mix64(h ^ 0x53435245454Eull);
++      const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
++      if (decoded == 0 || decoded > kMaxBlendedVertices)
++        return 0;
++      for (size_t v = 0; v < decoded; ++v) {
++        const float* vertex = plan.vertices.data() + v * gxc::kVertexFloats;
++        for (unsigned uv = 0; uv < plan.pipeline.shader.num_tex_gens && uv < gxc::kMaxTexGens; ++uv)
++          for (unsigned st = 0; st < 2; ++st)
++            h = mix64(h ^ std::bit_cast<uint32_t>(vertex[gxc::kVertexUvOffset / sizeof(float) + uv * 2 + st]));
++        for (unsigned rgb = 0; rgb < 3; ++rgb)
++          h = mix64(h ^ std::bit_cast<uint32_t>(vertex[gxc::kVertexColor0Offset / sizeof(float) + rgb]));
++      }
++    } else if (plan.draw_tag != 0) {
+       h = mix64(h ^ (uint64_t(plan.draw_tag) << 20) ^ 0x7A6u);
++    }
+     return h == 0 ? 1 : h;
+   }
+   if (blends_vertices(plan) && plan.match_position_size > 0 && plan.match_position_size <= 2 &&
+@@ -1349,7 +1365,8 @@ uint64_t draw_key(const gxc::DrawPlan& plan) noexcept { return draw_key_of(plan)
+ bool blends_vertices(const gxc::DrawPlan& plan) noexcept {
+   const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
+   return decoded > 0 && decoded <= kMaxBlendedVertices && !plan.pipeline.shader.has_pos_mtx_idx &&
+-         (!plan.match_direct_position || plan.draw_tag != 0 || plan.draw_scope_part != 0);
++         (!plan.match_direct_position || plan.draw_tag != 0 || plan.draw_scope_part != 0 ||
++          screen_space_sprite(plan));
+ }
+ 
+ void capture_draw(const gxc::DrawPlan& plan, DrawInput& out) noexcept {
+@@ -1361,22 +1378,47 @@ void capture_draw(const gxc::DrawPlan& plan, DrawInput& out) noexcept {
+   out.texcoordMask = 0;
+   out.tagged = false;
+   out.age = 0;
++  out.screenSpace = screen_space_sprite(plan);
++  out.screenCenter = {};
++  out.screenExtent = {};
+   if (out.key == 0)
+     return;
+-  // Only the positions of particles the host tagged: an untagged draw of one
++  // Screen sprites and particles the host tagged: an untagged world draw of one
+   // shape is not the same points from one frame to the next (the boat's
+   // shadow is cast on the sea's triangles under it, a different list as it
+   // moves), and blending one list toward the other drew the shadow torn.
+   const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
+   if (plan.match_direct_position) {
+-    if ((plan.draw_tag != 0 || plan.draw_scope_part != 0) && decoded > 0 && decoded <= kMaxBlendedVertices) {
++    if ((out.screenSpace || plan.draw_tag != 0 || plan.draw_scope_part != 0) && decoded > 0 &&
++        decoded <= kMaxBlendedVertices) {
+       out.positions.resize(decoded * 3u);
+       for (size_t i = 0; i < decoded; ++i)
+         std::memcpy(out.positions.data() + i * 3u,
+                     plan.vertices.data() + i * gxc::kVertexFloats + gxc::kVertexPosOffset / sizeof(float),
+                     sizeof(float) * 3);
+-      out.age = plan.draw_scope_part != 0 ? 0u : plan.draw_tag_age;
+-      out.tagged = true;
++      out.age = out.screenSpace || plan.draw_scope_part != 0 ? 0u : plan.draw_tag_age;
++      out.tagged = !out.screenSpace;
++      if (out.screenSpace) {
++        std::array<float, 2> low{INFINITY, INFINITY}, high{-INFINITY, -INFINITY};
++        for (size_t i = 0; i < decoded; ++i) {
++          const float* p = out.positions.data() + i * 3u;
++          for (unsigned r = 0; r < 2; ++r) {
++            const auto& m = plan.constants.posnormalmatrix[r];
++            const float value = m[0] * p[0] + m[1] * p[1] + m[2] * p[2] + m[3];
++            if (!std::isfinite(value)) {
++              out.key = 0;
++              out.positions.clear();
++              return;
++            }
++            low[r] = std::min(low[r], value);
++            high[r] = std::max(high[r], value);
++          }
++        }
++        for (unsigned r = 0; r < 2; ++r) {
++          out.screenCenter[r] = (low[r] + high[r]) * .5f;
++          out.screenExtent[r] = high[r] - low[r];
++        }
++      }
+     }
+     return;
+   }
+@@ -1435,7 +1477,7 @@ uint64_t used_matrix_rows(const gxc::DrawPlan& plan) noexcept {
+ 
+ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedMatrixRows,
+                                                    const gxc::VertexShaderConstants& current, bool repeatsLastDraw,
+-                                                   const VertexSamples* samples) {
++                                                   const VertexSamples* samples, const DrawInput* screenSprite) {
+   g_outcome = "no key";
+   g_blendRepeated = false;
+   const uint64_t serial = ++g_drawSerial;
+@@ -1485,6 +1527,13 @@ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedM
+   }
+   frame.records.push_back(
+       {key, constantsIndex, samplesIndex, {here[0][3], here[1][3], here[2][3]}, false, kNoSamples, 0, g_currentAge});
++  if (screenSprite != nullptr) {
++    auto& record = frame.records.back();
++    for (unsigned r = 0; r < 2; ++r)
++      record.position[r] = screenSprite->screenCenter[r];
++    record.position[2] = 0.f;
++    record.screenExtent = screenSprite->screenExtent;
++  }
+   ++g_frameCounts.draws;
+   KeyState& state = g_keys[key];
+   const uint32_t occurrence = state.occurrence++;
+@@ -1540,6 +1589,65 @@ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedM
+     return copy == 0 && movedPrevious != nullptr ? *movedPrevious : previousFrame.pool[copies[copy].constants];
+   };
+   const size_t candidates = static_cast<size_t>(range.second - range.first);
++  if (screenSprite != nullptr) {
++    // The nearest matching screen rectangle, consumed once. Occurrence can
++    // change when a counter reuses a glyph or a heart adds an animated copy.
++    // A newly visible digit must not borrow a distant rupee/heart sprite.
++    size_t best = candidates;
++    double score = HUGE_VAL;
++    for (size_t i = 0; i < candidates; ++i) {
++      if (copies[i].screenConsumed)
++        continue;
++      const double width = std::min(screenSprite->screenExtent[0], copies[i].screenExtent[0]);
++      const double height = std::min(screenSprite->screenExtent[1], copies[i].screenExtent[1]);
++      if (!(width > 0.0 && height > 0.0))
++        continue;
++      const double reach = std::max(2.0, 0.2 * std::min(width, height));
++      const double dx = screenSprite->screenCenter[0] - copies[i].position[0];
++      const double dy = screenSprite->screenCenter[1] - copies[i].position[1];
++      const double distance = dx * dx + dy * dy;
++      if (distance > reach * reach || !plausible(current, constantsOf(i), usedMatrixRows, kOwnTurnLimit))
++        continue;
++      const double dw = screenSprite->screenExtent[0] - copies[i].screenExtent[0];
++      const double dh = screenSprite->screenExtent[1] - copies[i].screenExtent[1];
++      const double candidateScore = distance + .05 * (dw * dw + dh * dh);
++      if (candidateScore < score) {
++        best = i;
++        score = candidateScore;
++      }
++    }
++    if (best == candidates) {
++      ++g_frameCounts.rejected;
++      g_outcome = "screen sprite new or discontinuous";
++      return nullptr;
++    }
++    range.first[best].screenConsumed = true;
++    const auto& previous = constantsOf(best);
++    g_match = {&copies[best], &previous, nullptr};
++    ++g_frameCounts.matched;
++    if (repeat(BlendPath::Main, &previous, nullptr)) {
++      if (g_lastBlend.identical) {
++        ++g_frameCounts.identical;
++        g_outcome = "screen sprite identical";
++        return nullptr;
++      }
++      ++g_frameCounts.blended;
++      g_outcome = "screen sprite blended";
++      g_blendRepeated = true;
++      return &g_blended[0];
++    }
++    g_lastBlend.identical = std::memcmp(&previous, &current, sizeof(current)) == 0;
++    if (g_lastBlend.identical) {
++      ++g_frameCounts.identical;
++      g_outcome = "screen sprite identical";
++      return nullptr;
++    }
++    for (int step = 0; step < g_frameSteps; ++step)
++      blend(previous, current, float(step_weight(step)), g_blended[step], usedMatrixRows);
++    ++g_frameCounts.blended;
++    g_outcome = "screen sprite blended";
++    return &g_blended[0];
++  }
+   const double turnLimit = candidates == 1 && occurrence == 0 ? kOwnTurnLimit : kTurnLimit;
+   const gxc::VertexShaderConstants* previous = nullptr;
+   size_t chosen = 0; // previous's copy
+@@ -1817,7 +1925,8 @@ const gxc::VertexShaderConstants* blend_draw(const DrawInput& input, const gxc::
+   FrameRecords& frame = g_frames[g_current];
+   const size_t recorded = frame.records.size();
+   const gxc::VertexShaderConstants* result = match_draw(input.key, input.usedMatrixRows, current, repeatsLastDraw,
+-                                                        input.haveSamples ? &input.samples : nullptr);
++                                                        input.haveSamples ? &input.samples : nullptr,
++                                                        input.screenSpace ? &input : nullptr);
+   g_currentTagged = false;
+   g_currentAge = 0;
+   // A particle's positions: kept for the next frame, and blended when the
+@@ -1857,8 +1966,13 @@ const gxc::VertexShaderConstants* blend_draw(const DrawInput& input, const gxc::
+     moves = moves || moved;
+   }
+   g_haveBlendedPositions = moves;
+-  if (g_haveBlendedPositions)
++  if (g_haveBlendedPositions) {
+     ++g_frameCounts.positions;
++    // UI geometry can animate without changing its uniform matrix. A menu
++    // consisting only of those sprites still needs its in-between frames.
++    if (input.screenSpace && result == nullptr)
++      ++g_frameCounts.blended;
++  }
+   // The ocean's grid follows the player. Using current-frame UVs on blended
+   // positions makes its texture slide in 30-Hz steps despite smooth waves.
+   // Only interpolate direct UVs with indexed vertex correspondence; particles
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+index 524516892cbc56ad1d8e266897722178c8425754..971c592a0d3869a5f1a9407c09712bdab48652ef 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+@@ -74,6 +74,11 @@ struct DrawInput {
+   uint8_t texcoordMask = 0;
+   bool tagged = false;
+   uint32_t age = 0;
++  // A depth-disabled direct-position 2D sprite: match its transformed bounds
++  // rather than its occurrence among copies of one texture.
++  bool screenSpace = false;
++  std::array<float, 2> screenCenter{};
++  std::array<float, 2> screenExtent{};
+ };
+ void capture_draw(const gxruntime::gxcore::DrawPlan& plan, DrawInput& out) noexcept;
+ // These draws need independent vertex ranges in each in-between frame.
+diff --git a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+index 6c9b5fb49e55cf4461cb122c225eed59e97e201c..b88bd8ef931495164e8c6dbfd7a53631073f1dd7 100644
+--- a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
++++ b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+@@ -113,10 +113,8 @@ int main() {
+   fi::set_enabled(true);
+   const uint64_t kShip = 11, kTree = 22, kHud = 33;
+ 
+-  // The countdown and rupee counter reuse a glyph texture, while the last
+-  // heart adds/removes animated copies. Screen-space draws must never pair
+-  // those sprites, even when their texture, shape and payload are identical.
+-  // All 120 Hz in-betweens repeat the real HUD's constants and vertices.
++  // Reused glyphs stay paired with their screen slot despite changing draw
++  // order/counts. Nearby UI movement and heart pulses still interpolate.
+   {
+     gxc::DrawPlan hud;
+     const uint8_t payload[96]{};
+@@ -126,37 +124,126 @@ int main() {
+     hud.match_direct_position = true;
+     hud.vertex_count = 4;
+     hud.tex_address = 0x00EA78A0;
++    hud.pipeline.shader.num_tex_gens = 1;
+     hud.vertices.resize(4 * gxc::kVertexFloats);
+-    hud.constants = draw_at(412.f, 412.f, 0.f);
+-    std::memset(hud.constants.projection, 0, sizeof(hud.constants.projection));
+-    hud.constants.projection[0][0] = 2.f / 640.f;
+-    hud.constants.projection[1][1] = -2.f / 480.f;
+-    hud.constants.projection[3][3] = 1.f;
+-    // A stale particle tag must not turn a HUD quad into a moving particle.
++    const auto quad = [&](float width, float height) {
++      for (unsigned v = 0; v < 4; ++v) {
++        auto* vertex = hud.vertices.data() + v * gxc::kVertexFloats;
++        vertex[gxc::kVertexPosOffset / sizeof(float)] = (v == 1 || v == 2) ? width : 0.f;
++        vertex[gxc::kVertexPosOffset / sizeof(float) + 1] = v >= 2 ? height : 0.f;
++        vertex[gxc::kVertexUvOffset / sizeof(float)] = (v == 1 || v == 2) ? 1.f : 0.f;
++        vertex[gxc::kVertexUvOffset / sizeof(float) + 1] = v >= 2 ? 1.f : 0.f;
++        for (unsigned c = 0; c < 4; ++c)
++          vertex[gxc::kVertexColor0Offset / sizeof(float) + c] = 1.f;
++      }
++    };
++    quad(20.f, 30.f);
++    const auto at = [](float x, float y) {
++      auto c = draw_at(x, y, 0.f);
++      std::memset(c.projection, 0, sizeof(c.projection));
++      c.projection[0][0] = 2.f / 640.f;
++      c.projection[1][1] = -2.f / 480.f;
++      c.projection[3][3] = 1.f;
++      return c;
++    };
++    hud.constants = at(412.f, 412.f);
++    // A stale particle tag must not distinguish otherwise identical UI.
+     hud.draw_tag = 123;
++    const auto key = fi::draw_key(hud);
++    CHECK(key != 0);
++    hud.draw_tag = 456;
++    CHECK(fi::draw_key(hud) == key);
++    hud.vertices[gxc::kVertexColor0Offset / sizeof(float) + 3] = .5f;
++    CHECK(fi::draw_key(hud) == key); // fade alpha may animate
++    hud.vertices[gxc::kVertexUvOffset / sizeof(float)] = .25f;
++    CHECK(fi::draw_key(hud) != key); // another atlas region is another glyph
++    quad(20.f, 30.f);
++    hud.vertices[gxc::kVertexColor0Offset / sizeof(float)] = 0.f;
++    CHECK(fi::draw_key(hud) != key); // a shadow is distinct from its foreground
++    quad(20.f, 30.f);
+     fi::set_steps(3);
+-    for (int frame = 0; frame < 3; ++frame) {
+-      for (float x : {412.f, 643.f, 605.f, 639.f}) {
+-        hud.constants.posnormalmatrix[0][3] = x;
+-        CHECK(fi::draw_key(hud) == 0);
+-        CHECK(blend_plan(hud, hud.constants) == nullptr);
+-        for (int step = 0; step < 3; ++step) {
+-          CHECK(fi::blended_positions(step) == nullptr);
+-          CHECK(fi::blended_texcoords(step) == nullptr);
+-        }
++
++    blend_plan(hud, at(643.f, 443.f));
++    blend_plan(hud, at(412.f, 412.f));
++    fi::end_game_frame();
++    for (const auto c : {at(413.f, 412.f), at(642.f, 443.f)}) {
++      const auto* blended = blend_plan(hud, c);
++      CHECK(blended != nullptr);
++      if (blended != nullptr) {
++        const float beforeX = c.posnormalmatrix[0][3] == 413.f ? 412.f : 643.f;
++        for (int step = 0; step < 3; ++step)
++          CHECK(near(fi::blended_step(step)->posnormalmatrix[0][3],
++                     beforeX + (c.posnormalmatrix[0][3] - beforeX) * float(step + 1) / 4.f));
++      }
++    }
++    CHECK(fi::frame_verdict());
++    fi::end_game_frame();
++    // The timer changes to another digit; next frame the shared glyph returns
++    // without borrowing the only remaining copy, at the distant rupee counter.
++    blend_plan(hud, at(642.f, 443.f));
++    fi::end_game_frame();
++    CHECK(blend_plan(hud, at(412.f, 412.f)) == nullptr);
++    CHECK(fi::blended_positions() == nullptr);
++    CHECK(blend_plan(hud, at(641.f, 443.f)) != nullptr);
++    // A new copy cannot reuse the same counterpart already consumed above.
++    CHECK(blend_plan(hud, at(640.f, 443.f)) == nullptr);
++    fi::end_game_frame();
++
++    // The last heart grows about its own centre, not a neighbouring heart.
++    blend_plan(hud, at(170.f, 40.f));
++    blend_plan(hud, at(195.f, 40.f));
++    fi::end_game_frame();
++    auto pulse = at(168.f, 37.f);
++    pulse.posnormalmatrix[0][0] = pulse.posnormalmatrix[1][1] = 1.2f;
++    CHECK(blend_plan(hud, pulse) != nullptr);
++    for (int step = 0; step < 3; ++step) {
++      const auto* b = fi::blended_step(step);
++      CHECK(b != nullptr);
++      if (b != nullptr) {
++        CHECK(near(b->posnormalmatrix[0][0], 1.f + .2f * float(step + 1) / 4.f));
++        CHECK(near(b->posnormalmatrix[0][3] + 10.f * b->posnormalmatrix[0][0], 180.f));
++        CHECK(near(b->posnormalmatrix[1][3] + 15.f * b->posnormalmatrix[1][1], 55.f));
++      }
++    }
++    CHECK(blend_plan(hud, at(195.f, 40.f)) == nullptr); // the neighbour stays still
++    fi::end_game_frame();
++
++    // A UI pulse can also resize its direct vertices with a fixed matrix.
++    quad(20.f, 30.f);
++    blend_plan(hud, at(170.f, 40.f));
++    fi::end_game_frame();
++    quad(22.f, 32.f);
++    blend_plan(hud, at(170.f, 40.f));
++    for (int step = 0; step < 3; ++step) {
++      const auto* b = fi::blended_positions(step);
++      CHECK(b != nullptr);
++      if (b != nullptr) {
++        CHECK(near(b[3], 20.f + 2.f * float(step + 1) / 4.f));
++        CHECK(near(b[7], 30.f + 2.f * float(step + 1) / 4.f));
+       }
+-      fi::end_game_frame();
+     }
+-    // Orthographic geometry written into a depth buffer (shadow maps) and
+-    // world-space direct sprites still participate in interpolation.
++    CHECK(fi::frame_verdict());
++    fi::end_game_frame();
++
++    // Invalid bounds do not leave a stale interpolated vertex buffer behind.
++    hud.constants = at(170.f, 40.f);
++    hud.vertices[0] = INFINITY;
++    fi::DrawInput invalid;
++    fi::capture_draw(hud, invalid);
++    CHECK(invalid.key == 0);
++    CHECK(fi::blend_draw(invalid, hud.constants) == nullptr);
++    CHECK(fi::blended_positions() == nullptr);
++    quad(20.f, 30.f);
++    // Orthographic depth-buffer geometry and perspective particles retain
++    // their existing identities and interpolation paths.
+     hud.pipeline.depth_test = 1;
+-    CHECK(fi::draw_key(hud) != 0);
++    CHECK(fi::draw_key(hud) != key);
+     hud.pipeline.depth_test = 0;
+     hud.pipeline.depth_update = 1;
+-    CHECK(fi::draw_key(hud) != 0);
++    CHECK(fi::draw_key(hud) != key);
+     hud.pipeline.depth_update = 0;
+     hud.constants.projection[3][2] = -1.f;
+-    CHECK(fi::draw_key(hud) != 0);
++    CHECK(fi::draw_key(hud) != key);
+     fi::set_steps(1);
+     fi::end_game_frame();
+     fi::end_game_frame();

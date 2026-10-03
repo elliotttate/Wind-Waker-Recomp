@@ -8,6 +8,7 @@ project(bluewake_ios LANGUAGES C CXX OBJC OBJCXX)
 
 set(BLUEWAKE_REPO_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 set(GXRUNTIME_DIR ${BLUEWAKE_REPO_ROOT}/ref/recompcore/GXRuntime)
+include(${BLUEWAKE_REPO_ROOT}/cmake/RecompCorePatches.cmake)
 set(BLUEWAKE_HOST_SRC ${BLUEWAKE_REPO_ROOT}/runtime/host/src)
 
 # Source paths compiled into the app (assert and log messages) are written
@@ -34,6 +35,7 @@ set(BLUEWAKE_HOST_SOURCES
     ${BLUEWAKE_HOST_SRC}/edge_intercepts.c
     ${BLUEWAKE_HOST_SRC}/game_options.c
     ${BLUEWAKE_HOST_SRC}/simulation_mode.c
+    ${BLUEWAKE_HOST_SRC}/forest_water.c
     ${BLUEWAKE_HOST_SRC}/fast_load.c
     ${BLUEWAKE_HOST_SRC}/fps_watch.c
     ${BLUEWAKE_HOST_SRC}/jump_button.c
