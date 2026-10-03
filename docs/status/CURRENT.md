@@ -47,8 +47,22 @@ is the one already there. `DOL_GX_TRANSFORM_VERIFY=1` copies anyway and counts d
   hits verified against a fresh derivation, 0 differences), with each vertex's unwritten slots zeroed instead
   of the whole buffer: no faster, slightly slower at most places.
 
-**Next**: native `strcmp` and stage-name search for the Dragon Roost hot spot (in progress on a branch,
-certified against the translation the same way as the second natives).
+**The search natives** (docs/status/NATIVE_SEARCH_2026-10-03.md, merged at 8eb0572): `strcmp`,
+`dStage_searchName` and `cTgIt_JudgeFilter` with `fopAcM_findObjectCB`, certified against the translation
+(0 mismatches) and hooked (`native entries: 12/12 certified`). In play they change nothing the game does (Dragon
+Roost Island, synchronous: Link's position the same at 158 of 158 probes, natives on and off) but they do not
+yet save time there (game thread 23.0-23.3 ms per game frame with the 2026-10-02 module, 23.4-23.8 with
+these): a search for daTag_Island's names needs about 6,000 guest cycles and the game thread's budget before
+its next event is usually 80 to 4,800, so the native declines and the translation runs. The headless training
+had longer slices (the stage-name native ran in 99.7 percent of its calls there). Next: natives that run as
+far as the budget allows and resume at the loop head.
+
+**The GX worker in two stages** (RecompCore branch `gx-two-stage`, not pinned): the plans handed to a second
+thread that puts them into Aurora. Exact (Smooth Motion dumps 62 of 62 at Outset and Gohma's room) but not
+faster: on eight E-cores 7 to 15 percent slower with the plan arrays swapped across (the builder reallocated
+them), about even with them copied. Putting a plan into Aurora is mostly copying its data into staging, and
+the hand-off is a copy of the same size. Also measured flat and dropped: the texture handle taken by
+reference instead of copied per draw.
 
 ## 2026-10-02 What we took from DeepSea: pipelines, Smooth Motion, the GX worker, training, natives, build time
 
