@@ -14,7 +14,10 @@ if(NOT WIN32)
 endif()
 
 get_filename_component(BLUEWAKE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
-set(GXRUNTIME_DIR ${BLUEWAKE_REPO_ROOT}/ref/recompcore/GXRuntime)
+# RecompCore's checkout: ref/recompcore, or another (a worktree) for a build
+# beside the usual one.
+set(BLUEWAKE_RECOMPCORE ${BLUEWAKE_REPO_ROOT}/ref/recompcore CACHE PATH "The RecompCore checkout to build with")
+set(GXRUNTIME_DIR ${BLUEWAKE_RECOMPCORE}/GXRuntime)
 set(BLUEWAKE_HOST_SRC ${BLUEWAKE_REPO_ROOT}/runtime/host/src)
 set(BLUEWAKE_COMPAT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/compat)
 
@@ -99,7 +102,7 @@ target_include_directories(BlueWake PRIVATE
     ${BLUEWAKE_COMPAT_INCLUDES}
     ${GXRUNTIME_DIR}/include
     ${BLUEWAKE_REPO_ROOT}/apple/ios/src
-    ${BLUEWAKE_REPO_ROOT}/ref/recompcore/Source/Core/Core/PowerPC/StaticRecomp)
+    ${BLUEWAKE_RECOMPCORE}/Source/Core/Core/PowerPC/StaticRecomp)
 target_compile_options(BlueWake PRIVATE
     $<$<COMPILE_LANGUAGE:C,CXX>:${BLUEWAKE_COMPAT_FORCE_INCLUDE}>)
 target_compile_definitions(BlueWake PRIVATE
@@ -121,7 +124,7 @@ endif()
 # The donor DSP (Dolphin's DSP interpreter and its high-level Zelda ucode, from
 # RecompCore) compiled from source, with only the Common services it needs
 # (apple/ios/src/dsp_common_shim.cpp), as on iOS.
-set(_donor ${BLUEWAKE_REPO_ROOT}/ref/recompcore)
+set(_donor ${BLUEWAKE_RECOMPCORE})
 set(_dsp ${_donor}/Source/Core/Core/DSP)
 add_library(bluewake_dsp_donor STATIC
     ${_dsp}/DSPAccelerator.cpp ${_dsp}/DSPAnalyzer.cpp ${_dsp}/DSPAssembler.cpp

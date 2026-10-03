@@ -417,8 +417,26 @@ int main(void) {
                  ninja=True)
         return build / "dolrecomp.exe"
 
-    def configure_app(self):
-        self.app_build = self.out / "app"
+    APP_PROFILE = ROOT / "windows/pgo/app.profdata"
+
+    def configure_app(self, build=None, instrument=False):
+        """The app's build, by default build/windows/app. With the committed
+        profile of the app's own code (windows/pgo/app.profdata,
+        scripts/windows/train_app_profile.py) it is compiled with it and with
+        ThinLTO: on four of the i9's E-cores that took the GX worker's CPU per
+        game frame from 16.6-17.2 ms to 13.8-14.3 and the game thread's from
+        23.9-24.3 to 22.4-23.2 (2026-10-02). `instrument` builds it to record
+        such a profile instead."""
+        self.app_build = build or self.out / "app"
+        profile, link = "", ""
+        if instrument:
+            profile = link = "-fprofile-instr-generate"
+        elif self.APP_PROFILE.exists() and not getattr(self.args, "no_app_pgo", False):
+            # Functions changed since the profile was recorded are compiled
+            # without counts (the warnings say so; they are expected).
+            profile = (f"-fprofile-instr-use={self.APP_PROFILE.as_posix()} -Wno-profile-instr-unprofiled "
+                       "-Wno-profile-instr-out-of-date -Wno-backend-plugin -flto=thin")
+            link = "-flto=thin"
         # The app for the same CPU level as the game module: the FIFO worker's
         # matrix work for Smooth Motion needs AVX2 and FMA to keep up (at the
         # baseline level it held the game below 30 FPS on Outset, 2026-09-29).
@@ -428,10 +446,10 @@ int main(void) {
             # Debug information in a PDB beside the build's BlueWake.exe (the
             # package copies only the exe and DLLs), so a crash address names its
             # function; /OPT:REF,ICF keep the code what it is without /DEBUG.
-            f"-DCMAKE_C_FLAGS=-march={self.args.march} -g -gcodeview",
-            f"-DCMAKE_CXX_FLAGS=-march={self.args.march} -g -gcodeview",
-            "-DBUILD_TESTING=OFF", "-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -Wl,/DEBUG -Wl,/OPT:REF -Wl,/OPT:ICF",
-            "-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld",
+            f"-DCMAKE_C_FLAGS=-march={self.args.march} -g -gcodeview {profile}",
+            f"-DCMAKE_CXX_FLAGS=-march={self.args.march} -g -gcodeview {profile}",
+            "-DBUILD_TESTING=OFF", f"-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -Wl,/DEBUG -Wl,/OPT:REF -Wl,/OPT:ICF {link}",
+            f"-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld {link}",
             f"-DBLUEWAKE_WINDOWS_CONSOLE={'ON' if self.args.console else 'OFF'}"])
 
     # --- 4 extract ---------------------------------------------------------
@@ -706,9 +724,31 @@ int main(void) {
             flags = [f"-fprofile-instr-use={self.profile.as_posix()}", "-Wno-profile-instr-unprofiled",
                      "-Wno-profile-instr-out-of-date", "-Wno-backend-plugin"]
             print(f"with the optimization profile {self.profile.name}")
-        return self.compile_composite(self.out / "composite", self.args.opt_level, flags, [], "composite")
+        cold = self.cold_sources() if self.profile is not None and self.args.tiered else None
+        return self.compile_composite(self.out / "composite", self.args.opt_level, flags, [], "composite", cold)
 
-    def compile_composite(self, build, opt_level, extra_flags, extra_link_flags, name):
+    def cold_sources(self):
+        """--tiered: the chunks whose function the training never ran, listed
+        for cmake/composite to compile at -O1 without GVN's memory dependence
+        analysis (the module's longest passes on its largest functions), as
+        DeepSea compiles its cold actor code. A chunk is one function, named
+        func_<its file's address>."""
+        stats = subprocess.run([self.llvm_profdata, "show", "--all-functions", self.profile], capture_output=True,
+                               text=True).stdout
+        counts = {name.upper(): int(count) for name, count in
+                  re.findall(r"(?m)^  func_([0-9A-Fa-f]+):\n(?:    .*\n)*?    Function count: (\d+)", stats)}
+        src = self.out / "composite-src"
+        cold = []
+        for path in sorted(src.glob("chunks_*/*.c")):
+            address = path.stem.rsplit("_", 1)[-1].upper()
+            if counts.get(address) == 0:
+                cold.append(path.relative_to(src).as_posix())
+        listing = self.out / "composite-cold-sources.txt"
+        listing.write_text("\n".join(cold) + "\n", encoding="utf-8")
+        print(f"tiered: {len(cold)} chunks the training never ran at -O1")
+        return listing
+
+    def compile_composite(self, build, opt_level, extra_flags, extra_link_flags, name, cold=None):
         rc = self.recompcore
         # Each chunk is one very large function, and two LLVM passes are
         # superlinear on it (clang 22, x86-64, measured with -ftime-report):
@@ -726,7 +766,8 @@ int main(void) {
             "cmake", "-S", ROOT / "cmake/composite", "-B", build, "-G", "Ninja", "-DCMAKE_C_COMPILER=clang",
             "-DCMAKE_BUILD_TYPE=Release", f"-DCMAKE_C_FLAGS={flags}", f"-DCMAKE_SHARED_LINKER_FLAGS={link_flags}",
             f"-DCOMPOSITE_OPTIMIZATION_LEVEL={opt_level}", f"-DCOMPOSITE_DIR={self.out / 'composite-src'}",
-            f"-DGXRUNTIME_DIR={rc / 'GXRuntime'}", f"-DABI_DIR={rc / 'Source/Core/Core/PowerPC/StaticRecomp'}"])
+            f"-DGXRUNTIME_DIR={rc / 'GXRuntime'}", f"-DABI_DIR={rc / 'Source/Core/Core/PowerPC/StaticRecomp'}",
+            f"-DCOMPOSITE_COLD_SOURCES_FILE={cold if cold is not None else ''}"])
         # -k 0: a chunk that fails does not stop the others. The usual cause is
         # memory (clang reports "out of memory" when several of the largest
         # chunks peak together), so what failed is retried with fewer jobs.
@@ -769,13 +810,40 @@ int main(void) {
     # stays in the build directory (docs/BUILDER.md). Unlike the Mac, the
     # bundled Apple-silicon profiles are not used: this one covers the runtime
     # in the module too, from this compiler.
-    TRAINING_VERSION = "3"
+    TRAINING_VERSION = "4"
     TRAINING_RETRACES = 23000
     # After player control (retrace 20,257 on the lookout), Link runs - off the
     # lookout, around Outset, turning - instead of standing until the end: the
     # collision, movement and animation code that play spends its time in is
     # then trained hot, not compiled cold for size. retrace:buttons:length:x:y.
     TRAINING_RUN = ["20400:0:700:0:127", "21100:0:500:90:110", "21600:0:500:-90:110", "22100:0:900:0:127"]
+    # Then the plain playback tours the game (BLUEWAKE_TEST_WARP, a scene change
+    # as a door makes it): towns, islands, dungeons, the sea from the boat. The
+    # opening and Outset alone left most of the game's code untrained (288 of
+    # 813 translated functions ran), so a dungeon's or the sea's code was
+    # compiled cold, for size. Each stop: the scene loads, then Link runs,
+    # turns and runs on. stage:room:point.
+    TRAINING_TOUR = ["sea:11:1",        # Windfall Island
+                     "sea:13:0",        # Dragon Roost Island
+                     "M_NewD2:0:0",     # Dragon Roost Cavern
+                     "sea:41:0",        # Forest Haven
+                     "kindan:0:0",      # the Forbidden Woods
+                     "Siren:0:0",       # the Tower of the Gods
+                     "majroom:0:0",     # the Forsaken Fortress
+                     "sea:1:100",       # the sea by the Fortress, on the boat
+                     "Hyrule:0:0",      # Hyrule Castle
+                     "sea:44:0"]        # back to Outset
+    TOUR_START = 23200
+    TOUR_STOP = 1500  # retraces at each stop
+
+    def training_tour(self):
+        """The tour's warps, its runs at each stop, and the retraces it ends at."""
+        warps, moves = [], []
+        for i, place in enumerate(self.TRAINING_TOUR):
+            at = self.TOUR_START + i * self.TOUR_STOP
+            warps.append(f"{at}:{place}")
+            moves += [f"{at + 450}:0:300:0:127", f"{at + 780}:0:300:110:60", f"{at + 1110}:0:300:-110:60"]
+        return warps, moves, self.TOUR_START + len(self.TRAINING_TOUR) * self.TOUR_STOP + 300
 
     def training_fingerprint(self):
         """What the recorded counts depend on: the game source (mods included),
@@ -854,7 +922,7 @@ int main(void) {
         if self.mods:
             runs.append(("mods", "widescreen,betterww"))
         for name, mods in runs:
-            raw += self.training_run(exe, module, work / f"run-{name}", mods)
+            raw += self.training_run(exe, module, work / f"run-{name}", mods, tour=name == "plain")
         self.run("training-merge", [self.llvm_profdata, "merge", "-o", profile, *raw])
         stats = subprocess.run([self.llvm_profdata, "show", "--all-functions", profile], capture_output=True,
                                text=True).stdout
@@ -868,28 +936,36 @@ int main(void) {
                                        "trained": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, indent=2))
         return self.hashed_profile(profile)
 
-    def training_run(self, exe, module, run, mods):
+    def training_run(self, exe, module, run, mods, tour=False, headless=True):
         """One headless playback of the opening: boot, A at the title, the
-        opening cutscene's text confirmed, player control on Outset. A new card
-        in its own folder; the player's saves are never touched."""
+        opening cutscene's text confirmed, player control on Outset, and with
+        `tour` the tour of the game after it. A new card in its own folder; the
+        player's saves are never touched. headless=False draws it in a window
+        (the app's own training, scripts/windows/train_app_profile.py)."""
+        warps, tour_moves, tour_end = self.training_tour() if tour else ([], [], self.TRAINING_RETRACES)
         run.mkdir(parents=True)
         env = {k: v for k, v in os.environ.items() if not k.startswith(("BLUEWAKE_", "DOL_", "LLVM_PROFILE_"))}
         env.update({
             "LLVM_PROFILE_FILE": str(run / "%m-%p.profraw"),
-            "BLUEWAKE_DATA_DIR": str(run), "BLUEWAKE_NO_DIALOG": "1", "BLUEWAKE_RENDERER": "headless",
+            "BLUEWAKE_DATA_DIR": str(run), "BLUEWAKE_NO_DIALOG": "1",
             "BLUEWAKE_DOL": str(self.out / "game/main.dol"), "BLUEWAKE_RELS_DIR": str(self.out / "game/rels"),
             "BLUEWAKE_DISC": str(self.iso),
             "BLUEWAKE_DSP_IROM": str(self.recompcore / "Data/Sys/GC/dsp_rom.bin"),
             "BLUEWAKE_DSP_COEF": str(self.recompcore / "Data/Sys/GC/dsp_coef.bin"),
-            "BLUEWAKE_MAX_RETRACES": str(self.TRAINING_RETRACES), "BLUEWAKE_WALL_PACE": "0",
+            "BLUEWAKE_MAX_RETRACES": str(tour_end), "BLUEWAKE_WALL_PACE": "0",
             "BLUEWAKE_PLAYER_PROBE": "1", "BLUEWAKE_PAD_BUTTONS": "0x0100",
             # The player-control milestone below waits on the overlap phase
             # this observation latches; the Windows app turns it off for play.
             "BLUEWAKE_OVERLAP_OBSERVATION": "1",
             "BLUEWAKE_PAD_PULSE_ON_TITLE_READY": "1", "BLUEWAKE_PAD_PULSE_LENGTH": "2",
             "BLUEWAKE_PAD_CONFIRM_EVENT": "any",
-            "BLUEWAKE_PAD_SCRIPT": ",".join([f"{n}:0x0100:2" for n in range(17800, 22001, 150)] + self.TRAINING_RUN),
+            "BLUEWAKE_PAD_SCRIPT": ",".join([f"{n}:0x0100:2" for n in range(17800, 22001, 150)] + self.TRAINING_RUN +
+                                            tour_moves),
         })
+        if warps:
+            env["BLUEWAKE_TEST_WARP"] = ",".join(warps)
+        if headless:
+            env["BLUEWAKE_RENDERER"] = "headless"
         if mods:
             env["BLUEWAKE_MODS"] = mods
         # A playback that crashes leaves no counts to merge, and another run of
@@ -1097,6 +1173,8 @@ def main():
                         help="CPU level for the game module (default x86-64-v3: AVX2, FMA, BMI2 and MOVBE, "
                              "any Intel Haswell or AMD Zen or newer; lowered automatically on older CPUs)")
     parser.add_argument("--opt-level", choices=("1", "2"), default="2", help="game module optimization level")
+    parser.add_argument("--tiered", action="store_true",
+                        help="compile the chunks the optimization training never ran at -O1 (a shorter build)")
     parser.add_argument("--no-mods", action="store_true", help="skip the widescreen and Better Wind Waker variants")
     parser.add_argument("--no-train", action="store_true",
                         help="skip local optimization training: faster to build, slower in game")
@@ -1104,6 +1182,8 @@ def main():
     parser.add_argument("--retrain", action="store_true",
                         help="train again even though the game source, runtime and compiler are unchanged")
     parser.add_argument("--console", action="store_true", help="build BlueWake.exe as a console program")
+    parser.add_argument("--no-app-pgo", action="store_true",
+                        help="build the app without its committed optimization profile and ThinLTO")
     parser.add_argument("--accept-new-composite", action="store_true",
                         help="continue if the generated source differs from the verified one")
     parser.add_argument("--source-only", action="store_true",
