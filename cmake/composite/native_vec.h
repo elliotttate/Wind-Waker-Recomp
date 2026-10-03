@@ -22,4 +22,12 @@
 int bluewake_native_vec(CPUState* cpu, u32 address);
 void bluewake_native_vec_report(void);
 
+/* PSMTXMultVecSR, added with the second set of natives (hooked at its entry
+ * by scripts/windows/native_entries.py): the same contract, for the leaf at
+ * BLUEWAKE_PSMTX_MULT_VEC_SR only. */
+#define BLUEWAKE_PSMTX_MULT_VEC_SR 0x8030DB24u
+extern int bluewake_native_vec_sr_enabled;
+int bluewake_native_vec_sr(CPUState* cpu);
+void bluewake_native_vec_sr_report(void);
+
 #endif

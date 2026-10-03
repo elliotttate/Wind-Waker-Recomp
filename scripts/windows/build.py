@@ -679,6 +679,10 @@ int main(void) {
         # The copies' plain loads and stores without their pc and suffix stores.
         self.source_step("lean-memory", "scripts/windows/lean_memory.py", root)
         self.source_step("native-j3d", "scripts/mods/prepare_native_j3d.py", root)
+        # Certified native entries, the second set (FIFO matrix loads, collision
+        # checks, PSMTXMultVecSR, joint matrix calculations): after the prepaid
+        # copies they certify, before the manifests that hash the chunks as they end up.
+        self.source_step("native-entries", "scripts/windows/native_entries.py", root)
         self.source_step("simulation-prepare", "scripts/mods/prepare_simulation_60hz.py", root)
         # Last: its manifest hashes whole chunk files, as they end up.
         self.source_step("native-math", "scripts/mods/prepare_native_math.py", root)
@@ -686,6 +690,7 @@ int main(void) {
         for name in ("guest-cpu", "gpr-inline", "chunk-headers", "direct-calls", "native-skin", "fast-blocks",
                      "lean-memory", "native-j3d", "simulation-prepare", "native-math"):
             print((self.logs / f"{name}.log").read_text(errors="replace").strip().splitlines()[-1])
+        print((self.logs / "native-entries.log").read_text(errors="replace").strip().splitlines()[-1])
 
     def source_step(self, name, script, root):
         """One source step. A run that crashed (a Windows exception status, not an
@@ -888,6 +893,13 @@ int main(void) {
         # Certified game math: isolated additions to the local PGO cache key.
         for path in (ROOT / "cmake/composite/native_game_math.c", ROOT / "cmake/composite/native_game_math.h",
                      ROOT / "scripts/windows/native_game_math.py"):
+            key.update(path.relative_to(ROOT).as_posix().encode())
+            key.update(path.read_bytes())
+        # Certified native entries, the second set: their sources and hooks.
+        for path in (ROOT / "cmake/composite/native_fifo.c", ROOT / "cmake/composite/native_fifo.h",
+                     ROOT / "cmake/composite/native_bg.c", ROOT / "cmake/composite/native_bg.h",
+                     ROOT / "cmake/composite/native_mtxcalc.c", ROOT / "cmake/composite/native_mtxcalc.h",
+                     ROOT / "scripts/windows/native_entries.py"):
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
         return key.hexdigest()

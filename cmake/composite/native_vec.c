@@ -417,3 +417,149 @@ int bluewake_native_vec(CPUState* cpu, u32 address) {
         s_vec_declined[which]++;
     return done;
 }
+
+/* --- PSMTXMultVecSR (0x8030DB24): the scale and rotation of a matrix times a
+ * vector, added with the second set of natives. Its entry is hooked by
+ * scripts/windows/native_entries.py where its translation is the one
+ * tests/native_vec_sr_test.c compared it against; the direct calls above do
+ * not route to it. Separate from bluewake_native_vec and its report.
+ *
+ * One block of 21 cycles: nine psq_l, three ps_mul, three ps_sum0, three
+ * ps_madd, three single psq_st. When all fifteen floats are bounded (finite,
+ * below 2^62: every product, sum and single rounding stays finite, so each
+ * operation takes the inline path), the operations run on values, as the
+ * leaves above do. Otherwise, as PSVECNormalize above, the translation's own
+ * statements with the block machinery taken out, on the registers themselves
+ * (inline_fp.h's helpers, or the interpreter's where they hand over), so
+ * every value, FPRF and flag is theirs whatever the operands: the
+ * interpreter only sets FPSCR flags, so nothing can stop the block part of
+ * the way. Every load comes before the first store, so the output may
+ * overlap the inputs. It declines, changing nothing, unless FP is available,
+ * paired singles unscaled (GQR0 type 0, HID2 LSQE), no write journal, all
+ * three ranges plain RAM, no exception pending, the turn's budget not spent
+ * and the next deadline beyond the block. The last access (the third store)
+ * leaves its cycle suffix, 1. */
+int bluewake_native_vec_sr_enabled;
+static unsigned long long s_vec_sr_runs, s_vec_sr_declined;
+
+void bluewake_native_vec_sr_report(void) {
+    fprintf(stderr, "[native-vec] multvec-sr=%llu/%llu (native/declined)\n", s_vec_sr_runs, s_vec_sr_declined);
+}
+
+/* The value path's helpers, always inline: the leaves above share theirs
+ * (vec_*), which clang keeps out of line here, and a call per operation, with
+ * its pair returned through memory, cost this leaf most of its time. Each is
+ * the vec_ helper of the same name, on a pointer into RAM. */
+#define SR_INLINE static inline __attribute__((always_inline))
+
+SR_INLINE bool sr_bounded(const u8* p, unsigned count) {
+    bool ok = true;
+    for (unsigned i = 0; i < count; ++i)
+        ok &= vec_bounded(read_be32(p + 4u * i));
+    return ok;
+}
+
+SR_INLINE VecPair sr_psq_l(const u8* p, bool w) {
+    return (VecPair){vec_single(read_be32(p)), w ? 1.0 : vec_single(read_be32(p + 4u))};
+}
+
+SR_INLINE VecPair sr_result(const CPUState* cpu, f64 r0, f64 r1, u32* fprf) {
+    const f32 s0 = bw_fp_single(cpu, r0), s1 = bw_fp_single(cpu, r1);
+    *fprf = bw_fp_class32(s0);
+    return (VecPair){(f64)s0, (f64)s1};
+}
+
+SR_INLINE VecPair sr_mul(const CPUState* cpu, VecPair a, VecPair c, u32* fprf) {
+    return sr_result(cpu, a.p0 * bw_fp_25bit(c.p0), a.p1 * bw_fp_25bit(c.p1), fprf);
+}
+
+/* ps_sum0 d, a, a, a: a0 + a1 in the first half, a1 carried. */
+SR_INLINE VecPair sr_sum0(const CPUState* cpu, VecPair a, u32* fprf) {
+    const f32 s0 = bw_fp_single(cpu, a.p0 + a.p1), s1 = bw_fp_single(cpu, a.p1);
+    *fprf = bw_fp_class32(s0);
+    return (VecPair){(f64)s0, (f64)s1};
+}
+
+SR_INLINE VecPair sr_madd(const CPUState* cpu, VecPair a, VecPair c, VecPair b, u32* fprf) {
+    return sr_result(cpu, bw_fp_fma_single(a.p0, bw_fp_25bit(c.p0), b.p0),
+                     bw_fp_fma_single(a.p1, bw_fp_25bit(c.p1), b.p1), fprf);
+}
+
+/* The operations on values, every operand bounded. */
+static int sr_values(CPUState* cpu, const u8* m, const u8* v, u32 out) {
+    u32 fprf = 0;
+    const VecPair f0 = sr_psq_l(m, false), f6 = sr_psq_l(v, false), f2 = sr_psq_l(m + 16, false);
+    VecPair f8 = sr_mul(cpu, f0, f6, &fprf);
+    const VecPair f4 = sr_psq_l(m + 32, false);
+    VecPair f10 = sr_mul(cpu, f2, f6, &fprf);
+    const VecPair f7 = sr_psq_l(v + 8, true);
+    VecPair f12 = sr_mul(cpu, f4, f6, &fprf);
+    const VecPair f3 = sr_psq_l(m + 24, false);
+    f8 = sr_sum0(cpu, f8, &fprf);
+    const VecPair f5 = sr_psq_l(m + 40, false);
+    f10 = sr_sum0(cpu, f10, &fprf);
+    const VecPair f1 = sr_psq_l(m + 8, false);
+    f12 = sr_sum0(cpu, f12, &fprf);
+    const VecPair f9 = sr_madd(cpu, f1, f7, f8, &fprf);
+    const VecPair f11 = sr_madd(cpu, f3, f7, f10, &fprf);
+    const VecPair f13 = sr_madd(cpu, f5, f7, f12, &fprf);
+    /* The stores in order, after every load. */
+    vec_store32(cpu, out, convert_to_single_ftz(f64_bits(f9.p0)));
+    vec_store32(cpu, out + 4u, convert_to_single_ftz(f64_bits(f11.p0)));
+    vec_store32(cpu, out + 8u, convert_to_single_ftz(f64_bits(f13.p0)));
+    const VecPair results[14] = {f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13};
+    for (unsigned r = 0; r < 14; ++r) {
+        cpu->fpr[r] = results[r].p0;
+        cpu->ps1[r] = results[r].p1;
+    }
+    return vec_finish(cpu, 21, 1, fprf);
+}
+
+static int vec_mult_sr(CPUState* cpu) {
+    const u32 m = cpu->gpr[3], v = cpu->gpr[4], out = cpu->gpr[5];
+    const u32 gqr = cpu->gqr[0];
+    if (cpu->exception != 0u || (cpu->msr & PPC_MSR_FP) == 0u || (cpu->hid2 & PPC_HID2_LSQE) == 0u ||
+        ((gqr >> 16) & 7u) != 0u || (gqr & 7u) != 0u || g_mem_write_journal != NULL || cpu->cycle_budget <= 0 ||
+        cpu->downcount <= -cpu->cycle_budget ||
+        (cpu->cycle_deadline_budget > 0 &&
+         (cpu->cycle_deadline_budget < 21 || cpu->cycle_deadline_budget + cpu->downcount < 21)) ||
+        !vec_ram(cpu, m, 48) || !vec_ram(cpu, v, 12) || !vec_ram(cpu, out, 12))
+        return 0;
+    const u8* matrix = cpu->ram + (m - GC_RAM_BASE);
+    const u8* vector = cpu->ram + (v - GC_RAM_BASE);
+    if (sr_bounded(matrix, 12) && sr_bounded(vector, 3))
+        return sr_values(cpu, matrix, vector, out);
+    vec_set(cpu, 0, vec_psq_l(cpu, m, false));
+    vec_set(cpu, 6, vec_psq_l(cpu, v, false));
+    vec_set(cpu, 2, vec_psq_l(cpu, m + 16u, false));
+    ppc_ps_mul_op(cpu, 8, 0, 6);
+    vec_set(cpu, 4, vec_psq_l(cpu, m + 32u, false));
+    ppc_ps_mul_op(cpu, 10, 2, 6);
+    vec_set(cpu, 7, vec_psq_l(cpu, v + 8u, true));
+    ppc_ps_mul_op(cpu, 12, 4, 6);
+    vec_set(cpu, 3, vec_psq_l(cpu, m + 24u, false));
+    ppc_ps_sum0(cpu, 8, 8, 8, 8);
+    vec_set(cpu, 5, vec_psq_l(cpu, m + 40u, false));
+    ppc_ps_sum0(cpu, 10, 10, 10, 10);
+    vec_set(cpu, 1, vec_psq_l(cpu, m + 8u, false));
+    ppc_ps_sum0(cpu, 12, 12, 12, 12);
+    ppc_ps_madd_op(cpu, 9, 1, 7, 8, false, false);
+    vec_psq_st(cpu, out, (VecPair){cpu->fpr[9], cpu->ps1[9]}, true);
+    ppc_ps_madd_op(cpu, 11, 3, 7, 10, false, false);
+    vec_psq_st(cpu, out + 4u, (VecPair){cpu->fpr[11], cpu->ps1[11]}, true);
+    ppc_ps_madd_op(cpu, 13, 5, 7, 12, false, false);
+    vec_psq_st(cpu, out + 8u, (VecPair){cpu->fpr[13], cpu->ps1[13]}, true);
+    cpu->downcount -= 21;
+    cpu->cycle_observation_suffix = 1u;
+    cpu->pc = cpu->lr & ~3u;
+    return 1;
+}
+
+int bluewake_native_vec_sr(CPUState* cpu) {
+    const int done = vec_mult_sr(cpu);
+    if (done)
+        s_vec_sr_runs++;
+    else
+        s_vec_sr_declined++;
+    return done;
+}

@@ -10,6 +10,10 @@
 #include "native_j3d.h"
 /* Certified game math entry hooks. */
 #include "native_game_math.h"
+/* Certified native entries, the second set (scripts/windows/native_entries.py). */
+#include "native_fifo.h"
+#include "native_bg.h"
+#include "native_mtxcalc.h"
 #include <stdlib.h>
 #include <stdio.h>
 static int s_native_math;
@@ -219,6 +223,25 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
         /* Certified game math entry hooks use the existing native opt-in. */
         bluewake_native_game_math_enabled = s_native_math;
         if (s_native_math) atexit(bluewake_native_game_math_report);
+        /* Certified native entries, the second set (scripts/windows/native_entries.py
+         * hooks them where their translations are the tested ones): the J3D FIFO
+         * matrix loads, two collision checks, PSMTXMultVecSR and the joint
+         * matrix calculations, with the other certified natives;
+         * BLUEWAKE_NATIVE_ENTRIES=0 leaves them to the translation. */
+        {
+            const char* entries = getenv("BLUEWAKE_NATIVE_ENTRIES");
+            const int on = s_native_math && !(entries && strcmp(entries, "0") == 0);
+            bluewake_native_fifo_enabled = on;
+            bluewake_native_bg_enabled = on;
+            bluewake_native_vec_sr_enabled = on;
+            bluewake_native_mtxcalc_enabled = on;
+            if (on) {
+                atexit(bluewake_native_fifo_report);
+                atexit(bluewake_native_bg_report);
+                atexit(bluewake_native_vec_sr_report);
+                atexit(bluewake_native_mtxcalc_report);
+            }
+        }
         if (s_native_math) {
             atexit(bluewake_native_skin_report);
             atexit(bluewake_native_vec_report);
