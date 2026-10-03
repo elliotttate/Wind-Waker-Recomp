@@ -9,7 +9,9 @@ static bool g_keep_trees, g_thirty_minutes;
 void bluewake_forest_water_set_ftree_text(u32 linked_start) {
     // Module 317, section 1: action_waitM_main, immediately after getTimer.
     // The recompiler supplies the stable linked address, independent of the
-    // game's changing REL allocation and save-state restoration.
+    // game's changing REL allocation and save-state restoration. For GZLE01
+    // that is 0xC13B1850; naming it here keeps the Windows builder's direct
+    // calls (scripts/windows/direct_calls.py) from returning past it.
     bluewake_forest_water_tree_timer_check =
         linked_start != 0u ? linked_start + 0x176Cu : 0u;
 }

@@ -67,6 +67,8 @@ void bluewake_fast_load_reload(void);
 // climb.h: BLUEWAKE_CLIMB and BLUEWAKE_CLIMB_STAMINA read again, and the
 // stamina wheel's place in the game's picture.
 void bluewake_climb_reload(void);
+// forest_water.h: BLUEWAKE_FOREST_WATER_KEEP_TREES and _30_MINUTES read again.
+void bluewake_forest_water_reload(void);
 bool bluewake_climb_hud(float* fraction, bool* exhausted, float* x, float* y, float* aspect, float* alpha);
 // save_state.h: a save (false) or a load of the latest state (true), done by
 // the game thread at its next clean point.
@@ -105,6 +107,10 @@ struct Settings {
     bool quick_doors = true;   // no walk-in or door closing behind Link (quick_doors.h)
     bool climb = false;        // climb any wall on a stamina wheel (climb.h)
     int climb_stamina = 12;    // seconds of climbing on a full wheel
+    // The Forest Water challenge (forest_water.h): watered trees kept when the
+    // water runs out, and a 30-minute timer for the next scoop. Both off.
+    bool forest_keep_trees = false;
+    bool forest_30_minutes = false;
     // Controls: apply at once.
     bool mouse_camera = true;
     double mouse_sensitivity = 1.0;
@@ -126,6 +132,9 @@ struct Settings {
     bool betterww = false;
     std::map<std::string, bool> options;  // only those changed from their default
     bool hd_textures = false;
+    // The pack's folder when it is not Load\Textures\GZLE01: the Wind Waker HD
+    // importer's --install names its own (docs/WWHD_TEXTURES.md).
+    std::string texture_pack;
     bool native_60hz = false;  // experimental 60 Hz gameplay (docs/SIMULATION_60HZ.md)
     bool lle_audio = false;
 };
@@ -181,6 +190,8 @@ void load_file() {
         else if (k == "quick_doors") d.quick_doors = parse_bool(v);
         else if (k == "climb") d.climb = parse_bool(v);
         else if (k == "climb_stamina") d.climb_stamina = std::clamp(std::atoi(v.c_str()), 4, 30);
+        else if (k == "forest_water_keep_trees") d.forest_keep_trees = parse_bool(v);
+        else if (k == "forest_water_30_minutes") d.forest_30_minutes = parse_bool(v);
         else if (k == "show_fps") d.show_fps = parse_bool(v);
         else if (k == "pause_unfocused") d.pause_unfocused = parse_bool(v);
         else if (k == "compile_shaders_first") d.shaders_first = parse_bool(v);
@@ -200,6 +211,7 @@ void load_file() {
         else if (k == "betterww") d.betterww = parse_bool(v);
         else if (k.rfind("option.", 0) == 0) d.options[k.substr(7)] = parse_bool(v);
         else if (k == "hd_textures") d.hd_textures = parse_bool(v);
+        else if (k == "texture_pack") d.texture_pack = v;
         else if (k == "lle_audio") d.lle_audio = parse_bool(v);
         else if (k == "native_60hz") d.native_60hz = parse_bool(v);
     }
@@ -225,6 +237,8 @@ void save_file() {
                  d.smooth_steps == kStepsDisplay ? "display" : d.smooth_steps >= 3 ? "120" : "60",
                  d.fast_forward, d.quick_doors);
     std::fprintf(f, "climb=%d\nclimb_stamina=%d\n", d.climb, d.climb_stamina);
+    std::fprintf(f, "forest_water_keep_trees=%d\nforest_water_30_minutes=%d\n", d.forest_keep_trees,
+                 d.forest_30_minutes);
     std::fprintf(f, "mouse_camera=%d\nmouse_sensitivity=%.2f\nmouse_invert_y=%d\n", d.mouse_camera,
                  d.mouse_sensitivity, d.mouse_invert_y);
     std::fprintf(f, "controller_invert_x=%d\ncontroller_invert_y=%d\n", d.pad_invert_x, d.pad_invert_y);
@@ -236,6 +250,8 @@ void save_file() {
     std::fprintf(f, "aspect=%s\nkeep_aspect=%d\nbetterww=%d\nhd_textures=%d\nlle_audio=%d\n", d.aspect.c_str(),
                  d.keep_aspect, d.betterww, d.hd_textures, d.lle_audio);
     std::fprintf(f, "native_60hz=%d\n", d.native_60hz);
+    if (!d.texture_pack.empty())
+        std::fprintf(f, "texture_pack=%s\n", d.texture_pack.c_str());
     for (const auto& [name, on] : d.options)
         std::fprintf(f, "option.%s=%d\n", name.c_str(), on);
     const bool ok = std::fclose(f) == 0;
@@ -286,6 +302,10 @@ void default_window(double ratio, int* w, int* h) {
 }
 
 std::string texture_folder() { return g_data_dir + "Load\\Textures\\GZLE01"; }
+// The folder the pack is loaded from: the one chosen, else texture_folder().
+std::string texture_pack_folder(const Settings& d) {
+    return d.texture_pack.empty() ? texture_folder() : d.texture_pack;
+}
 
 // --- the window -------------------------------------------------------------
 
@@ -500,8 +520,8 @@ void restart() {
 bool needs_restart() {
     const Settings &a = g_saved, &b = g_launched;
     return a.aspect != b.aspect || a.keep_aspect != b.keep_aspect || a.betterww != b.betterww ||
-           a.options != b.options || a.hd_textures != b.hd_textures || a.lle_audio != b.lle_audio ||
-           a.native_60hz != b.native_60hz;
+           a.options != b.options || a.hd_textures != b.hd_textures || a.texture_pack != b.texture_pack ||
+           a.lle_audio != b.lle_audio || a.native_60hz != b.native_60hz;
 }
 
 void restart_note(bool differs) {
@@ -782,13 +802,38 @@ void tab_enhancements() {
     ImGui::Unindent();
     ImGui::EndDisabled();
     ImGui::Spacing();
+    ImGui::TextUnformatted("Forest Water challenge");
+    if (ImGui::Checkbox("Keep watered trees when time runs out", &d.forest_keep_trees)) {
+        _putenv_s("BLUEWAKE_FOREST_WATER_KEEP_TREES", d.forest_keep_trees ? "1" : "0");
+        bluewake_forest_water_reload();
+        changed();
+    }
+    ImGui::TextDisabled("    Forest Water still expires. Refill and carry on with the trees still to water.");
+    if (ImGui::Checkbox("30-minute Forest Water timer", &d.forest_30_minutes)) {
+        _putenv_s("BLUEWAKE_FOREST_WATER_30_MINUTES", d.forest_30_minutes ? "1" : "0");
+        bluewake_forest_water_reload();
+        changed();
+    }
+    ImGui::TextDisabled("    Applies the next time Link scoops Forest Water.");
+    ImGui::Spacing();
     if (ImGui::Checkbox("HD texture pack", &d.hd_textures))
         changed();
     restart_note(d.hd_textures != g_launched.hd_textures);
     ImGui::SameLine();
     if (ImGui::SmallButton("Open the texture folder"))
-        open_folder(texture_folder());
-    ImGui::TextDisabled("    A Dolphin-format pack for GZLE01 (its folder of .png or .dds files) goes in that folder.");
+        open_folder(texture_pack_folder(d));
+    if (d.texture_pack.empty()) {
+        ImGui::TextDisabled("    A Dolphin-format pack for GZLE01 (its folder of .png or .dds files) goes in that folder.");
+    } else {
+        ImGui::TextDisabled("    The pack in %s", d.texture_pack.c_str());
+        restart_note(d.texture_pack != g_launched.texture_pack);
+        ImGui::Indent();
+        if (ImGui::SmallButton("Use Load\\Textures\\GZLE01 instead")) {
+            d.texture_pack.clear();
+            changed();
+        }
+        ImGui::Unindent();
+    }
 }
 
 void tab_game() {
@@ -1256,7 +1301,7 @@ extern "C" void bw_settings_apply_launch(void) {
     CreateDirectoryA((g_data_dir + "Load\\Textures").c_str(), nullptr);
     CreateDirectoryA(texture_folder().c_str(), nullptr);
     if (d.hd_textures)
-        env_default("DOL_AURORA_TEXTURE_PACK", texture_folder());
+        env_default("DOL_AURORA_TEXTURE_PACK", texture_pack_folder(d));
     if (d.lle_audio)
         env_default("BLUEWAKE_DSP_MODE", "lle");
     if (env_set("BLUEWAKE_QUICK_DOORS"))
@@ -1275,6 +1320,14 @@ extern "C" void bw_settings_apply_launch(void) {
         d.climb_stamina = std::clamp(std::atoi(std::getenv("BLUEWAKE_CLIMB_STAMINA")), 4, 30);
     else
         env_default("BLUEWAKE_CLIMB_STAMINA", std::to_string(d.climb_stamina));
+    if (env_set("BLUEWAKE_FOREST_WATER_KEEP_TREES"))
+        d.forest_keep_trees = std::getenv("BLUEWAKE_FOREST_WATER_KEEP_TREES")[0] == '1';
+    else
+        env_default("BLUEWAKE_FOREST_WATER_KEEP_TREES", d.forest_keep_trees ? "1" : "0");
+    if (env_set("BLUEWAKE_FOREST_WATER_30_MINUTES"))
+        d.forest_30_minutes = std::getenv("BLUEWAKE_FOREST_WATER_30_MINUTES")[0] == '1';
+    else
+        env_default("BLUEWAKE_FOREST_WATER_30_MINUTES", d.forest_30_minutes ? "1" : "0");
     if (env_set("BLUEWAKE_SIMULATION_60HZ"))
         d.native_60hz = std::getenv("BLUEWAKE_SIMULATION_60HZ")[0] == '1';
     else if (d.native_60hz)

@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 _native_yaz0 = None
-_native_path = Path(sys.prefix) / "libwwhd_yaz0.so"
+_native_path = Path(sys.prefix) / ("wwhd_yaz0.dll" if sys.platform == "win32" else "libwwhd_yaz0.so")
 if _native_path.is_file():
     import ctypes
     _native_yaz0 = ctypes.CDLL(str(_native_path)).wwhd_yaz0_decode

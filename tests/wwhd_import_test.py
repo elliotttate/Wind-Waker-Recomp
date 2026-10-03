@@ -393,9 +393,17 @@ class TextureTests(unittest.TestCase):
             settings = base / "settings.ini"
             original = "# personal settings\nDOL_AURORA_TEXTURE_PACK=old\nBLUEWAKE_HAPTICS=classic\nOTHER=value\n"
             settings.write_text(original)
-            install(base / "pack", settings)
+            install(base / "pack", settings, windows=False)
             self.assertIn("BLUEWAKE_HAPTICS=classic\nOTHER=value\n", settings.read_text())
+            self.assertIn("DOL_AURORA_TEXTURE_PACK=" + str((base / "pack").resolve()) + "\n", settings.read_text())
             self.assertEqual(next(base.glob("settings.ini.before-wwhd-*")).read_text(), original)
+            # BlueWake for Windows: its own keys, the pack turned on and named.
+            windows = base / "windows" / "settings.ini"
+            windows.parent.mkdir()
+            windows.write_text("# BlueWake settings\nhd_textures=0\nclimb=1\ntexture_pack=old\nhaptics=classic\n")
+            install(base / "pack", windows, windows=True)
+            self.assertEqual(windows.read_text(), "# BlueWake settings\nclimb=1\nhaptics=classic\nhd_textures=1\n"
+                             "texture_pack=" + str((base / "pack").resolve()) + "\n")
             invalid = base / "bad.key"
             invalid.write_bytes(b"x")
             with self.assertRaises(FormatError):

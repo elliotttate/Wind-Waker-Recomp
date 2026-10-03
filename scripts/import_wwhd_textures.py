@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import hashlib
 import importlib.metadata
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -28,7 +29,26 @@ from wwhd.font import BitmapFont
 from wwhd.ui import LAYOUT_SPRITES, OPENING_PANELS, fit_sprite, font_sprites, opening_sprite
 
 ROOT = Path(__file__).resolve().parent.parent
-SUPPORT = Path.home() / "Library/Application Support/Wind Waker Recomp"
+WINDOWS = sys.platform == "win32"
+if WINDOWS:
+    # The Windows app's data folder (windows/src/win_entry.c): settings.ini,
+    # disc.txt (the disc it remembers) and Load\Textures.
+    SUPPORT = Path(os.environ.get("APPDATA") or Path.home() / "AppData/Roaming") / "BlueWake"
+else:
+    SUPPORT = Path.home() / "Library/Application Support/Wind Waker Recomp"
+
+
+def default_gc_disc() -> Path:
+    """The GameCube ISO the app already plays: on Windows the .iso or .gcm it
+    remembers (an .rvz it unpacked once to GZLE01.iso in its data folder)."""
+    if WINDOWS:
+        try:
+            remembered = Path((SUPPORT / "disc.txt").read_text(encoding="utf-8").strip())
+            if remembered.suffix.lower() in (".iso", ".gcm") and remembered.is_file():
+                return remembered
+        except (OSError, ValueError):
+            pass
+    return SUPPORT / "GZLE01.iso"
 
 
 def resource(path: str) -> tuple[str, ...]:
@@ -216,13 +236,19 @@ def file_sha256(path: Path) -> str:
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
-def install(pack: Path, settings: Path):
+def install(pack: Path, settings: Path, windows: bool = WINDOWS):
     text = settings.read_text() if settings.exists() else ""
-    value = "DOL_AURORA_TEXTURE_PACK=" + str(pack.resolve())
-    if re.search(r"^DOL_AURORA_TEXTURE_PACK=.*$", text, flags=re.M):
-        new = re.sub(r"^DOL_AURORA_TEXTURE_PACK=.*$", lambda _: value, text, flags=re.M)
+    if windows:
+        # BlueWake for Windows: its own keys (windows/src/win_settings.cpp), the
+        # HD texture pack turned on and loaded from this folder.
+        kept = [line for line in text.splitlines() if not re.match(r"(hd_textures|texture_pack)=", line)]
+        new = "\n".join(kept + ["hd_textures=1", "texture_pack=" + str(pack.resolve())]) + "\n"
     else:
-        new = text + ("\n" if text and not text.endswith("\n") else "") + value + "\n"
+        value = "DOL_AURORA_TEXTURE_PACK=" + str(pack.resolve())
+        if re.search(r"^DOL_AURORA_TEXTURE_PACK=.*$", text, flags=re.M):
+            new = re.sub(r"^DOL_AURORA_TEXTURE_PACK=.*$", lambda _: value, text, flags=re.M)
+        else:
+            new = text + ("\n" if text and not text.endswith("\n") else "") + value + "\n"
     settings.parent.mkdir(parents=True, exist_ok=True)
     if settings.exists():
         backup = settings.with_name(settings.name + ".before-wwhd-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))
@@ -377,13 +403,13 @@ def build(args) -> dict:
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("hd_source", type=Path, help="USA Wind Waker HD WUX/WUD, or decrypted content folder")
-    p.add_argument("--gc-disc", type=Path, default=SUPPORT / "GZLE01.iso", help="GameCube GZLE01 rev 0 ISO")
+    p.add_argument("--gc-disc", type=Path, default=default_gc_disc(), help="GameCube GZLE01 rev 0 ISO")
     p.add_argument("--disc-key", type=Path, help="WUD disc key file (default: game.key beside image)")
     p.add_argument("--common-key", type=Path, help="common key file to decrypt the disc's own ticket")
     p.add_argument("--title-key", type=Path, help="disc-specific decrypted title key file, instead of common key")
     p.add_argument("--output", type=Path, default=SUPPORT / "Load/Textures/WWHD", help="new output folder")
     p.add_argument("--fallback-pack", type=Path, help="existing pack for keys not replaced by the HD disc")
-    p.add_argument("--install", action="store_true", help="select the completed pack for the next Mac app launch")
+    p.add_argument("--install", action="store_true", help="select the completed pack for the app's next launch")
     p.add_argument("--settings", type=Path, default=SUPPORT / "settings.ini")
     p.add_argument("--only", action="append", help="limit to HD resource paths containing this text (for development)")
     args = p.parse_args()
@@ -395,7 +421,9 @@ def main():
     print(f"Created {report['replacement_count']} replacements; {len(report['conflicts_skipped'])} conflicts skipped.\n"
           + (f"Added {report['fallback']['texture_count']} fallback replacements.\n" if report['fallback'] else "")
           + f"Pack: {args.output.expanduser().resolve()}\n"
-          + ("Selected for the next app launch.\n" if args.install else "Choose this folder in Display > HD texture pack.\n"))
+          + ("Selected for the next app launch.\n" if args.install else
+             "Run again with --install to select it.\n" if WINDOWS else
+             "Choose this folder in Display > HD texture pack.\n"))
     return 0
 
 

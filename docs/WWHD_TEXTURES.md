@@ -19,6 +19,17 @@ the versions pinned in `scripts/wwhd/requirements.txt`, and builds a small Yaz0
 decoder if a C compiler is available. Without a compiler the Python decoder
 works, but takes longer. No game data or keys are downloaded by this script.
 
+On Windows, with Python 3.11 or newer installed, run this from PowerShell in the
+repository instead (it builds the decoder with Visual Studio's C compiler when
+one is installed):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup_wwhd_tools.ps1
+```
+
+and use `build\wwhd-tools\Scripts\python.exe` wherever the commands below say
+`build/wwhd-tools/bin/python`.
+
 ## Import your discs
 
 For a WUX/WUD image, supply your disc key and a common key file. Keys are
@@ -51,7 +62,9 @@ build/wwhd-tools/bin/python scripts/import_wwhd_textures.py /path/to/content \
 
 The default GameCube disc is the ISO already imported by the Mac app, at
 `~/Library/Application Support/Wind Waker Recomp/GZLE01.iso`. You may omit
-`--gc-disc` when that file exists.
+`--gc-disc` when that file exists. On Windows it is the `.iso` or `.gcm` that
+BlueWake remembers (`%APPDATA%\BlueWake\disc.txt`), or the ISO it unpacked
+from a Dolphin `.rvz` (`%APPDATA%\BlueWake\GZLE01.iso`).
 
 ## Keep an existing pack as fallback
 
@@ -80,6 +93,14 @@ The default output is
 and backs up the previous settings. Restart the app to load it. You can also
 omit `--install` and paste the output path into **Display > HD texture pack**.
 Choose a different pack, or **None**, to revert.
+
+On Windows the default output is `%APPDATA%\BlueWake\Load\Textures\WWHD`.
+Close BlueWake first: `--install` turns on **HD texture pack** and points it at
+that folder in `%APPDATA%\BlueWake\settings.ini` (`hd_textures=1`,
+`texture_pack=...`), keeping a backup of the previous file, and BlueWake
+rewrites that file when its settings change. The settings menu (F1, Mods)
+then names the pack's folder, with a button to go back to
+`Load\Textures\GZLE01`.
 
 Use `--output /path/to/new-folder` to choose another output folder. Existing
 folders are preserved; the importer requires a new destination. For an

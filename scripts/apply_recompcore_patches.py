@@ -44,15 +44,20 @@ def main():
     lock = json.loads((root / "config/dependencies.lock.json").read_text())
     entry = next(d for d in lock["dependencies"] if d["id"] == "recompcore")
     pin = entry["sha"]
+    checkout = (args.checkout or root / "ref/recompcore").resolve()
     # A pin that already contains the runtime delta (the Windows line's fork
-    # commits) names no working-tree patch: nothing to apply.
+    # commits) names no working-tree patch: the checkout must be that commit
+    # exactly.
     if "working_tree_patch_manifest" not in entry:
+        if git(checkout, "rev-parse", "HEAD").decode().strip() != pin:
+            raise ValueError(f"ref/recompcore is not at the pinned {pin}")
+        if git(checkout, "status", "--porcelain", "--untracked-files=no"):
+            raise ValueError("ref/recompcore has local changes; the build must use the pinned source exactly")
         print("RecompCore runtime patch: none for this pin (the pinned commit carries it)")
         return
     manifest = json.loads((root / entry["working_tree_patch_manifest"]).read_text())
     if manifest["base_sha"] != pin:
         raise ValueError("runtime patch base differs from the dependency lock")
-    checkout = (args.checkout or root / "ref/recompcore").resolve()
     patch = root / manifest["patch"]
     print("RecompCore runtime patch:", apply(checkout, pin, patch, manifest["sha256"], args.check))
 
