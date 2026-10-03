@@ -74,6 +74,8 @@ add_library(${MODULE_NAME} SHARED
   native_fifo.c
   native_bg.c
   native_mtxcalc.c
+  # Certified native entries, the third set: the actor search by name.
+  native_search.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c
