@@ -905,6 +905,11 @@ int main(void) {
                      ROOT / "scripts/windows/native_entries.py"):
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
+        # Certified native entries, the third set (the actor search by name):
+        # its sources (its hooks are native_entries.py's, above).
+        for path in (ROOT / "cmake/composite/native_search.c", ROOT / "cmake/composite/native_search.h"):
+            key.update(path.relative_to(ROOT).as_posix().encode())
+            key.update(path.read_bytes())
         return key.hexdigest()
 
     def train(self):

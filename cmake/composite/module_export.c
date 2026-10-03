@@ -14,6 +14,8 @@
 #include "native_fifo.h"
 #include "native_bg.h"
 #include "native_mtxcalc.h"
+/* Certified native entries, the third set: the actor search by name. */
+#include "native_search.h"
 #include <stdlib.h>
 #include <stdio.h>
 static int s_native_math;
@@ -241,6 +243,11 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
                 atexit(bluewake_native_vec_sr_report);
                 atexit(bluewake_native_mtxcalc_report);
             }
+            /* The third set: strcmp and dStage_searchName (the actor search
+             * by name), with the same switch. */
+            bluewake_native_search_enabled = on;
+            if (on)
+                atexit(bluewake_native_search_report);
         }
         if (s_native_math) {
             atexit(bluewake_native_skin_report);

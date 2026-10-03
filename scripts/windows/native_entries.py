@@ -3,6 +3,9 @@
 translated GZLE01 functions with a native form in cmake/composite
 (native_fifo.c, native_bg.c, native_vec.c's PSMTXMultVecSR,
 native_mtxcalc.c).
+The third set (native_search.c: strcmp and dStage_searchName, the actor
+search by name) is hooked the same way, by the entries added below the
+second set's.
 
   native_entries.py COMPOSITE_SRC
   native_entries.py --hashes COMPOSITE_SRC    (print each entry's body hash)
@@ -51,6 +54,10 @@ GROUPS = {
     "vec_sr": ("native_vec.h", "bluewake_native_vec_sr_enabled", "bluewake_native_vec_sr(ctx)"),
     "mtxcalc": ("native_mtxcalc.h", "bluewake_native_mtxcalc_enabled", "bluewake_native_mtxcalc(ctx, 0x{entry:08X}u)"),
 }
+# --- The third set: the actor search by name (cmake/composite/native_search.c) ---
+GROUPS["search"] = ("native_search.h", "bluewake_native_search_enabled",
+                    "bluewake_native_search(ctx, 0x{entry:08X}u)")
+# --- end of the third set's groups ---
 
 # entry -> (name, group, fragments [(chunk start, first address, end address)],
 #           SHA-256 of the canonical fragments and prepaid copies)
@@ -85,6 +92,15 @@ ENTRIES = {
                   (0x803096E0, 0x8030D0C8, 0x8030D0FC)],
                  "8df3c54d0620dc3152b7b640038b7637d9514d3e51cd6133f4dfb4b836f9c324"),
 }
+# --- The third set (tests/native_search_test.c): strcmp, and dStage_searchName
+# with the strcmps it calls in strcmp's chunk, which its native stands in for
+# too. ---
+ENTRIES[0x8032DB44] = ("strcmp", "search", [(0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
+                       "0a578813114c0553f81a447d7d0c6ef7d36b22afc5e5f6465ae01517bb5a2375")
+ENTRIES[0x80041544] = ("dStage_searchName", "search",
+                       [(0x8003D6E0, 0x80041544, 0x800415B4), (0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
+                       "bdf91cee67046b81e7b60bb4669129749a912db84cd9fd96028b74a4cac01dd7")
+# --- end of the third set's entries ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
 J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"
