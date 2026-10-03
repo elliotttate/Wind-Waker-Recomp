@@ -1,3 +1,96 @@
+## 2026-10-02 What we took from DeepSea: pipelines, Smooth Motion, the GX worker, training, natives, build time
+
+The borrow list in DEEPSEA_COMPARISON_2026-10-02.md, item by item, measured on the i9-13900KF + RTX 5090.
+RecompCore 44e5c2c (patches/recompcore 0121-0129, branch `windows-release`; 0121, Dawn's device lock, was
+written in another session for a crash after a save state loads, and the pipeline threads depend on it).
+
+**Priority and the slow-game detector.** The process runs above normal priority (a6f8ea9;
+`BLUEWAKE_PRIORITY=0` opts out): with the game on four E-cores and 8 threads spinning beside it, it kept
+full speed with and without, so this is insurance. Smooth Motion's slow-game test is now the median of the
+last 60 frame gaps, gaps of 150 ms or more left out, two slow medians in a row (0122): six held hitches of
+120-200 ms (`BLUEWAKE_TEST_STALL`) no longer drop the in-between frames; two E-cores, really too slow,
+still do.
+
+**Shader stutter.**
+- Pipelines compile on a quarter of the logical CPUs, 1-4 (0123, with the device lock): the 213-pipeline
+  seed compiled in 1.06-1.25 s instead of 3.7-4.4; booting into Gohma's room, draws skipped 3,259 against
+  15,930-20,192.
+- The bundled seed is 513 pipelines from a tour of 49 places (04e0e1b): booting into the three save states
+  asks for no pipeline it lacks.
+- Settings, Display, "Compile shaders before playing" (238a829) holds the game at its first present behind a
+  progress panel until the queued pipelines are made.
+- The ubershader (0128-0129): a draw whose pipeline is still compiling is drawn by one WGSL module that
+  reads its shader key from a uniform (gxcore_uber.cpp), with a pipeline per fixed-function state; forced
+  on every draw it draws the lava rooms' frames identical to the specialized pipelines'. Its two shaders
+  take about 650 ms each to compile when Dawn's blob cache lacks them, so one pipeline per shader is made
+  first, and only when nothing else is queued unless an earlier run made one. Draws left out (counting a
+  batch's draws), the old seed: a first launch, Gohma's room 5,933 against 6,069 without, the lava room
+  5,296 against 5,297, the bridge 4,613 against 4,848; after playing Outset once, 950 against 4,860, 141
+  against 3,477 and 215 against 3,377. On by default with D3D12 only (`DOL_AURORA_UBERSHADER=0/1/2`);
+  Metal and Vulkan have not drawn it.
+
+**Smooth Motion coverage.**
+- Colours blend in the in-between frames (0126): light, material and ambient colours, TEV colour and
+  konst registers, fog colour. Real frames unchanged (31 of 31); the in-between frames' fading wind streaks
+  now halfway; no measurable cost.
+- Cloth (0125 with 40953dd): a dCloth packet's strips (flags) and the boat's sail are tagged as a draw
+  scope over indexed draws and blended vertex by vertex. Takes a module that watches 0x80063728 and
+  0x800E93B8 (built from 40953dd on). Checked with the new module: the three flags on the ship at sea
+  room 14 are drawn as 8 tagged strips of 10 vertices each, matched and blended with their positions
+  captured every frame; real frames identical with the tags on and off. Not seen on screen yet (the flags
+  were behind the deck's roof in the views tried).
+
+**The GX worker.**
+- The decode finds a draw's attribute arrays once and multiplies by 1/2^frac (0124; 285 million
+  components compared bit for bit).
+- A draw's 2.8 KB vertex constants are kept when the transform state's version is the draw before's
+  (0127): GX worker CPU per game frame 16.4-17.0 ms against 18.8-19.2, four E-cores, unpaced.
+- The compact vertex (132 to about 108 bytes with unorm8x4 colours) was not done: a profile of the GX
+  worker (four E-cores, Smooth Motion 60) has it idle 64 percent of the time, and vertex writes and copies
+  are a few percent of the rest; the saving would be under 2 percent of its working time, against
+  changing the vertex layout in gxcore, the ubershader, frame interpolation and the tests.
+
+**Training, the app, build time** (135a62d).
+- The training's plain playback goes on from Outset to ten places by test warp: 425 of 813 translated
+  functions ran, against 288 (TRAINING_VERSION 4).
+- The app is compiled with its own profile (windows/pgo/app.profdata, scripts/windows/train_app_profile.py)
+  and ThinLTO: GX worker CPU per game frame 13.8-14.3 ms against 16.6-17.2, game thread 22.4-23.2 against
+  23.9-24.3.
+- `--tiered` compiles the chunks the training never ran (367) at -O1 without GVN's memory dependence:
+  the module compiled in 14-16 minutes instead of about 39 (the 0.4.0 build: 35). The cold chunks were already
+  compiled for size by the profile; Gohma's room (which no training visits) below shows no loss.
+
+**Natives** (the second set, docs/status/NATIVE_ENTRIES_2026-10-02.md, merged from `game-natives-2`):
+J3DFifoLoadPosMtxImm, NrmMtxImm and NrmMtxImm3x3, PSMTXMultVecSR, the Basic, Softimage and Maya
+calcTransform, dBgW::ChkGrpThrough and cBgS_Chk::ChkSameActorPid, each certified against its translation
+(60,000 cases each, 0 mismatches) and hooked only where the translation hashes to the tested one
+(`native entries: 9/9 certified`). In play they almost never decline: over the training's two playbacks
+(the opening, Outset and the tour; the instrumented module's counts) calcTransform ran natively in 97.4
+percent of 5.4 million calls, the FIFO matrix loads in 99.7 percent of 20.7 million, the two collision
+checks in 99.3 percent of 163 million, PSMTXMultVecSR in 91 percent of 318,000. Synchronous captures
+(`DOL_GX_FIFO_WORKER=0`) with them on and off (`BLUEWAKE_NATIVE_ENTRIES=0`) and with 0.4.0's module: the
+Outset route 19 of 19 identical, Gohma's room from its save state 26 of 26. (The module's reports at exit run - the
+profile counts them - but their lines no longer reach the log, 0.4.0's included; the last run whose log has
+them is from 2026-10-01. The counts here are the profile's.)
+
+**All of it, against 0.4.0** (the builder at 1fcf9e3 with `--tiered`: module be22aba4, the app with
+RecompCore 44e5c2c, its profile and ThinLTO). Four E-cores (`0x000F0000`), unpaced, Smooth Motion off,
+three runs each, interleaved:
+
+| | game FPS | GX worker CPU per game frame | game thread CPU per game frame |
+| --- | --- | --- | --- |
+| Outset route, 0.4.0 | 37.2-37.7 | 19.8-20.0 ms | 23.8-24.2 ms |
+| Outset, new app, 0.4.0's module | 36.6-41.9 | 12.9-14.5 ms | 21.5-22.5 ms |
+| Outset, new app and module | 44.2-44.9 | 12.2-12.5 ms | 20.5-20.6 ms |
+| Gohma's room, 0.4.0 (the one run of three that started) | 48.7 | 15.6 ms | 16.4 ms |
+| Gohma's room, new app, 0.4.0's module | 48.0-52.8 | 12.3-12.7 ms | 15.6 ms |
+| Gohma's room, new app and module | 48.1-54.4 | 12.2-12.4 ms | 15.4-16.0 ms |
+
+Booting into Gohma's room on those four cores, 0.4.0 stopped right after the load in 4 of 6 runs (the
+device lock's crash); the new app in 0 of 12. In Gohma's room, which no training visits, the tiered module
+is as fast as 0.4.0's fully optimized one. One of the builder's two instrumented training playbacks stopped
+at retrace 38,482 of 38,500 and was run again (the builder retries once); not seen in any other run.
+
 ## 2026-10-02 A crash after a save state loads: Dawn used from several threads without its lock
 
 **What was wrong.** About one boot in ten straight into a save state (`BLUEWAKE_LOAD_STATE`) crashed in the
@@ -44,6 +137,7 @@ own locks cannot deadlock against it. The log says `Device lock (implicit device
   both ways.
 
 The Mac line (RecompCore `bluewake`) creates its device the same way and needs the same commit.
+
 ## 2026-10-02 Windows 0.4.0: the lava's colour and controller vibration
 
 Published as v0.4.0 (tag at main d102695) with the Mac's 0.2.0 build: Windows from windows-release 7ca0cb9,

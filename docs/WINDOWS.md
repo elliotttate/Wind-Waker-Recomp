@@ -110,15 +110,19 @@ the verified digest, adds the mods, compiles the game module and the app, and wr
 `build\windows\BlueWake`. Each stage prints its progress; full logs are in `build\windows\logs`. Rerunning the
 same command reuses finished work.
 
-The first build takes a few hours; on the PC above, most of it is compiling the game module with its
-optimization profile (75 minutes) and training that profile (below, about 25 minutes). Later builds reuse all
-of it and take minutes, unless the game source, RecompCore's runtime, the compiler or `--march` changed.
+The first build takes about an hour on the i9-13900KF: training the optimization profile (below, about 25
+minutes) and compiling the game module with it (about 15 minutes: the code the training ran at `-O2`, the rest,
+which the profile marks cold, at `-O1`; `--no-tiered` compiles all of it at `-O2`, about 25 minutes longer, and
+measured no faster in play). Later builds reuse all of it and take minutes, unless the game source, RecompCore's
+runtime, the compiler or `--march` changed.
 
 **Optimization training.** Like the Mac builder's local training, the Windows builder makes an optimization
 profile from your own game: it compiles an instrumented game module (a couple of minutes), plays the opening
-through to player control on Outset twice without a window (once plain, once with widescreen and Better Wind
-Waker's options, about 11 minutes each), and compiles the real module with the counts (clang's
-`-fprofile-instr-use`). The profile is made from your disc, so it stays in `build\windows\pgo-local` and is
+through to player control on Outset twice without a window (once plain, going on to tour ten places by warp -
+Windfall, Dragon Roost and its cavern, Forest Haven, the Forbidden Woods, the Tower of the Gods, the Forsaken
+Fortress, the sea, Hyrule - in about 17 minutes; once with widescreen and Better Wind Waker's options, about 7),
+and compiles the real module with the counts (clang's `-fprofile-instr-use`). The app itself is compiled with a
+profile of its own code that comes with the source (`windows/pgo/app.profdata`) and ThinLTO. The profile is made from your disc, so it stays in `build\windows\pgo-local` and is
 never shared. `--no-train` skips it (a faster first build, a slower game).
 
 Options (`--help` lists all):
@@ -128,6 +132,8 @@ Options (`--help` lists all):
 | `--source-only` | Stop after generating the source: checks your tools, disc and translation in a few minutes |
 | `--no-mods` | Skip the mods (widescreen 16:9 and 16:10, Better Wind Waker's options) |
 | `--no-train` | Skip the optimization training (see above) |
+| `--no-tiered` | Compile all of the game module at `-O2` (see above) |
+| `--no-app-pgo` | Compile the app without its profile and ThinLTO |
 | `--retrain` | Train again although nothing the profile depends on changed |
 | `--jobs N` | Parallel compile jobs (default: the cores, as far as free memory allows) |
 | `--march LEVEL` | CPU level for the game module and the app (default `x86-64-v3`) |

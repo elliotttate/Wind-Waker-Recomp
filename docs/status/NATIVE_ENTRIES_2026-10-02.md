@@ -298,3 +298,13 @@ Checked on the hooked copy:
   themselves, and the test was run both ways.
 - **Other builds.** The hooks come only from this Windows source step. A tree without them never calls
   the natives.
+
+## In play (2026-10-02)
+
+Merged into windows-release and built (`native entries: 9/9 certified, 9 new hooks in 5 chunks`). The
+instrumented module's counts over the training's two playbacks (the opening, Outset and a tour of ten places):
+calcTransform ran natively in 97.4 percent of 5.4 million calls (Basic 1.2 million, Softimage 7, Maya 4.2
+million), the FIFO matrix loads in 99.7 percent of 20.7 million, ChkSameActorPid and ChkGrpThrough together in
+99.3 percent of 163 million (55 and 107 million), PSMTXMultVecSR in 91 percent of 318,000. Synchronous captures
+with them on and off (`BLUEWAKE_NATIVE_ENTRIES=0`) and with 0.4.0's module: Outset 19 of 19 frames identical,
+Gohma's room 26 of 26.

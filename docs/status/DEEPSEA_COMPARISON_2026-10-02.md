@@ -37,7 +37,13 @@ PGO profile, the gap stays above 1.5 times.
   33 ms pair in their heaviest scene), so they cost the slowest thread; ours are built from the recorded draws
   on the graphics threads and cost the game thread nothing.
 
-## Worth borrowing (none measured here yet)
+## Worth borrowing
+
+What came of each, measured, is in CURRENT.md ("What we took from DeepSea", 2026-10-02): all nine were taken
+but the compact vertex (item 5's second half, measured as under 2 percent of the GX worker's work), and
+together they took Outset on four E-cores from 37.5 to 44.5 game frames a second unpaced (GX worker 19.9 to
+12.3 ms of CPU per game frame, game thread 24.0 to 20.6).
+
 
 1. **Game-thread priority:** they raise the emulation thread to ABOVE_NORMAL while 60 fps is on
    (`mods/frame60-accum/mod.c:281-319`) and measured fewer governor drops under a CPU hog; we never call

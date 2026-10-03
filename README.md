@@ -250,7 +250,9 @@ game's code. Details are in [docs/MODS.md](docs/MODS.md).
 ## Known issues
 
 - **First minutes of a new install:** rendering pipelines compile as new scenes appear, so the first
-  visits hitch briefly; later launches reuse them.
+  visits can miss a few objects for a moment; later launches reuse them. On Windows a draw whose pipeline
+  is still compiling is drawn with an ubershader once that has compiled (in the first minute of the first
+  launch), and Settings, Display, "Compile shaders before playing" waits for the known pipelines first.
 - **Loading hitches.** Changing areas can briefly stall.
 - **Save states** belong to the version of the app that made them: a later version may refuse one. The
   memory card is not part of a state, so keep saving in the game as well.

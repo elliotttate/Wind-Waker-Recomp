@@ -728,15 +728,19 @@ int main(void) {
             flags = [f"-fprofile-instr-use={self.profile.as_posix()}", "-Wno-profile-instr-unprofiled",
                      "-Wno-profile-instr-out-of-date", "-Wno-backend-plugin"]
             print(f"with the optimization profile {self.profile.name}")
-        cold = self.cold_sources() if self.profile is not None and self.args.tiered else None
+        tiered = self.profile is not None and not getattr(self.args, "no_tiered", False)
+        cold = self.cold_sources() if tiered else None
         return self.compile_composite(self.out / "composite", self.args.opt_level, flags, [], "composite", cold)
 
     def cold_sources(self):
-        """--tiered: the chunks whose function the training never ran, listed
-        for cmake/composite to compile at -O1 without GVN's memory dependence
+        """The chunks whose function the training never ran, listed for
+        cmake/composite to compile at -O1 without GVN's memory dependence
         analysis (the module's longest passes on its largest functions), as
-        DeepSea compiles its cold actor code. A chunk is one function, named
-        func_<its file's address>."""
+        DeepSea compiles its cold actor code: the module compiles in about 15
+        minutes instead of 39, and Gohma's room, which no training visits, ran
+        as fast as with the whole module at -O2 (2026-10-02; the profile had
+        already compiled those chunks for size). --no-tiered compiles them all
+        at -O2. A chunk is one function, named func_<its file's address>."""
         stats = subprocess.run([self.llvm_profdata, "show", "--all-functions", self.profile], capture_output=True,
                                text=True).stdout
         counts = {name.upper(): int(count) for name, count in
@@ -1184,8 +1188,9 @@ def main():
                         help="CPU level for the game module (default x86-64-v3: AVX2, FMA, BMI2 and MOVBE, "
                              "any Intel Haswell or AMD Zen or newer; lowered automatically on older CPUs)")
     parser.add_argument("--opt-level", choices=("1", "2"), default="2", help="game module optimization level")
-    parser.add_argument("--tiered", action="store_true",
-                        help="compile the chunks the optimization training never ran at -O1 (a shorter build)")
+    parser.add_argument("--no-tiered", action="store_true",
+                        help="compile every chunk at -O2, not only those the optimization training ran "
+                             "(a build about 25 minutes longer)")
     parser.add_argument("--no-mods", action="store_true", help="skip the widescreen and Better Wind Waker variants")
     parser.add_argument("--no-train", action="store_true",
                         help="skip local optimization training: faster to build, slower in game")
