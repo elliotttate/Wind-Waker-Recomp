@@ -19,10 +19,18 @@
  * XER's CA where it aligns, and the cycles each block charges. It returns
  * what the translation returns - the byte difference, 0, or -1/+1 from the
  * word compare - and leaves r0, r3 to r8, CTR, CR0 and CA as the last
- * instruction to write each left it, pc at the return address. The one
- * suffix store on its prepaid paths (the aligning block's mtctr, 2) is made
- * where that block runs; its loads, lean in the prepaid copies
- * (scripts/windows/lean_memory.py), store none.
+ * instruction to write each left it, pc at the return address.
+ *
+ * Its loads are the prepaid copies' (scripts/windows/lean_memory.py,
+ * gather_pipe.h's bw_readN_at): ordinary MEM1 inline, storing nothing;
+ * anything else out of line, which first stores the instruction's cycle
+ * suffix, then reads through get_ram_ptr as mem_readN does - the guest-alias
+ * registry, where the REL modules' linked data lives (0xC0400000 up: an
+ * actor's own string literals, the names it searches and the archives it
+ * asks for), or the uncached mirror. The native does the same, and leaves the
+ * suffix of the last such load (or of the aligning block's mtctr, 2) as the
+ * last suffix store. It stops at the hardware (0xC8000000 up) and at an
+ * address nothing backs (a device's read handler), where the native declines.
  *
  * dStage_searchName runs its frame (the back chain, the saved LR, r29 to r31
  * through the inline register save and restore), its loop and every strcmp
@@ -35,28 +43,51 @@
  * strcmp's first two blocks, the result test and the loop step); the native
  * charges the same without the call.
  *
+ * A whole search takes thousands of cycles (about 6,000 to entry 383, 12,400
+ * through all 825), and the host gives the game thread windows of at most a
+ * few thousand: the cycle cap, or less, the distance to the next device
+ * deadline (cycle_domain.c; the DSP's step every 12,600 cycles ends most).
+ * So the native runs as much of a search as the window holds, and stops where
+ * the translation can take over with nothing told apart: at a strcmp's return
+ * (0x80041578, the block after the call), with every register, the frame,
+ * the cycles and the suffix as the translated blocks leave them there. From
+ * there the chunk's own return dispatch goes on in the same chunk, and the
+ * translation's checks stop the guest where they would have. Every stretch
+ * the native runs between two such points (the step, the next call block and
+ * strcmp, about 15 cycles for a first byte that differs) fits the window
+ * whole: each block's budget check passes, each block is prepaid. The same
+ * native runs from the loop's other block leaders - the call block
+ * (0x8004156C), the strcmp's return, the step (0x80041588) - hooked there
+ * too, so a search the translation took up again, or the scheduler resumed in
+ * a later window, goes on natively from its next block. From a resumption the
+ * frame is already there, and the epilogue reads it back from memory.
+ *
  * Each declines, changing nothing, unless that is certain: no exception
- * pending, no aliases over MEM1, every load plain RAM, the turn's budget not
- * spent anywhere in the work, and no deadline inside it (the next deadline
- * at least 8 cycles out, beyond every block's suffix, and beyond the last
- * cycle, so the translation prepays every block and never leaves its copy).
- * dStage_searchName also needs its frame's five words in plain RAM, no write
- * journal, nothing it reads (the name, the table) under its own frame, and
- * its calls into strcmp's chunk and back to pass silently, as they do in
- * play: the module's edge filter on (direct_calls.h: the host handed over its
- * flags and the builder's watch list), the host's edge service quiet, and
- * neither strcmp's entry nor the return address (0x80041578) one the host
- * watches - then neither the direct call nor the chassis loop it falls back
- * to asks the host anything, and the result is the same however each call
- * is made.
+ * pending, no aliases over MEM1, every load plain RAM or the out-of-line
+ * kind above, the first stretch fitting the turn's budget, and no deadline
+ * inside it (the next deadline at least 8 cycles out, beyond every block's
+ * suffix, and beyond the stretch's last cycle, so the translation prepays
+ * every block and never leaves its copy). dStage_searchName also needs its
+ * frame's five words in plain RAM, no write journal for the entry (whose
+ * prologue stores them), nothing it reads (the name, the table) under that
+ * frame, the loop's counter and entry pointer its own (r31 = the table +
+ * 12 * r30, r30 below 825) where it resumes, and its calls into strcmp's
+ * chunk and back to pass silently, as they do in play: the module's edge
+ * filter on (direct_calls.h: the host handed over its flags and the builder's
+ * watch list), the host's edge service quiet, and neither strcmp's entry nor
+ * the return address (0x80041578) one the host watches - then neither the
+ * direct call nor the chassis loop it falls back to asks the host anything,
+ * and the result is the same however each call is made.
  *
  * The judge - cTgIt_JudgeFilter's call of fopAcM_findObjectCB, and the walk
  * over every actor batched for the host - is a separate section at the end,
  * with its own comment.
  *
- * tests/native_search_test.c compares strcmp and dStage_searchName with the
- * translation, every register and byte; tests/native_search_judge_test.c the
- * judge. No identifier here may be `ctx`. */
+ * tests/native_search_test.c compares strcmp and dStage_searchName (from its
+ * entry and from each resumption point, in windows that end anywhere in the
+ * search) with the translation, every register and byte;
+ * tests/native_search_judge_test.c the judge. No identifier here may be
+ * `ctx`. */
 #include "native_search.h"
 #include "direct_calls.h"
 
@@ -66,24 +97,30 @@
 
 int bluewake_native_search_enabled;
 
-enum { SEARCH_STRCMP, SEARCH_STAGE_NAME, SEARCH_JUDGE, SEARCH_COUNT };
+enum { SEARCH_STRCMP, SEARCH_STAGE_NAME, SEARCH_JUDGE, SEARCH_RESUME, SEARCH_COUNT };
 static unsigned long long s_search_runs[SEARCH_COUNT], s_search_declined[SEARCH_COUNT], s_search_entries;
-static unsigned long long s_judge_other; /* JudgeFilter calls with another judge */
+static unsigned long long s_search_partial; /* searches stopped at a strcmp's return, for the window */
+static unsigned long long s_search_slow;    /* runs that read through the out-of-line path */
+static unsigned long long s_judge_other;    /* JudgeFilter calls with another judge */
 
 void bluewake_native_search_report(void) {
     fprintf(stderr,
-            "[native-search] strcmp=%llu/%llu stage-name=%llu/%llu judge-filter=%llu/%llu (native/declined; "
-            "%llu JudgeFilter calls with another judge among the declined; %llu table entries compared "
-            "natively)\n",
-            s_search_runs[0], s_search_declined[0], s_search_runs[1], s_search_declined[1], s_search_runs[2],
-            s_search_declined[2], s_judge_other, s_search_entries);
+            "[native-search] strcmp=%llu/%llu stage-name=%llu/%llu resume=%llu/%llu judge-filter=%llu/%llu "
+            "(native/declined; %llu searches stopped for the window at a strcmp's return; %llu runs read "
+            "out of line; %llu JudgeFilter calls with another judge among the declined; %llu table entries "
+            "compared natively)\n",
+            s_search_runs[0], s_search_declined[0], s_search_runs[1], s_search_declined[1], s_search_runs[3],
+            s_search_declined[3], s_search_runs[2], s_search_declined[2], s_search_partial, s_search_slow,
+            s_judge_other, s_search_entries);
     bluewake_native_search_judge_report();
 }
 
 #define SEARCH_TABLE 0x80372818u   /* l_objectName */
 #define SEARCH_ENTRIES 0x339u      /* 825 */
 #define SEARCH_ENTRY_BYTES 12u
+#define SEARCH_LOOP 0x8004156Cu    /* dStage_searchName's call block, the loop's head */
 #define SEARCH_RETURN 0x80041578u  /* dStage_searchName's return from strcmp */
+#define SEARCH_STEP 0x80041588u    /* dStage_searchName's step to the next entry */
 /* Above every suffix on these paths (strcmp's word load, 7, is the largest). */
 #define SEARCH_DEADLINE_MIN 8
 
@@ -91,19 +128,21 @@ static int search_judge_filter(CPUState* cpu); /* the judge's section, below */
 
 /* What one strcmp leaves: the registers it writes (r6 from its second block
  * on, r7 and r8 from its word loop on, CTR and CA where it aligns), its CR0,
- * and the cycles charged so far. */
+ * the suffix (in: the one before it), and the cycles charged so far. */
 typedef struct StrOut {
     u32 r0, r3, r4, r5, r6, r7, r8, ctr, ca;
-    u32 cr0;
+    u32 cr0, suffix;
     u32 cycles;
-    bool wrote6, wrote78, aligned;
-    u32 end3, end4; /* one past the last byte read through each pointer */
+    bool wrote6, wrote78, aligned, slow;
+    bool need_slow; /* the plain form met a load it does not make */
+    u32 end3, end4; /* one past the last byte read through each pointer (only raised) */
 } StrOut;
 
 SEARCH_INLINE u32 str_cr0(bool less, bool greater, u32 so) {
     return (less ? 0x8u : greater ? 0x4u : 0x2u) | so;
 }
 
+/* Plain MEM1 loads only (the judge's own: its frames, nodes and actors). */
 SEARCH_INLINE bool str_byte(const u8* ram, u32 size, u32 address, u32* value) {
     const u32 offset = address - GC_RAM_BASE;
     if (offset >= size)
@@ -120,19 +159,58 @@ SEARCH_INLINE bool str_word(const u8* ram, u32 size, u32 address, u32* value) {
     return true;
 }
 
+/* The out-of-line read (gather_pipe.h's bw_mem_readN_slow, then core/cpu.h's
+ * mem_readN): false for the hardware, whose accesses drain the gather pipe
+ * and reach a handler, and where get_ram_ptr finds nothing (a device's read
+ * handler). */
+static __attribute__((noinline)) bool search_load_slow(CPUState* cpu, u32 address, u32 bytes, u32* value) {
+    if ((address & 0x40000000u) != 0u && (address & 0xF8000000u) == 0xC8000000u)
+        return false;
+    const u8* p = get_ram_ptr(cpu, address, bytes, NULL);
+    if (p == NULL)
+        return false;
+    *value = bytes == 1u ? p[0] : read_be32(p);
+    return true;
+}
+
+/* A load as the prepaid copy makes it: ordinary MEM1 inline (the copy's own
+ * test: no aliases over MEM1, which the natives require, and the address in
+ * range); anything else out of line, after the copy stores the instruction's
+ * suffix (and pc, which a later store overwrites). */
+SEARCH_INLINE bool str_load(CPUState* cpu, const u8* ram, u32 size, u32 address, u32 bytes, u32 suffix, u32* value,
+                            StrOut* o, bool general) {
+    const u32 offset = address - GC_RAM_BASE;
+    if (offset <= size - bytes) {
+        *value = bytes == 1u ? ram[offset] : read_be32(ram + offset);
+        return true;
+    }
+    if (!general) {
+        o->need_slow = true;
+        return false;
+    }
+    if (!search_load_slow(cpu, address, bytes, value))
+        return false;
+    o->suffix = suffix;
+    o->slow = true;
+    return true;
+}
+
 SEARCH_INLINE void str_reach(u32* end, u32 address, u32 bytes) {
     if (address + bytes > *end)
         *end = address + bytes;
 }
 
 /* strcmp(r3, r4) from its entry to its blr, charging from `cycles`: true
- * with o filled in; false where a load is not plain RAM or the cycles would
- * pass `limit`. o's end3 and end4 are only raised. */
-SEARCH_INLINE bool str_run(const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u32 r4, u32 cycles, StrOut* o) {
+ * with o filled in; false where a load cannot be made or the cycles would
+ * pass `limit` (o's suffix, slow flag and extents may then have moved). The
+ * loads' suffixes are the prepaid copies': 3 and 2 in the byte blocks, 7 and
+ * 4 in the word loop's first block, 5 and 4 in its next ones. */
+SEARCH_INLINE bool str_run(CPUState* cpu, const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u32 r4, u32 cycles,
+                           StrOut* o, bool general) {
     u32 r0, r5, r6 = 0u, r7 = 0u, r8 = 0u, cr0;
     /* 8032DB44 (4): lbz r5,0(r3); lbz r0,0(r4); subf. r0,r0,r5; beq 8032DB5C */
     cycles += 4u;
-    if (!str_byte(ram, size, r3, &r5) || !str_byte(ram, size, r4, &r0))
+    if (!str_load(cpu, ram, size, r3, 1u, 3u, &r5, o, general) || !str_load(cpu, ram, size, r4, 1u, 2u, &r0, o, general))
         return false;
     str_reach(&o->end3, r3, 1u);
     str_reach(&o->end4, r4, 1u);
@@ -166,7 +244,7 @@ SEARCH_INLINE bool str_run(const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u
             r3 = 0u;
             goto done;
         }
-        /* 8032DB84 (5): subfic r0,r6,3; mtctr r0; cmplwi r0,0; beq 8032DBC0 */
+        /* 8032DB84 (5): subfic r0,r6,3; mtctr r0 (suffix 2); cmplwi r0,0; beq 8032DBC0 */
         cycles += 5u;
         {
             const u64 sum = 3ull + (u64)(u32)~r6 + 1ull;
@@ -175,6 +253,7 @@ SEARCH_INLINE bool str_run(const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u
         }
         u32 ctr = r0;
         o->aligned = true;
+        o->suffix = 2u;
         cr0 = str_cr0(false, r0 != 0u, so);
         if (r0 != 0u) {
             for (;;) {
@@ -184,7 +263,7 @@ SEARCH_INLINE bool str_run(const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u
                     return false;
                 r3 += 1u;
                 r4 += 1u;
-                if (!str_byte(ram, size, r3, &r5) || !str_byte(ram, size, r4, &r0))
+                if (!str_load(cpu, ram, size, r3, 1u, 3u, &r5, o, general) || !str_load(cpu, ram, size, r4, 1u, 2u, &r0, o, general))
                     return false;
                 str_reach(&o->end3, r3, 1u);
                 str_reach(&o->end4, r4, 1u);
@@ -222,7 +301,7 @@ SEARCH_INLINE bool str_run(const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u
     /* 8032DBC8 (8): lwz r7,0(r3); lis r5,0x8081; addi r6,r5,0x8080 (0x80808080); lwz r8,0(r4);
      * addis r5,r7,-257; addi r0,r5,-257; and. r0,r0,r6; bne 8032DC1C */
     cycles += 8u;
-    if (!str_word(ram, size, r3, &r7) || !str_word(ram, size, r4, &r8))
+    if (!str_load(cpu, ram, size, r3, 4u, 7u, &r7, o, general) || !str_load(cpu, ram, size, r4, 4u, 4u, &r8, o, general))
         return false;
     str_reach(&o->end3, r3, 4u);
     str_reach(&o->end4, r4, 4u);
@@ -256,7 +335,7 @@ SEARCH_INLINE bool str_run(const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u
                 return false;
             r3 += 4u;
             r4 += 4u;
-            if (!str_word(ram, size, r3, &r7) || !str_word(ram, size, r4, &r8))
+            if (!str_load(cpu, ram, size, r3, 4u, 5u, &r7, o, general) || !str_load(cpu, ram, size, r4, 4u, 4u, &r8, o, general))
                 return false;
             str_reach(&o->end3, r3, 4u);
             str_reach(&o->end4, r4, 4u);
@@ -269,7 +348,7 @@ SEARCH_INLINE bool str_run(const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u
     }
     /* 8032DC1C (4): lbz r5,0(r3); lbz r0,0(r4); subf. r0,r0,r5; beq 8032DC34 */
     cycles += 4u;
-    if (!str_byte(ram, size, r3, &r5) || !str_byte(ram, size, r4, &r0))
+    if (!str_load(cpu, ram, size, r3, 1u, 3u, &r5, o, general) || !str_load(cpu, ram, size, r4, 1u, 2u, &r0, o, general))
         return false;
     r0 = r5 - r0;
     cr0 = str_cr0((s32)r0 < 0, (s32)r0 > 0, so);
@@ -296,7 +375,7 @@ byte_tail_test:
             return false;
         r3 += 1u;
         r4 += 1u;
-        if (!str_byte(ram, size, r3, &r5) || !str_byte(ram, size, r4, &r0))
+        if (!str_load(cpu, ram, size, r3, 1u, 3u, &r5, o, general) || !str_load(cpu, ram, size, r4, 1u, 2u, &r0, o, general))
             return false;
         str_reach(&o->end3, r3, 1u);
         str_reach(&o->end4, r4, 1u);
@@ -330,10 +409,44 @@ done:
     return cycles <= limit;
 }
 
-/* Ready for any of these: nothing pending, no aliases, a running budget, and
- * no deadline nearer than every block's suffix and length. */
+/* The general form, out of line: the plain one has no call in its loops. */
+static __attribute__((noinline)) bool str_run_general(CPUState* cpu, const u8* ram, u32 size, u32 so, u32 limit,
+                                                      u32 r3, u32 r4, u32 cycles, StrOut* o) {
+    return str_run(cpu, ram, size, so, limit, r3, r4, cycles, o, true);
+}
+
+/* strcmp: the plain form (every load ordinary MEM1), and where it meets
+ * another load, the general one from the start. */
+SEARCH_INLINE bool str_compare(CPUState* cpu, const u8* ram, u32 size, u32 so, u32 limit, u32 r3, u32 r4, u32 cycles,
+                               StrOut* o) {
+    /* The general form on its own copy: only its address leaves this
+     * function, and o stays in registers. */
+    const u32 suffix = o->suffix, end3 = o->end3, end4 = o->end4;
+    const bool slow = o->slow;
+    o->need_slow = false;
+    if (str_run(cpu, ram, size, so, limit, r3, r4, cycles, o, false))
+        return true;
+    if (!o->need_slow)
+        return false;
+    StrOut general;
+    general.suffix = suffix;
+    general.slow = slow;
+    general.end3 = end3;
+    general.end4 = end4;
+    general.ctr = general.ca = 0u;
+    general.need_slow = false;
+    if (!str_run_general(cpu, ram, size, so, limit, r3, r4, cycles, &general))
+        return false;
+    *o = general;
+    return true;
+}
+
+/* Ready for any of these: nothing pending, no aliases over MEM1, RAM of a
+ * sane size, a running budget, and no deadline nearer than every block's
+ * suffix. */
 SEARCH_INLINE bool search_ready(const CPUState* cpu) {
-    return cpu->exception == 0u && !g_ppc_guest_aliases_overlap_mem1 && cpu->cycle_budget > 0 &&
+    return cpu->exception == 0u && !g_ppc_guest_aliases_overlap_mem1 && cpu->ram_size >= 0x10000u &&
+           cpu->cycle_budget > 0 &&
            (cpu->cycle_deadline_budget <= 0 || cpu->cycle_deadline_budget >= SEARCH_DEADLINE_MIN);
 }
 
@@ -347,13 +460,36 @@ SEARCH_INLINE u32 search_limit(const CPUState* cpu) {
     return limit <= 0 ? 0u : limit > 0x7FFFFFFF ? 0x7FFFFFFFu : (u32)limit;
 }
 
+/* strcmp's usual call, kept apart so that it runs without the rest's frame:
+ * both first bytes plain MEM1 and different, 8032DB44 (4) and 8032DB54 (2).
+ * r4 and the suffix stay as they are. */
+SEARCH_INLINE int search_strcmp_first(CPUState* cpu) {
+    if (!search_ready(cpu) || search_limit(cpu) < 6u)
+        return 0;
+    const u32 o3 = cpu->gpr[3] - GC_RAM_BASE, o4 = cpu->gpr[4] - GC_RAM_BASE;
+    if (o3 >= cpu->ram_size || o4 >= cpu->ram_size)
+        return 0;
+    const u32 r5 = cpu->ram[o3], r0 = r5 - cpu->ram[o4];
+    if (r0 == 0u)
+        return 0;
+    cpu->gpr[0] = cpu->gpr[3] = r0;
+    cpu->gpr[5] = r5;
+    cpu->cr = (cpu->cr & 0x0FFFFFFFu) | (str_cr0((s32)r0 < 0, (s32)r0 > 0, cpu->xer >> 31) << 28);
+    cpu->downcount -= 6;
+    cpu->pc = cpu->lr & ~3u;
+    return 1;
+}
+
 /* strcmp(r3, r4), entered with the return address in LR. */
-static int search_strcmp(CPUState* cpu) {
+static __attribute__((noinline)) int search_strcmp(CPUState* cpu) {
     if (!search_ready(cpu))
         return 0;
+    const u32 limit = search_limit(cpu);
     StrOut o;
     o.end3 = o.end4 = 0u;
-    if (!str_run(cpu->ram, cpu->ram_size, cpu->xer >> 31, search_limit(cpu), cpu->gpr[3], cpu->gpr[4], 0u, &o))
+    o.suffix = cpu->cycle_observation_suffix;
+    o.slow = false;
+    if (!str_compare(cpu, cpu->ram, cpu->ram_size, cpu->xer >> 31, limit, cpu->gpr[3], cpu->gpr[4], 0u, &o))
         return 0;
     cpu->gpr[0] = o.r0;
     cpu->gpr[3] = o.r3;
@@ -368,11 +504,13 @@ static int search_strcmp(CPUState* cpu) {
     if (o.aligned) {
         cpu->ctr = o.ctr;
         cpu->xer = (cpu->xer & ~0x20000000u) | o.ca << 29;
-        cpu->cycle_observation_suffix = 2u;
     }
+    cpu->cycle_observation_suffix = o.suffix;
     cpu->cr = (cpu->cr & 0x0FFFFFFFu) | (o.cr0 << 28);
     cpu->downcount -= (s64)o.cycles;
     cpu->pc = cpu->lr & ~3u;
+    if (o.slow)
+        s_search_slow++;
     return 1;
 }
 
@@ -382,97 +520,262 @@ SEARCH_INLINE bool search_boundary_silent(const CPUState* cpu, u32 address) {
     return bw_edge_filter_enabled && bw_edge_watch_ready && bw_host_quiet(cpu) && bw_edge_unwatched(address);
 }
 
+/* [a, a_end) and [b, b_end) apart, in either of the two forms of a MEM1
+ * address (an out-of-line read may reach MEM1 through the uncached mirror). */
 SEARCH_INLINE bool search_apart(u32 a, u32 a_end, u32 b, u32 b_end) {
-    return a_end <= b || b_end <= a;
+    const u32 ma = a & ~0x40000000u, ma_end = ma + (a_end - a);
+    return (a_end <= b || b_end <= a) && (ma_end <= b || b_end <= ma);
 }
 
-/* What dStage_searchName(name) leaves, run from its entry to its blr with
- * its frame at sp - 32: the result, the registers its last strcmp (or the
- * last to write each) leaves, the cycles, and how far it read the table and
- * the name. */
+/* ---- dStage_searchName, from any of its block leaders it may stop or resume at ---- */
+
+/* The points the search runs from: its entry, the loop's call block, a
+ * strcmp's return (the result test), the step. */
+enum { NAME_ENTRY, NAME_LOOP, NAME_RESULT, NAME_STEP };
+/* How far a run got: nowhere, a strcmp's return, the epilogue. */
+enum { NAME_NONE, NAME_AT_RESULT, NAME_DONE };
+
+/* The registers the loop's blocks write, the suffix, and what a run charged,
+ * compared and read. */
+typedef struct NameState {
+    u32 r0, r3, r4, r5, r6, r7, r8, ctr, ca, cr0, lr, r30, r31, suffix;
+    u32 cycles, entries;
+    u32 end3, end4; /* one past the last byte read of the table and of the name */
+    bool wrote6, wrote78, aligned, slow;
+} NameState;
+
+/* The search from `at` (its index k = s->r30, its entry s->r31), run on s to
+ * each strcmp's return while the stretch to it fits `limit`, and on to the
+ * epilogue when it ends: NAME_AT_RESULT with s the state at the last strcmp's
+ * return reached, NAME_DONE with s the state at the epilogue (r3 the result,
+ * CR0 equal, the epilogue's 11 cycles counted; the caller makes its loads),
+ * NAME_NONE with s unchanged. `pre` cycles come before the first call block
+ * (the prologue's 14 from the entry). The name's first byte is `first`;
+ * name_ok false where it cannot be read, and then no strcmp is run. In the
+ * plain form (general false) every load is ordinary MEM1, and one that is
+ * not ends the run; the general form reads the name out of line. */
+SEARCH_INLINE int name_run_on(CPUState* cpu, u32 so, u32 limit, u32 name, u32 first, bool name_ok, NameState* s,
+                               int at, bool general) {
+    const u8* ram = cpu->ram;
+    const u32 size = cpu->ram_size;
+    const u8* table = ram + (SEARCH_TABLE - GC_RAM_BASE);
+    int outcome = NAME_NONE;
+    u32 k = s->r30, pre = 0u;
+    if (at == NAME_ENTRY)
+        pre = 14u; /* 80041544 (5), the inline _savegpr_29 (4), 80041558 (5) */
+    else if (at == NAME_RESULT)
+        goto result;
+    else if (at == NAME_STEP)
+        goto step;
+    for (;;) {
+        /* 8004156C (3): or r3,r31,r31; or r4,r29,r29; bl strcmp - and strcmp */
+        if (!name_ok)
+            return outcome;
+        {
+            const u32 avail = limit - s->cycles;
+            const u32 c = table[k * SEARCH_ENTRY_BYTES];
+            if (c != first) {
+                /* Entries whose first byte differs: strcmp's 8032DB44 (4) and
+                 * 8032DB54 (2), then for each after the first, 80041578 (2),
+                 * 80041588 (4) and the call block (3): 15. As many as fit. */
+                if (avail < pre + 9u)
+                    return outcome;
+                const u32 most = (avail - pre - 9u) / 15u + 1u;
+                const u32 end = most < SEARCH_ENTRIES - k ? k + most : SEARCH_ENTRIES;
+                const u8* scan = table + (k + 1u) * SEARCH_ENTRY_BYTES;
+                const u8* const stop = table + end * SEARCH_ENTRY_BYTES;
+                while (scan != stop && *scan != first)
+                    scan += SEARCH_ENTRY_BYTES;
+                const u32 m = (u32)(scan - table) / SEARCH_ENTRY_BYTES - k;
+                const u32 last = scan[-(int)SEARCH_ENTRY_BYTES];
+                k += m - 1u;
+                s->cycles += pre + 9u + 15u * (m - 1u);
+                s->r0 = s->r3 = last - first;
+                s->r4 = name;
+                s->r5 = last;
+                s->cr0 = str_cr0((s32)s->r0 < 0, (s32)s->r0 > 0, so);
+                if (general) {
+                    s->suffix = 2u; /* the name's byte, read out of line */
+                    s->slow = true;
+                }
+                str_reach(&s->end4, name, 1u);
+                s->entries += m;
+            } else {
+                if (avail < pre + 3u)
+                    return outcome;
+                StrOut o;
+                o.suffix = s->suffix;
+                o.slow = false;
+                o.end3 = s->end3;
+                o.end4 = s->end4;
+                if (!str_run(cpu, ram, size, so, limit, SEARCH_TABLE + k * SEARCH_ENTRY_BYTES, name,
+                             s->cycles + pre + 3u, &o, general))
+                    return outcome;
+                s->r0 = o.r0;
+                s->r3 = o.r3;
+                s->r4 = o.r4;
+                s->r5 = o.r5;
+                if (o.wrote6) {
+                    s->r6 = o.r6;
+                    s->wrote6 = true;
+                }
+                if (o.wrote78) {
+                    s->r7 = o.r7;
+                    s->r8 = o.r8;
+                    s->wrote78 = true;
+                }
+                if (o.aligned) {
+                    s->ctr = o.ctr;
+                    s->ca = o.ca;
+                    s->aligned = true;
+                }
+                s->cr0 = o.cr0;
+                s->suffix = o.suffix;
+                s->slow |= o.slow;
+                s->cycles = o.cycles;
+                s->end3 = o.end3;
+                s->end4 = o.end4;
+                s->entries++;
+            }
+            s->lr = SEARCH_RETURN;
+            s->r30 = k;
+            s->r31 = SEARCH_TABLE + k * SEARCH_ENTRY_BYTES;
+            str_reach(&s->end3, s->r31, 1u);
+            outcome = NAME_AT_RESULT;
+        }
+    result:
+        /* 80041578 (2): cmpwi r3,0; bne 80041588 */
+        if (s->r3 == 0u) {
+            /* 80041580 (2): or r3,r31,r31; b 8004159C; the epilogue (11) */
+            if (limit - s->cycles < 15u)
+                return outcome;
+            s->cycles += 15u;
+            s->r3 = s->r31;
+            s->cr0 = 0x2u | so;
+            return NAME_DONE;
+        }
+        pre = 2u;
+    step:
+        /* 80041588 (4): addi r30,r30,1; cmplwi r30,825; addi r31,r31,12; blt 8004156C */
+        pre += 4u;
+        if (k + 1u >= SEARCH_ENTRIES) {
+            /* 80041598 (1): li r3,0; the epilogue (11) */
+            if (limit - s->cycles < pre + 12u)
+                return outcome;
+            s->cycles += pre + 12u;
+            s->r30 = k + 1u;
+            s->r31 += SEARCH_ENTRY_BYTES;
+            s->r3 = 0u;
+            s->cr0 = 0x2u | so; /* cmplwi r30,825 with r30 = 825 */
+            return NAME_DONE;
+        }
+        k++;
+    }
+}
+
+/* Each form on a copy, kept in registers (s is the caller's). */
+static __attribute__((noinline)) int name_run_plain(CPUState* cpu, u32 so, u32 limit, u32 name, u32 first,
+                                                    NameState* s, int at) {
+    NameState t = *s;
+    const int outcome = name_run_on(cpu, so, limit, name, first, true, &t, at, false);
+    if (outcome != NAME_NONE)
+        *s = t;
+    return outcome;
+}
+
+static __attribute__((noinline)) int name_run_general(CPUState* cpu, u32 so, u32 limit, u32 name, u32 first,
+                                                      bool name_ok, NameState* s, int at) {
+    NameState t = *s;
+    const int outcome = name_run_on(cpu, so, limit, name, first, name_ok, &t, at, true);
+    if (outcome != NAME_NONE)
+        *s = t;
+    return outcome;
+}
+
+/* The plain form where the name's first byte is ordinary MEM1 (name_fast),
+ * the general one otherwise. */
+SEARCH_INLINE int name_run(CPUState* cpu, u32 so, u32 limit, u32 name, u32 first, bool name_ok, bool name_fast,
+                           NameState* s, int at) {
+    return name_fast ? name_run_plain(cpu, so, limit, name, first, s, at)
+                     : name_run_general(cpu, so, limit, name, first, name_ok, s, at);
+}
+
+SEARCH_INLINE void name_state(const CPUState* cpu, NameState* s) {
+    s->r0 = cpu->gpr[0];
+    s->r3 = cpu->gpr[3];
+    s->r4 = cpu->gpr[4];
+    s->r5 = cpu->gpr[5];
+    s->r6 = cpu->gpr[6];
+    s->r7 = cpu->gpr[7];
+    s->r8 = cpu->gpr[8];
+    s->ctr = cpu->ctr;
+    s->ca = (cpu->xer >> 29) & 1u;
+    s->cr0 = cpu->cr >> 28;
+    s->lr = cpu->lr;
+    s->r30 = cpu->gpr[30];
+    s->r31 = cpu->gpr[31];
+    s->suffix = cpu->cycle_observation_suffix;
+    s->cycles = s->entries = 0u;
+    s->end3 = SEARCH_TABLE;
+    s->end4 = 0u;
+    s->wrote6 = s->wrote78 = s->aligned = s->slow = false;
+}
+
+/* The name's first byte, as each strcmp's first block reads it. */
+SEARCH_INLINE bool name_first(CPUState* cpu, u32 name, u32* first, bool* fast) {
+    const u32 offset = name - GC_RAM_BASE;
+    *fast = offset < cpu->ram_size;
+    if (*fast) {
+        *first = cpu->ram[offset];
+        return true;
+    }
+    return search_load_slow(cpu, name, 1u, first);
+}
+
+/* What dStage_searchName(name) leaves, run whole from its entry with its
+ * frame at sp - 32 and the frame's words those it stores: the result, the
+ * registers its strcmps write (the last to write each), the cycles, and how
+ * far it read the table and the name. For the judge, below. */
 typedef struct SearchName {
     u32 result, r4, r5, r6, r7, r8, ctr, ca;
     bool wrote6, wrote78, aligned;
     u32 cycles;
-    u32 end3, end4; /* one past the last byte read of the table and of the name */
-    u32 entries;    /* the table entries it compared */
+    u32 end3, end4;
+    u32 entries;
 } SearchName;
 
-/* dStage_searchName(name) computed: false where a load is not plain RAM or
- * the cycles would pass `limit`. Nothing is written. */
-static bool search_name_run(const u8* ram, u32 size, u32 so, u32 limit, u32 name, SearchName* n) {
-    if (SEARCH_TABLE - GC_RAM_BASE > size - SEARCH_ENTRIES * SEARCH_ENTRY_BYTES)
+/* dStage_searchName(name) computed whole: false where it does not fit
+ * `limit` or a load cannot be made. Nothing is written. */
+static bool search_name_run(CPUState* cpu, u32 so, u32 limit, u32 name, SearchName* n) {
+    if (SEARCH_TABLE - GC_RAM_BASE > cpu->ram_size - SEARCH_ENTRIES * SEARCH_ENTRY_BYTES)
         return false;
     u32 first;
-    if (!str_byte(ram, size, name, &first))
+    bool fast;
+    if (!name_first(cpu, name, &first, &fast))
         return false;
-    StrOut o;
-    o.end3 = SEARCH_TABLE + 1u;
-    o.end4 = name + 1u;
-    n->r4 = name;
-    n->r5 = 0u;
-    n->wrote6 = n->wrote78 = n->aligned = false;
-    n->r6 = n->r7 = n->r8 = n->ctr = n->ca = 0u;
-    /* 80041544 (5) and the inline _savegpr_29 (4); 80041558 (5) */
-    u32 cycles = 14u, result = 0u, index = 0u;
-    const u8* entry_bytes = ram + (SEARCH_TABLE - GC_RAM_BASE);
-    for (;; ++index) {
-        /* The entries whose first byte differs from the name's: for each,
-         * 8004156C (3), strcmp's 8032DB44 (4) and 8032DB54 (2), 80041578 (2)
-         * and 80041588 (4); strcmp leaves r5 the entry's byte, r4 the name. */
-        const u32 start = index;
-        while (index < SEARCH_ENTRIES && entry_bytes[index * SEARCH_ENTRY_BYTES] != first)
-            index++;
-        if (index != start) {
-            cycles += 15u * (index - start);
-            n->r4 = name;
-            n->r5 = entry_bytes[(index - 1u) * SEARCH_ENTRY_BYTES];
-        }
-        if (index == SEARCH_ENTRIES)
-            break;
-        const u32 entry = SEARCH_TABLE + index * SEARCH_ENTRY_BYTES;
-        if (!str_run(ram, size, so, limit, entry, name, cycles + 3u, &o))
-            return false;
-        n->r4 = o.r4;
-        n->r5 = o.r5;
-        if (o.wrote6) {
-            n->r6 = o.r6;
-            n->wrote6 = true;
-        }
-        if (o.wrote78) {
-            n->r7 = o.r7;
-            n->r8 = o.r8;
-            n->wrote78 = true;
-        }
-        if (o.aligned) {
-            n->ctr = o.ctr;
-            n->ca = o.ca;
-            n->aligned = true;
-        }
-        cycles = o.cycles + 2u;
-        if (o.r3 == 0u) {
-            /* 80041580 (2): or r3,r31,r31; b 8004159C */
-            cycles += 2u;
-            result = entry;
-            break;
-        }
-        cycles += 4u;
-    }
-    if (index == SEARCH_ENTRIES) {
-        /* 80041598 (1): li r3,0 */
-        cycles += 1u;
-        str_reach(&o.end3, SEARCH_TABLE + (SEARCH_ENTRIES - 1u) * SEARCH_ENTRY_BYTES, 1u);
-    } else {
-        str_reach(&o.end3, SEARCH_TABLE + index * SEARCH_ENTRY_BYTES, 1u);
-    }
-    /* 8004159C (2), the inline _restgpr_29 (4), 800415A4 (5) */
-    cycles += 11u;
-    n->result = result;
-    n->cycles = cycles;
-    n->end3 = o.end3;
-    n->end4 = o.end4;
-    n->entries = index + (index < SEARCH_ENTRIES);
-    return cycles <= limit;
+    NameState s;
+    name_state(cpu, &s);
+    s.r30 = 0u;
+    s.r31 = SEARCH_TABLE;
+    s.end4 = name + 1u;
+    if (name_run(cpu, so, limit, name, first, true, fast, &s, NAME_ENTRY) != NAME_DONE)
+        return false;
+    n->result = s.r3;
+    n->r4 = s.r4;
+    n->r5 = s.r5;
+    n->r6 = s.r6;
+    n->r7 = s.r7;
+    n->r8 = s.r8;
+    n->ctr = s.ctr;
+    n->ca = s.ca;
+    n->wrote6 = s.wrote6;
+    n->wrote78 = s.wrote78;
+    n->aligned = s.aligned;
+    n->cycles = s.cycles;
+    n->end3 = s.end3;
+    n->end4 = s.end4;
+    n->entries = s.entries;
+    return true;
 }
 
 /* The registers dStage_searchName leaves (all but r0, r1, r3, r11, r29 to
@@ -509,51 +812,141 @@ SEARCH_INLINE void search_name_frame(CPUState* cpu, u32 sp, u32 lr, u32 r29, u32
     search_store(cpu, sp - 4u, r31);
 }
 
-/* dStage_searchName(r3 name), entered with the return address in LR. */
-static int search_stage_name(CPUState* cpu) {
-    if (!search_ready(cpu) || g_mem_write_journal != NULL)
+/* dStage_searchName from `at`: its entry (r3 the name, LR the return
+ * address), or a block leader of its loop (r1 its frame, r29 the name, r30
+ * and r31 the loop's). */
+static int search_stage_name(CPUState* cpu, int at) {
+    if (!search_ready(cpu) || (at == NAME_ENTRY && g_mem_write_journal != NULL))
         return 0;
+    /* The shortest stretch from each point (name_run): from the entry the
+     * prologue, a call block and strcmp's first two blocks; from the call
+     * block those; from a strcmp's return the result test, the step and
+     * those, or the epilogue; from the step the step and those. Below it the
+     * stretch cannot fit, as at the strcmp's return a search just stopped at,
+     * where the hook runs again. */
+    static const u8 least[] = {[NAME_ENTRY] = 23u, [NAME_LOOP] = 9u, [NAME_RESULT] = 15u, [NAME_STEP] = 13u};
     const u32 limit = search_limit(cpu);
-    if (limit < 40u)
-        return 0;
-    if (!search_boundary_silent(cpu, BLUEWAKE_SEARCH_STRCMP) || !search_boundary_silent(cpu, SEARCH_RETURN))
+    if (limit < least[at] || !search_boundary_silent(cpu, BLUEWAKE_SEARCH_STRCMP) ||
+        !search_boundary_silent(cpu, SEARCH_RETURN))
         return 0;
     const u32 size = cpu->ram_size;
-    const u32 sp = cpu->gpr[1];
-    /* The frame's words: the back chain (sp-32), the saved LR (sp+4) and
-     * r29 to r31 (sp-12 to sp-4), stored and read back as plain RAM. */
-    const u32 frame = sp - 32u;
-    if (size < 8u || sp - GC_RAM_BASE > size - 8u || frame - GC_RAM_BASE > size - 4u || frame > sp)
+    if (SEARCH_TABLE - GC_RAM_BASE > size - SEARCH_ENTRIES * SEARCH_ENTRY_BYTES)
         return 0;
     const u32 so = cpu->xer >> 31;
-    const u32 name = cpu->gpr[3];
-    SearchName n;
-    if (!search_name_run(cpu->ram, size, so, limit, name, &n))
+    NameState s;
+    name_state(cpu, &s);
+    u32 sp = 0u, frame, name;
+    if (at == NAME_ENTRY) {
+        /* The frame's words: the back chain (sp-32), the saved LR (sp+4) and
+         * r29 to r31 (sp-12 to sp-4), stored and read back as plain RAM. */
+        sp = cpu->gpr[1];
+        frame = sp - 32u;
+        if (sp - GC_RAM_BASE > size - 8u || frame - GC_RAM_BASE > size - 4u || frame > sp)
+            return 0;
+        name = cpu->gpr[3];
+        /* The prologue: stwu r1,-32(r1); mflr r0; stw r0,36(r1); addi r11,r1,32;
+         * the inline _savegpr_29 (LR 0x80041558, the suffix 0); or r29,r3,r3;
+         * lis r3,0x8037; addi r0,r3,0x2818; or r31,r0,r0; li r30,0. */
+        s.r0 = SEARCH_TABLE;
+        s.r3 = 0x80370000u;
+        s.r30 = 0u;
+        s.r31 = SEARCH_TABLE;
+        s.lr = 0x80041558u;
+        s.suffix = 0u;
+    } else {
+        frame = cpu->gpr[1];
+        name = cpu->gpr[29];
+        if (s.r30 >= SEARCH_ENTRIES || s.r31 != SEARCH_TABLE + s.r30 * SEARCH_ENTRY_BYTES)
+            return 0;
+    }
+    u32 first = 0u;
+    bool fast = false;
+    const bool name_ok = name_first(cpu, name, &first, &fast);
+    const int outcome = name_run(cpu, so, limit, name, first, name_ok, fast, &s, at);
+    if (outcome == NAME_NONE)
         return 0;
-    /* Nothing read lies under the frame's stores, which come first. */
-    if (!search_apart(SEARCH_TABLE, n.end3, frame, sp + 8u) || !search_apart(name, n.end4, frame, sp + 8u))
+    u32 r29 = 0u, r30 = 0u, r31 = 0u, saved_lr = 0u;
+    if (outcome == NAME_DONE) {
+        /* The epilogue: addi r11,r1,32; the inline _restgpr_29 (r29 to r31 from
+         * the frame, the suffix 0); lwz r0,36(r1); mtlr r0 (the suffix 2);
+         * addi r1,r1,32; blr. From the entry the frame holds what the prologue
+         * stores; from a resumption it is read back as it is. */
+        if (at == NAME_ENTRY) {
+            r29 = cpu->gpr[29];
+            r30 = cpu->gpr[30];
+            r31 = cpu->gpr[31];
+            saved_lr = cpu->lr;
+        } else {
+            if (frame - GC_RAM_BASE > size - 40u)
+                return 0;
+            const u8* f = cpu->ram + (frame - GC_RAM_BASE);
+            r29 = read_be32(f + 20u);
+            r30 = read_be32(f + 24u);
+            r31 = read_be32(f + 28u);
+            saved_lr = read_be32(f + 36u);
+        }
+    }
+    /* From the entry, nothing read lies under the frame's stores, which come
+     * first. */
+    if (at == NAME_ENTRY &&
+        (!search_apart(SEARCH_TABLE, s.end3, frame, sp + 8u) || !search_apart(name, s.end4, frame, sp + 8u)))
         return 0;
 
-    const u32 lr = cpu->lr;
-    search_name_frame(cpu, sp, lr, cpu->gpr[29], cpu->gpr[30], cpu->gpr[31]);
-    search_name_registers(cpu, &n);
-    cpu->gpr[0] = lr;
-    cpu->gpr[3] = n.result;
-    cpu->gpr[11] = sp;
-    cpu->cr = (cpu->cr & 0x0FFFFFFFu) | ((0x2u | so) << 28);
-    cpu->downcount -= (s64)n.cycles;
-    cpu->cycle_observation_suffix = 2u;
-    cpu->pc = lr & ~3u;
-    s_search_entries += n.entries;
+    if (at == NAME_ENTRY) {
+        search_name_frame(cpu, sp, cpu->lr, cpu->gpr[29], cpu->gpr[30], cpu->gpr[31]);
+        cpu->gpr[1] = frame;
+        cpu->gpr[11] = sp;
+        cpu->gpr[29] = name;
+    }
+    cpu->gpr[3] = s.r3;
+    cpu->gpr[4] = s.r4;
+    cpu->gpr[5] = s.r5;
+    if (s.wrote6)
+        cpu->gpr[6] = s.r6;
+    if (s.wrote78) {
+        cpu->gpr[7] = s.r7;
+        cpu->gpr[8] = s.r8;
+    }
+    if (s.aligned) {
+        cpu->ctr = s.ctr;
+        cpu->xer = (cpu->xer & ~0x20000000u) | s.ca << 29;
+    }
+    cpu->cr = (cpu->cr & 0x0FFFFFFFu) | (s.cr0 << 28);
+    cpu->downcount -= (s64)s.cycles;
+    if (outcome == NAME_DONE) {
+        cpu->gpr[0] = saved_lr;
+        cpu->gpr[1] = frame + 32u;
+        cpu->gpr[11] = frame + 32u;
+        cpu->gpr[29] = r29;
+        cpu->gpr[30] = r30;
+        cpu->gpr[31] = r31;
+        cpu->lr = saved_lr;
+        cpu->cycle_observation_suffix = 2u;
+        cpu->pc = saved_lr & ~3u;
+    } else {
+        /* At a strcmp's return: the result test is next. */
+        cpu->gpr[0] = s.r0;
+        cpu->gpr[30] = s.r30;
+        cpu->gpr[31] = s.r31;
+        cpu->lr = s.lr;
+        cpu->cycle_observation_suffix = s.suffix;
+        cpu->pc = SEARCH_RETURN;
+        s_search_partial++;
+    }
+    s_search_entries += s.entries;
+    if (s.slow)
+        s_search_slow++;
     return 1;
 }
 
-int bluewake_native_search(CPUState* cpu, u32 address) {
+static __attribute__((noinline)) int search_dispatch(CPUState* cpu, u32 address) {
     unsigned which;
     int done;
     switch (address) {
-    case BLUEWAKE_SEARCH_STRCMP: which = SEARCH_STRCMP; done = search_strcmp(cpu); break;
-    case BLUEWAKE_SEARCH_STAGE_NAME: which = SEARCH_STAGE_NAME; done = search_stage_name(cpu); break;
+    case BLUEWAKE_SEARCH_STAGE_NAME: which = SEARCH_STAGE_NAME; done = search_stage_name(cpu, NAME_ENTRY); break;
+    case BLUEWAKE_SEARCH_NAME_LOOP: which = SEARCH_RESUME; done = search_stage_name(cpu, NAME_LOOP); break;
+    case BLUEWAKE_SEARCH_NAME_RESULT: which = SEARCH_RESUME; done = search_stage_name(cpu, NAME_RESULT); break;
+    case BLUEWAKE_SEARCH_NAME_STEP: which = SEARCH_RESUME; done = search_stage_name(cpu, NAME_STEP); break;
     case BLUEWAKE_SEARCH_JUDGE_FILTER: which = SEARCH_JUDGE; done = search_judge_filter(cpu); break;
     default: return 0;
     }
@@ -562,6 +955,18 @@ int bluewake_native_search(CPUState* cpu, u32 address) {
     else
         s_search_declined[which]++;
     return done;
+}
+
+int bluewake_native_search(CPUState* cpu, u32 address) {
+    if (address == BLUEWAKE_SEARCH_STRCMP) {
+        if (search_strcmp_first(cpu) || search_strcmp(cpu)) {
+            s_search_runs[SEARCH_STRCMP]++;
+            return 1;
+        }
+        s_search_declined[SEARCH_STRCMP]++;
+        return 0;
+    }
+    return search_dispatch(cpu, address);
 }
 
 /* ---- The judge: cTgIt_JudgeFilter with fopAcM_findObjectCB, and the walk batched ----
@@ -622,7 +1027,12 @@ int bluewake_native_search(CPUState* cpu, u32 address) {
  * dStage_searchName and its return, strcmp's entry and return). They decline
  * (nothing changed) on anything pending, a write journal, aliases over MEM1,
  * a judge other than fopAcM_findObjectCB, a NULL search parameter, or a load
- * under the frames' stores. */
+ * under the frames' stores. A call or a node that the window cannot hold
+ * whole (at Dragon Roost, "ikada_h" takes about 6,000 cycles, more than
+ * most windows) is left to the translation, and in it dStage_searchName's
+ * native runs the search as far as each window holds and goes on from its
+ * hooks in the next: only JudgeFilter's and findObjectCB's few dozen cycles
+ * of blocks stay translated. */
 #define SEARCH_JUDGE_FILTER BLUEWAKE_SEARCH_JUDGE_FILTER /* cTgIt_JudgeFilter */
 #define SEARCH_FIND_OBJECT 0x8002833Cu                     /* fopAcM_findObjectCB */
 #define SEARCH_NDIT_RETURN 0x80244F88u                     /* cNdIt_Judge, after its bctrl */
@@ -689,9 +1099,18 @@ SEARCH_INLINE bool judge_ready(const CPUState* cpu) {
            (cpu->cycle_deadline_budget <= 0 || cpu->cycle_deadline_budget >= SEARCH_JUDGE_DEADLINE_MIN);
 }
 
+/* A hint, never a result: the name whose search last failed to fit (or to
+ * load) and the most room it failed in. The same search in no more room
+ * fails the same way unless the name or the table changed in between, so the
+ * call declines at once instead of scanning to the window's end again, as it
+ * would at every actor of a walk whose search is longer than the windows. A
+ * wrong hint only declines: the translation runs the call, and
+ * dStage_searchName's own native in it. Another name replaces it. */
+static u32 s_judge_hint_name, s_judge_hint_limit;
+
 /* The search's constants, for JudgeFilter entered with r4 the filter and
  * sp its r1: false where the call must not run natively. */
-static bool judge_search(const CPUState* cpu, u32 limit, JudgeSearch* s) {
+static bool judge_search(CPUState* cpu, u32 limit, JudgeSearch* s) {
     const u8* ram = cpu->ram;
     const u32 size = cpu->ram_size;
     const u32 sp = cpu->gpr[1];
@@ -718,9 +1137,19 @@ static bool judge_search(const CPUState* cpu, u32 limit, JudgeSearch* s) {
         !judge_word(ram, size, s->prm + 4u, s->lo, s->hi, &s->mask) ||
         !judge_word(ram, size, s->prm + 8u, s->lo, s->hi, &s->param))
         return false;
-    if (!search_name_run(ram, size, cpu->xer >> 31, limit, s->name, &s->n) ||
-        !judge_clear(SEARCH_TABLE, s->n.end3 - SEARCH_TABLE, s->lo, s->hi) ||
-        !judge_clear(s->name, s->n.end4 - s->name, s->lo, s->hi))
+    /* The name may be an actor's own literal, in its module's linked data,
+     * or reach MEM1 through the uncached mirror: apart from the stores in
+     * either form. */
+    if (s->name == s_judge_hint_name && limit <= s_judge_hint_limit)
+        return false;
+    if (!search_name_run(cpu, cpu->xer >> 31, limit, s->name, &s->n)) {
+        s_judge_hint_name = s->name;
+        s_judge_hint_limit = limit;
+        return false;
+    }
+    if (!judge_clear(SEARCH_TABLE, s->n.end3 - SEARCH_TABLE, s->lo, s->hi) ||
+        !judge_clear(s->name, s->n.end4 - s->name, s->lo, s->hi) ||
+        !judge_clear(s->name & ~0x40000000u, s->n.end4 - s->name, s->lo, s->hi))
         return false;
     s->entry_procname = s->entry_argument = 0u;
     if (s->n.result != 0u && (!judge_half(ram, size, s->n.result + 8u, s->lo, s->hi, &s->entry_procname) ||

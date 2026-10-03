@@ -110,6 +110,16 @@ ENTRIES[0x80245640] = ("cTgIt_JudgeFilter", "search",
                         (0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
                        "795c6cb80232a10a8e2ceca570ee310e52f37a4ca4931a70920261c6f75385c2")
 # --- end of the third set's entries ---
+# --- The third set, resumable (tests/native_search_test.c): dStage_searchName's
+# loop at its call block, a strcmp's return and its step, where a search the
+# native stopped for the host's window, or the translation began, goes on
+# natively. The same translation as the entry's (the whole function and
+# strcmp), so the same hash. ---
+for _resume in (0x8004156C, 0x80041578, 0x80041588):
+    ENTRIES[_resume] = ("dStage_searchName at %08X" % _resume, "search",
+                        [(0x8003D6E0, 0x80041544, 0x800415B4), (0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
+                        "bdf91cee67046b81e7b60bb4669129749a912db84cd9fd96028b74a4cac01dd7")
+# --- end of the resumable entries ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
 J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"
