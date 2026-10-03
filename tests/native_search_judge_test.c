@@ -26,7 +26,9 @@
  * search parameter: a name, a mask, a parameter), actors whose procname,
  * argument and parameter match the name's table entry in every combination
  * (so the judge answers NULL at each test, or matches); an object-name table
- * of 825 entries with the name in it or not; random registers, flags and
+ * of 825 entries with the name in it or not, the name in MEM1, in a guest
+ * alias registered in the module and the test alike (as a REL actor's
+ * literal is) or through the uncached mirror; random registers, flags and
  * cycle state. And the ways it must stop early or decline: budgets and
  * deadlines inside the walk and before every suffix, an exception pending,
  * aliases over MEM1, a write journal, the calls inside an iteration in
@@ -87,7 +89,18 @@ static u32 next(void) {
 
 static void put(u8* ram, u32 address, u32 value) { write_be32(ram + (address - GC_RAM_BASE), value); }
 static u32 get(const u8* ram, u32 address) { return read_be32(ram + (address - GC_RAM_BASE)); }
-static u8* at(u8* ram, u32 address) { return ram + (address - GC_RAM_BASE); }
+/* A guest alias, registered in the module and in the test alike, as a REL
+ * module's linked data (where an actor's name literals live). */
+#define ALIAS 0xC1F00000u
+#define ALIAS_BYTES 0x1000u
+static u8 s_alias_native[ALIAS_BYTES], s_alias_module[ALIAS_BYTES];
+/* The byte behind a guest address the test lays out: MEM1, its mirror, the
+ * alias. */
+static u8* at(u8* ram, u32 address) {
+    if (address - ALIAS < ALIAS_BYTES)
+        return s_alias_native + (address - ALIAS);
+    return ram + ((address & ~0x40000000u) - GC_RAM_BASE);
+}
 
 static void journal(u32 offset, u32 size, void* user) {
     (void)offset;
@@ -209,7 +222,13 @@ static u32 build_search(u8* ram, unsigned scenario) {
         for (u32 i = 0; i < 8u; ++i)
             entry[i] = i < length ? character(style) : 0u;
     }
-    const u32 name = NAME + next() % 4u;
+    /* The name in MEM1, in the alias (an actor's own literal) or through
+     * the uncached mirror. */
+    const u32 name = scenario % 3u == 1u ? ALIAS + next() % 0x800u
+                     : scenario % 7u == 3u ? (NAME + next() % 4u) | 0x40000000u
+                                           : NAME + next() % 4u;
+    for (u32 i = 0; i < ALIAS_BYTES; ++i)
+        s_alias_native[i] = (u8)next();
     const u32 index = next() % ENTRIES;
     if (scenario % 5u == 0u) { /* a name it lacks, most likely */
         const u32 length = 1u + next() % 8u;
@@ -217,7 +236,8 @@ static u32 build_search(u8* ram, unsigned scenario) {
             *at(ram, name + i) = character(style);
         *at(ram, name + length) = 0u;
     } else {
-        memcpy(at(ram, name), at(ram, TABLE + 12u * index), 8u);
+        for (u32 i = 0; i < 8u; ++i)
+            *at(ram, name + i) = *at(ram, TABLE + 12u * index + i);
         *at(ram, name + 8u) = 0u;
     }
     put(ram, PRM, name);
@@ -228,7 +248,7 @@ static u32 build_search(u8* ram, unsigned scenario) {
     /* The entry the translation finds: the first of that name. */
     for (u32 e = 0; e < ENTRIES; ++e)
         if (strncmp((const char*)at(ram, TABLE + 12u * e), (const char*)at(ram, name), 12) == 0 &&
-            strlen((const char*)at(ram, name)) < 12u)
+            strnlen((const char*)at(ram, name), 12) < 12u)
             return TABLE + 12u * e;
     return 0u;
 }
@@ -442,6 +462,13 @@ int main(int argc, char** argv) {
         return 1;
     }
     set_edge(edge_service, NULL);
+    bool (*module_alias_add)(u32, u32, u8*) =
+        (bool (*)(u32, u32, u8*))(void*)GetProcAddress(lib, "ppc_guest_alias_add_shared");
+    if (module_alias_add == NULL || !module_alias_add(ALIAS, ALIAS_BYTES, s_alias_module) ||
+        !ppc_guest_alias_add_shared(ALIAS, ALIAS_BYTES, s_alias_native) || g_ppc_guest_aliases_overlap_mem1) {
+        fprintf(stderr, "cannot register the alias\n");
+        return 1;
+    }
     u8* reference_ram = module_image(lib);
     u8* native_ram = protect_image(VirtualAlloc(NULL, GC_MAIN_RAM_SIZE, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
     u8* before = VirtualAlloc(NULL, GC_MAIN_RAM_SIZE, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
@@ -487,6 +514,8 @@ int main(int argc, char** argv) {
             found += k.entry != 0u;
             matched += native.gpr[3] != 0u;
             copy_areas(reference_ram, before);
+        memcpy(s_alias_module, s_alias_native, ALIAS_BYTES);
+            memcpy(s_alias_module, s_alias_native, ALIAS_BYTES);
             CPUState* g = guest_cpu();
             *g = k.cpu;
             g->ram = reference_ram;
@@ -560,6 +589,7 @@ int main(int argc, char** argv) {
         found += k.entry != 0u;
 
         copy_areas(reference_ram, before);
+        memcpy(s_alias_module, s_alias_native, ALIAS_BYTES);
         CPUState* g = guest_cpu();
         *g = k.cpu;
         g->ram = reference_ram;
@@ -640,6 +670,7 @@ int main(int argc, char** argv) {
             base.gpr[1] = AREA + 0xC000u;
             put(native_ram, base.gpr[1] + 36u, RETURN_ADDRESS);
             copy_areas(reference_ram, native_ram);
+            memcpy(s_alias_module, s_alias_native, ALIAS_BYTES);
             CPUState* g = guest_cpu();
             double best_t = 1e30, best_n = 1e30;
             unsigned ran_nodes = 0;
