@@ -112,16 +112,16 @@
     {
       "id": "recompcore",
       "url": "https://github.com/elliotttate/RecompCore",
-      "sha": "7c629039cd46bd990d2ddfcf94db72e51bda20d4",
+      "sha": "44e5c2c2451f713c9e21ed9a4a5f560f3d057ff4",
       "branch": "windows-release",
       "license": "GPL-3.0",
       "role": "static-recomp runtime (GXRuntime), vendored Aurora renderer at GXRuntime/graphics/aurora, Dolphin DSP donor sources, and the DolRecomp translator as the DolRecomp submodule; the product source for the iPad build (scripts/ios/build_device.sh)",
-      "verified": "2026-09-25",
+      "verified": "2026-10-02",
       "upstream": {
         "url": "https://github.com/ExpansionPak/RecompCore",
         "base_sha": "5c3611e2bcb03d1578274c956bc3d7b913527ec2"
       },
-      "fork_contents": "the 80 BlueWake commits after the upstream base, including the former unpublished head 3476998bdb5b57a21a9b51daf6aaf5bbdf463f7d and the patches/recompcore series through 0097 (0085-0091 in commit 0f642d4, the iPad device session of 2026-09-26; 0092, HD texture packs and the aspect override, in 7952fa2; 0093, background decoding of HD textures, in 594807d), plus the previously uncommitted GXRuntime core cpu.h/cpu.c and DSPIntTables sources, with .gitmodules pointing DolRecomp at chrissotraidis/DolRecomp branch bluewake (chrissotraidis/RecompCore 2d60636); this fork's copy adds patches/recompcore 0098-0116 and points DolRecomp at elliotttate/DolRecomp",
+      "fork_contents": "the 80 BlueWake commits after the upstream base, including the former unpublished head 3476998bdb5b57a21a9b51daf6aaf5bbdf463f7d and the patches/recompcore series through 0097 (0085-0091 in commit 0f642d4, the iPad device session of 2026-09-26; 0092, HD texture packs and the aspect override, in 7952fa2; 0093, background decoding of HD textures, in 594807d), plus the previously uncommitted GXRuntime core cpu.h/cpu.c and DSPIntTables sources, with .gitmodules pointing DolRecomp at chrissotraidis/DolRecomp branch bluewake (chrissotraidis/RecompCore 2d60636); this fork's copy adds patches/recompcore 0098-0129 and points DolRecomp at elliotttate/DolRecomp",
       "superseded_local_patch": {
         "base_sha": "5c3611e2bcb03d1578274c956bc3d7b913527ec2",
         "head_sha": "3476998bdb5b57a21a9b51daf6aaf5bbdf463f7d",

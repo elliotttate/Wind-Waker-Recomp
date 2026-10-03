@@ -1,0 +1,202 @@
+From bb63c90ca5f4e1ff84901bf773f5b06ae74bd50a Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Fri, 2 Oct 2026 18:16:32 -0400
+Subject: [PATCH 125/128] Smooth Motion: a cloth's strips blended vertex by
+ vertex
+
+Flags and the boat's sail move their vertices on the CPU each game frame
+and draw them as strips through position arrays, under a matrix that hardly
+moves. The in-between frame blends matrices, so it drew the cloth where the
+next frame has it: cloth flapped at 30 FPS while everything around it moved
+at 60.
+
+The host can now tag a cloth's strips the way it tags a wake's (a draw
+scope over a count of draws, BP 0x7C/0x7B), with bit 23 of the count saying
+that the scope's draws index their positions rather than send them. gxcore
+gives each such draw its scope and place, frame_interp keys it by them, and
+keeps and blends its decoded positions one by one, as it does a particle's
+(blend_positions()). The per-draw trace (DOL_AURORA_FRAME_INTERP_TRACE)
+shows a draw's scope.
+
+frame_interp_test has a cloth case: a strip whose free edge sways by 8 units
+is drawn halfway (4) in the in-between frame, and a strip that stood still
+is drawn as it is. In play it needs the host's tags (Wind Waker Recomp's
+draw_tags.c, at dCloth_packet_c::draw and daHo_packet_c::draw), which take
+effect with a game module that watches those addresses.
+---
+ .../graphics/aurora/lib/gfx/frame_interp.cpp  | 11 ++++--
+ .../graphics/aurora/lib/gfx/gxcore_draw.cpp   |  4 +--
+ .../aurora/tests/frame_interp_test.cpp        | 36 +++++++++++++++++++
+ .../include/gxruntime/gxcore/gxcore.hpp       |  5 ++-
+ .../include/gxruntime/gxcore/shader.hpp       |  4 +--
+ GXRuntime/graphics/gxcore/src/gxcore.cpp      | 14 +++++---
+ 6 files changed, 61 insertions(+), 13 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+index 45d919f5..dcfaeade 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+@@ -1272,10 +1272,11 @@ void set_enabled(bool enabled) noexcept { g_enabled.store(enabled, std::memory_o
+ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+   if (plan.match_payload == nullptr || plan.match_payload_size == 0)
+     return 0;
+-  if (plan.match_direct_position && plan.draw_scope_part != 0) {
++  if (plan.draw_scope_part != 0) {
+     // One of the draws a wake's emitter makes (its fans and strips), by its
+     // place among them: its vertices are the wake's particles in order (see
+-    // blend_positions()).
++    // blend_positions()). Or one of a cloth's strips: the same vertices of
++    // the cloth every frame.
+     const uint64_t h = mix64(0x5C0Au ^ (uint64_t(plan.draw_scope) << 8) ^ (uint64_t(plan.draw_scope_part) << 40));
+     return h == 0 ? 1 : h;
+   }
+@@ -1333,7 +1334,11 @@ void capture_draw(const gxc::DrawPlan& plan, DrawInput& out) noexcept {
+   // shadow is cast on the sea's triangles under it, a different list as it
+   // moves), and blending one list toward the other drew the shadow torn.
+   const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
+-  if (plan.match_direct_position) {
++  // A cloth's strip (a scope over draws that index their positions): the
++  // game moves its vertices each frame, so they are blended one by one, as a
++  // particle's are.
++  const bool cloth = !plan.match_direct_position && plan.draw_scope_part != 0;
++  if (plan.match_direct_position || cloth) {
+     if ((plan.draw_tag != 0 || plan.draw_scope_part != 0) && decoded > 0 && decoded <= kMaxBlendedVertices) {
+       out.positions.resize(decoded * 3u);
+       for (size_t i = 0; i < decoded; ++i)
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index 38758240..3c423c0f 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -1714,7 +1714,7 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+     std::fprintf(stderr,
+                  "[frame-interp-trace] frame=%llu %s key=%016llx prim=0x%02X fmt=%u verts=%u payload=%u idx=%d "
+                  "t=(%.1f,%.1f,%.1f) s=%.3f proj00=%.3f proj32=%.1f tex=%08X bt=(%.1f,%.1f,%.1f) bt0=(%.1f,%.1f,%.1f) "
+-                 "direct=%d tag=%06X age=%u positions=%d\n",
++                 "direct=%d tag=%06X age=%u scope=%06X:%u positions=%d\n",
+                  static_cast<unsigned long long>(frame_interp::game_frame_number()), frame_interp::last_outcome(),
+                  static_cast<unsigned long long>(frame_interp::draw_key(plan)),
+                  plan.match_primitive, plan.match_vtx_fmt, plan.vertex_count, plan.match_payload_size,
+@@ -1727,7 +1727,7 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+                  interpConstants ? interpConstants->transformmatrices[0][3] - plan.constants.transformmatrices[0][3] : 0.f,
+                  interpConstants ? interpConstants->transformmatrices[1][3] - plan.constants.transformmatrices[1][3] : 0.f,
+                  interpConstants ? interpConstants->transformmatrices[2][3] - plan.constants.transformmatrices[2][3] : 0.f,
+-                 plan.match_direct_position ? 1 : 0, plan.draw_tag, plan.draw_tag_age,
++                 plan.match_direct_position ? 1 : 0, plan.draw_tag, plan.draw_tag_age, plan.draw_scope, plan.draw_scope_part,
+                  tracedPositions != nullptr ? 1 : 0);
+   }
+   if (!staging_has_capacity(vertBytes + gxc::kVertexStrideBytes, indexBytes, sizeof(plan.constants),
+diff --git a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+index 696cb1a5..1704c4d9 100644
+--- a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
++++ b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+@@ -850,6 +850,42 @@ int main() {
+     CHECK(front != nullptr && near(front[2], -30.f) && near(front[3 * 3 + 2], 30.f));
+   }
+ 
++  // A cloth's strips (a scope over draws that index their positions): the
++  // game moves the vertices itself, under a matrix that stays put, so each
++  // vertex is blended halfway, as a particle's are.
++  {
++    fi::end_game_frame();
++    fi::end_game_frame();
++    static const uint8_t payload[24] = {7};
++    const auto strip = [](uint32_t part, float sway) {
++      gxc::DrawPlan plan;
++      plan.match_payload = payload;
++      plan.match_payload_size = sizeof(payload);
++      plan.match_primitive = 0x98;
++      plan.match_direct_position = false; // indexed positions
++      plan.vertex_count = 4;
++      plan.draw_scope = 0x5151;
++      plan.draw_scope_part = part;
++      plan.vertices.assign(4 * gxc::kVertexFloats, 0.f);
++      for (int i = 0; i < 4; ++i) {
++        float* v = plan.vertices.data() + i * gxc::kVertexFloats;
++        v[0] = (i & 1) * 20.f + sway * (i >> 1); // the free edge sways
++        v[1] = (i >> 1) * 30.f;
++      }
++      return plan;
++    };
++    const auto pole = draw_at(0, 0, -300);
++    blend_plan(strip(1, 0.f), pole);
++    blend_plan(strip(2, 0.f), pole);
++    fi::end_game_frame();
++    CHECK(blend_plan(strip(1, 8.f), pole) == nullptr); // the matrix did not move
++    const float* swayed = fi::blended_positions();
++    CHECK(swayed != nullptr && near(swayed[2 * 3], 4.f) && near(swayed[3 * 3], 24.f) && near(swayed[0], 0.f));
++    // The second strip did not move: drawn as it is.
++    blend_plan(strip(2, 0.f), pole);
++    CHECK(fi::blended_positions() == nullptr);
++  }
++
+   // 120 Hz: three in-between frames at a quarter, half and three quarters of
+   // the way. A draw moving at 40 units a frame is at 10, 20 and 30; a turn of
+   // the camera by 24 degrees puts what stands still at 6, 12 and 18 degrees
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp
+index 6f62524d..ab24da9c 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp
+@@ -225,10 +225,13 @@ private:
+   bool replay_overflow_ = false;
+   CachedVertexAttrs cached_attrs_{}; // cross-draw N/B/T fallback (stream order)
+   DrawPlan scratch_plan_{};          // reused by on_consumed_draw
+-  // The draw scope under way: its emitter, the draws left and the next's place.
++  // The draw scope under way: its emitter, the draws left and the next's place,
++  // and whether its draws index their positions (cloth) rather than send them
++  // (a wake's).
+   std::uint32_t scope_ = 0;
+   std::uint32_t scope_left_ = 0;
+   std::uint32_t scope_part_ = 0;
++  bool scope_indexed_ = false;
+   PlanObserver plan_observer_ = nullptr;
+   void* plan_observer_user_ = nullptr;
+   CopyObserver copy_observer_ = nullptr;
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+index 0484518d..60f7ca22 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+@@ -482,8 +482,8 @@ struct DrawPlan {
+   std::uint32_t draw_tag = 0;
+   std::uint32_t draw_tag_age = 0;
+   // Or, for one of the draws an emitter's callback makes (kDrawScopeRegister:
+-  // a wake's fans and strips), that emitter and the draw's place among them
+-  // (from 1). 0: none.
++  // a wake's fans and strips) or a cloth's strips, that emitter or cloth and
++  // the draw's place among them (from 1). 0: none.
+   std::uint32_t draw_scope = 0;
+   std::uint32_t draw_scope_part = 0;
+   // Viewport, raw XF values (wd/2, -ht/2, zmax*2^24, xorig+342, yorig+342,
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore.cpp b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+index c19ce96d..418226a3 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+@@ -1902,17 +1902,21 @@ void GxCoreSink::on_consumed_draw(const ar::ConsumedDraw& draw,
+   self->pending_state_.build_draw_plan_into(draw, self->counters_,
+                                             &self->cached_attrs_, plan);
+   // A draw scope: the next draws with positions of their own, up to its
+-  // count, are its emitter's; any other draw ends it.
++  // count, are its emitter's; any other draw ends it. A count with bit 23
++  // set is a cloth's strips, which index their positions.
+   const GxCoreState& state = self->pending_state_;
+   if (state.bp_valid(GxCoreState::kDrawScopeRegister)) {
++    const std::uint32_t count =
++        state.bp_valid(GxCoreState::kDrawScopeCountRegister)
++            ? state.bp(GxCoreState::kDrawScopeCountRegister)
++            : 0u;
+     self->scope_ = state.bp(GxCoreState::kDrawScopeRegister);
+-    self->scope_left_ = state.bp_valid(GxCoreState::kDrawScopeCountRegister)
+-                            ? state.bp(GxCoreState::kDrawScopeCountRegister)
+-                            : 0u;
++    self->scope_left_ = count & 0x7FFFFFu;
++    self->scope_indexed_ = (count & 0x800000u) != 0u;
+     self->scope_part_ = 1;
+   }
+   if (self->scope_left_ != 0u) {
+-    if (plan.ok && plan.match_direct_position) {
++    if (plan.ok && (plan.match_direct_position || self->scope_indexed_)) {
+       plan.draw_scope = self->scope_;
+       plan.draw_scope_part = self->scope_part_++;
+       --self->scope_left_;
+-- 
+2.45.2.windows.1
+

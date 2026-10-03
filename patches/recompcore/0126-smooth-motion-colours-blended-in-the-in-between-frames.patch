@@ -1,0 +1,493 @@
+From 50763a2ae3b62645de72850edad2656e55265952 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Fri, 2 Oct 2026 18:16:43 -0400
+Subject: [PATCH 126/128] Smooth Motion: colours blended in the in-between
+ frames
+
+The in-between frame blended each draw's matrices and drew it in this
+frame's colours: a model fading in or out, a particle's colour over its
+life, a flash, the wind's streaks fading, all changed only at 30 FPS. Now
+the colours blend too, rounded to the nearest:
+
+- the vertex block's light colours and material and ambient registers
+  (in blend(), with the matrices);
+- a TEV draw's pixel constants: the TEV colour and konst registers and the
+  fog colour. Each matched draw keeps its pixel constants with its record
+  (a run of identical ones once), and when its counterpart's colours differ,
+  blend_draw makes a block per step (blended_pixel()). The helper thread
+  stages it beside the vertex blocks (InterpRanges::pixel), and render()
+  binds it as group 2 per part, a batch drawn part by part where the
+  parts' blocks differ. The pixel constants travel with the helper's job
+  only where they differ from the job before's, as the vertex constants do.
+  The alpha-test references and the rest stay this frame's.
+
+Checked on the i9 (BlueWake, Smooth Motion 60, paced, game frames 880-910
+of the Outset route): every real frame identical to the build before (31
+of 31); every in-between frame differs, in 3,000-4,000 pixels by up to 41
+of 255 - the wind's streaks in the sky, which fade, now halfway. On four
+E-cores, old and new interleaved, two runs each: game-thread CPU per game
+frame 24.1 and 23.7 ms before, 24.9 and 23.3 ms after; GX worker 61/57 and
+62/56 percent of a core, the Smooth Motion helper and the render worker the
+same. frame_interp_test has the colours: konst 0 to 200 and alpha 255 to 0
+blend to 100 and 128, a TEV register -100 to 101 to 1, the material alpha
+and a light's colour halfway, and nothing when the colours did not change.
+---
+ GXRuntime/graphics/aurora/lib/gfx/common.hpp  |  1 +
+ .../graphics/aurora/lib/gfx/frame_interp.cpp  | 59 +++++++++++++-
+ .../graphics/aurora/lib/gfx/frame_interp.hpp  | 12 ++-
+ .../graphics/aurora/lib/gfx/gxcore_draw.cpp   | 81 ++++++++++++++-----
+ .../aurora/tests/frame_interp_test.cpp        | 46 +++++++++++
+ 5 files changed, 174 insertions(+), 25 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.hpp b/GXRuntime/graphics/aurora/lib/gfx/common.hpp
+index ed9de40d..ec856ca8 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.hpp
+@@ -337,6 +337,7 @@ constexpr int kInterpMaxSteps = 7;
+ struct InterpRanges {
+   Range uniform[kInterpMaxSteps];
+   Range verts[kInterpMaxSteps];
++  Range pixel[kInterpMaxSteps]; // a TEV draw's pixel constants with blended colours
+ };
+ void resolve_interp_job(size_t slot, const InterpRanges& ranges);
+ // One draw of a batch (gxcore_draw.cpp): its indices' count, and its first
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+index dcfaeade..de5dbcfc 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+@@ -85,17 +85,21 @@ struct Record {
+   uint32_t positions;
+   uint32_t positionCount;
+   uint32_t age;
++  // A TEV draw's pixel constants in FrameRecords::pixels (kNoSamples: none).
++  uint32_t pixel = kNoSamples;
+ };
+ struct FrameRecords {
+   std::vector<gxc::VertexShaderConstants> pool;
+   std::vector<Record> records;
+   std::vector<VertexSamples> samples;
+   std::vector<float> positions; // x, y, z per vertex
++  std::vector<gxc::PixelShaderConstants> pixels; // a run of identical ones once
+   void clear() {
+     pool.clear();
+     records.clear();
+     samples.clear();
+     positions.clear();
++    pixels.clear();
+   }
+ };
+ 
+@@ -104,6 +108,9 @@ constexpr uint32_t kMaxBlendedVertices = 1024;
+ // blend_draw()'s in-between positions for its draw (x, y, z per vertex), per step.
+ std::vector<float> g_blendedPositions[kMaxSteps];
+ bool g_haveBlendedPositions = false;
++// And its pixel constants with their colours blended, per step.
++gxc::PixelShaderConstants g_blendedPixel[kMaxSteps];
++bool g_haveBlendedPixel = false;
+ 
+ FrameRecords g_frames[2];
+ unsigned g_current = 0;
+@@ -883,6 +890,13 @@ inline void blend_linear(const A from[][4], const B to[][4], double t, O out[][4
+     blend_turn(from, to, t, out);
+ }
+ 
++// An integer RGBA colour (0-255, or a TEV register's -1024..1023) the step's
++// way from `from` to `to`, rounded to the nearest.
++inline void lerp_colour(std::int32_t out[4], const std::int32_t from[4], const std::int32_t to[4], double t) {
++  for (int c = 0; c < 4; ++c)
++    out[c] = static_cast<std::int32_t>(std::lround(from[c] + (to[c] - from[c]) * t));
++}
++
+ inline void lerp_rows(float out[][4], const float from[][4], const float to[][4], int rows, float t) {
+   for (int r = 0; r < rows; ++r)
+     for (int c = 0; c < 4; ++c)
+@@ -1087,6 +1101,12 @@ void blend(const gxc::VertexShaderConstants& previous, const gxc::VertexShaderCo
+       out.lights[l].dir[c] = previous.lights[l].dir[c] + (current.lights[l].dir[c] - previous.lights[l].dir[c]) * t;
+     }
+   }
++  // Colours: the lights', and the material and ambient registers (a model
++  // fading in or out, flashing when hit, the day's light changing).
++  for (int l = 0; l < 8; ++l)
++    lerp_colour(out.lights[l].color, previous.lights[l].color, current.lights[l].color, t);
++  for (int m = 0; m < 4; ++m)
++    lerp_colour(out.materials[m], previous.materials[m], current.materials[m], t);
+ }
+ 
+ // The in-between frame when the camera's motion is known: each matrix is the
+@@ -1749,9 +1769,40 @@ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedM
+   return &g_blended[0];
+ }
+ 
++// A TEV draw's colours (blend_draw()): kept with its record, and blended
++// with its counterpart's when it has one and they differ.
++static void blend_pixel(const gxc::PixelShaderConstants& pixel, size_t recorded) {
++  FrameRecords& frame = g_frames[g_current];
++  if (frame.records.size() == recorded)
++    return;
++  if (frame.pixels.empty() || std::memcmp(&frame.pixels.back(), &pixel, sizeof(pixel)) != 0)
++    frame.pixels.push_back(pixel);
++  frame.records.back().pixel = static_cast<uint32_t>(frame.pixels.size() - 1);
++  const Record* before = g_match.record;
++  if (before == nullptr || before->pixel == kNoSamples)
++    return;
++  const gxc::PixelShaderConstants& then = g_frames[g_current ^ 1u].pixels[before->pixel];
++  if (std::memcmp(then.colors, pixel.colors, sizeof(pixel.colors)) == 0 &&
++      std::memcmp(then.kcolors, pixel.kcolors, sizeof(pixel.kcolors)) == 0 &&
++      std::memcmp(then.fogcolor, pixel.fogcolor, sizeof(pixel.fogcolor)) == 0)
++    return;
++  for (int step = 0; step < g_frameSteps; ++step) {
++    gxc::PixelShaderConstants& out = g_blendedPixel[step];
++    std::memcpy(&out, &pixel, sizeof(out));
++    const double t = step_weight(step);
++    for (int r = 0; r < 4; ++r) {
++      lerp_colour(out.colors[r], then.colors[r], pixel.colors[r], t);
++      lerp_colour(out.kcolors[r], then.kcolors[r], pixel.kcolors[r], t);
++    }
++    lerp_colour(out.fogcolor, then.fogcolor, pixel.fogcolor, t);
++  }
++  g_haveBlendedPixel = true;
++}
++
+ const gxc::VertexShaderConstants* blend_draw(const DrawInput& input, const gxc::VertexShaderConstants& current,
+-                                             bool repeatsLastDraw) {
++                                             bool repeatsLastDraw, const gxc::PixelShaderConstants* pixel) {
+   g_haveBlendedPositions = false;
++  g_haveBlendedPixel = false;
+   g_match = {};
+   const bool havePositions = !input.positions.empty();
+   const uint32_t count = static_cast<uint32_t>(input.positions.size() / 3u);
+@@ -1763,6 +1814,8 @@ const gxc::VertexShaderConstants* blend_draw(const DrawInput& input, const gxc::
+                                                         input.haveSamples ? &input.samples : nullptr);
+   g_currentTagged = false;
+   g_currentAge = 0;
++  if (pixel != nullptr)
++    blend_pixel(*pixel, recorded);
+   // A particle's positions: kept for the next frame, and blended when the
+   // draw was matched (in 3D or 2D, with one matrix).
+   if (!havePositions || frame.records.size() == recorded || input.usedMatrixRows != 0)
+@@ -1808,6 +1861,10 @@ const float* blended_positions(int step) noexcept {
+   return g_haveBlendedPositions && step < g_frameSteps ? g_blendedPositions[step].data() : nullptr;
+ }
+ 
++const gxc::PixelShaderConstants* blended_pixel(int step) noexcept {
++  return g_haveBlendedPixel && step < g_frameSteps ? &g_blendedPixel[step] : nullptr;
++}
++
+ const gxc::VertexShaderConstants* blended_step(int step) noexcept {
+   return &g_blended[std::clamp(step, 0, kMaxSteps - 1)];
+ }
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+index 13eff3ea..fbcce103 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+@@ -81,10 +81,12 @@ void capture_draw(const gxruntime::gxcore::DrawPlan& plan, DrawInput& out) noexc
+ // The pointer is valid until the next call. repeats_last_draw: `current` is
+ // the constants of the draw before this one (the caller already compared
+ // them), so they are not compared again, and an in-between block made from
+-// the same match is reused.
++// the same match is reused. pixel: a TEV draw's pixel constants, whose
++// colours are blended with its counterpart's (blended_pixel()).
+ const gxruntime::gxcore::VertexShaderConstants* blend_draw(const DrawInput& input,
+                                                            const gxruntime::gxcore::VertexShaderConstants& current,
+-                                                           bool repeats_last_draw = false);
++                                                           bool repeats_last_draw = false,
++                                                           const gxruntime::gxcore::PixelShaderConstants* pixel = nullptr);
+ // A draw known by its key and rows alone (no samples or positions).
+ const gxruntime::gxcore::VertexShaderConstants* blend_draw(
+     uint64_t key, uint64_t used_matrix_rows,
+@@ -98,6 +100,12 @@ const gxruntime::gxcore::VertexShaderConstants* blended_step(int step) noexcept;
+ // decoded vertex), valid until the next call, or nullptr when it draws its own.
+ const float* blended_positions(int step = 0) noexcept;
+ 
++// After a blend_draw() given pixel constants: a step's, with the TEV colour
++// and konst registers and the fog colour blended toward the counterpart's
++// (a fade, a particle's colour over its life, a flash), valid until the next
++// call, or nullptr when they are its own (no counterpart, or the same).
++const gxruntime::gxcore::PixelShaderConstants* blended_pixel(int step) noexcept;
++
+ // Whether the last blend_draw() returned the same in-between block as the call
+ // before it (its bytes unchanged), so the caller need not compare them.
+ bool last_blend_repeated() noexcept;
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index 3c423c0f..9784f6d6 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -681,6 +681,7 @@ namespace {
+ struct DrawPart {
+   Range uniform;
+   Range verts;
++  Range pixel;
+   uint32_t firstIndex;
+   uint32_t indexCount;
+   uint32_t firstVertex;
+@@ -708,14 +709,15 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   // traced frame's own, matched while recording, are one step's).
+   const bool interpolated = frame_interp::encoding_interpolated();
+   const int step = interpolated ? interp_replay_step() : 0;
+-  const auto job_ranges = [&](uint32_t job, Range& uniform, Range& verts) {
+-    uniform = verts = {};
++  const auto job_ranges = [&](uint32_t job, Range& uniform, Range& verts, Range& pixel) {
++    uniform = verts = pixel = {};
+     if (!interpolated)
+       return;
+     if (data.interpJob != UINT32_MAX) {
+       const InterpRanges& ranges = interp_job_ranges(job);
+       uniform = ranges.uniform[step];
+       verts = ranges.verts[step];
++      pixel = ranges.pixel[step];
+     } else if (step == 0) {
+       uniform = data.interpUniformRange;
+       verts = data.interpVertRange;
+@@ -727,14 +729,15 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   static std::vector<DrawPart> parts;
+   parts.clear();
+   DrawPart whole{.firstIndex = firstIndex, .indexCount = data.indexCount, .firstVertex = 0};
+-  job_ranges(data.interpJob, whole.uniform, whole.verts);
++  job_ranges(data.interpJob, whole.uniform, whole.verts, whole.pixel);
+   bool asOne = true;
+   if (interpolated && data.batchSize > 1 && data.interpJob != UINT32_MAX) {
+     for (uint32_t i = 1; i < data.batchSize && asOne; ++i) {
+-      Range uniform, verts;
+-      job_ranges(data.interpJob + i, uniform, verts);
++      Range uniform, verts, pixel;
++      job_ranges(data.interpJob + i, uniform, verts, pixel);
+       const uint32_t first = batch_draw(data.batch + i).firstVertex;
+       asOne = uniform.offset == whole.uniform.offset && uniform.size == whole.uniform.size &&
++              pixel.offset == whole.pixel.offset && pixel.size == whole.pixel.size &&
+               (whole.verts.size == 0 ? verts.size == 0
+                                      : verts.size != 0 && verts.offset == whole.verts.offset +
+                                                                               first * gxc::kVertexStrideBytes);
+@@ -745,7 +748,7 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+         const BatchDraw& part = batch_draw(data.batch + i);
+         DrawPart& draw = parts.emplace_back(
+             DrawPart{.firstIndex = index, .indexCount = part.indexCount, .firstVertex = part.firstVertex});
+-        job_ranges(data.interpJob + i, draw.uniform, draw.verts);
++        job_ranges(data.interpJob + i, draw.uniform, draw.verts, draw.pixel);
+         index += part.indexCount;
+       }
+     }
+@@ -795,27 +798,34 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+     pass.SetIndexBuffer(g_indexBuffer, wgpu::IndexFormat::Uint16);
+     g_pass.indexBound = true;
+   }
+-  const auto draw = [&] {
++  // group 2 on the TEV path: the PS uniform (a dynamic-uniform bind group at
++  // its own offset), or in an in-between frame its blended colours'.
++  const auto setGroup2 = [&](const DrawPart& part) {
++    const bool blended = part.pixel.size != 0;
++    const auto& psGroup = blended ? g_interpUniformBindGroup : g_uniformBindGroup;
++    const uint32_t psOffset = blended ? part.pixel.offset : data.pixelUniformRange.offset;
++    if (psGroup.Get() != g_pass.group2 || psOffset != g_pass.offset2) {
++      pass.SetBindGroup(2, psGroup, 1, &psOffset);
++      g_pass.group2 = psGroup.Get();
++      g_pass.offset2 = psOffset;
++    }
++  };
++  const auto draw = [&](bool pixel) {
+     for (const DrawPart& part : parts) {
+       setGroup1(part);
++      if (pixel)
++        setGroup2(part);
+       const int32_t baseVertex = setVertices(part);
+       pass.DrawIndexed(part.indexCount, 1, part.firstIndex, baseVertex);
+     }
+   };
+   if (data.depthPipeline != 0) {
+-    draw();
++    draw(false);
+     if (!bind(data.pipeline))
+       return;
+   }
+   if (data.tev) {
+-    // group 2 = PS uniform (same dynamic-uniform bind group, its own offset);
+-    // group 3 = texture.
+-    const uint32_t psOffset = data.pixelUniformRange.offset;
+-    if (g_uniformBindGroup.Get() != g_pass.group2 || psOffset != g_pass.offset2) {
+-      pass.SetBindGroup(2, g_uniformBindGroup, 1, &psOffset);
+-      g_pass.group2 = g_uniformBindGroup.Get();
+-      g_pass.offset2 = psOffset;
+-    }
++    // group 3 = texture (group 2, the PS uniform, is set for each part).
+     if (data.textureBindGroup != 0) {
+       const auto& group = find_bind_group(data.textureBindGroup);
+       if (group.Get() != g_pass.group3) {
+@@ -831,7 +841,7 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+       g_pass.offset2 = UINT32_MAX;
+     }
+   }
+-  draw();
++  draw(data.tev);
+ }
+ 
+ void note_frame_presented() {
+@@ -1057,6 +1067,11 @@ struct InterpJob {
+   // helper, which keeps the last it was given (InterpHelper::constants).
+   bool constantsCopied;
+   gxc::VertexShaderConstants constants;
++  // A TEV draw's pixel constants, the same way: copied only where they differ
++  // from those the job before them carried (pixelCopied).
++  bool tev;
++  bool pixelCopied;
++  gxc::PixelShaderConstants pixel;
+ };
+ 
+ // A particle's in-between vertices: its own, with the blended positions, in
+@@ -1083,15 +1098,19 @@ struct InterpHelper {
+   std::mutex mutex;
+   std::condition_variable work;
+   std::condition_variable idle;
+-  // Recording thread: the frame packet being queued and its job count.
++  // Recording thread: the frame packet being queued and its job count, and
++  // whether a job of it has carried pixel constants.
+   uint64_t packet = 0;
+   uint32_t jobs = 0;
++  bool pixelCarried = false;
+   // Helper thread: the last block it staged per step, and a particle's vertices.
+   UniformCache cache[frame_interp::kMaxSteps];
++  UniformCache pixelCache[frame_interp::kMaxSteps];
+   std::vector<float> vertices;
+   // Helper thread: the constants of the last job that carried them, which the
+-  // jobs after it that repeat them use.
++  // jobs after it that repeat them use; and the pixel constants likewise.
+   gxc::VertexShaderConstants constants;
++  gxc::PixelShaderConstants pixel;
+ };
+ 
+ // Made with the thread and never destroyed: the detached thread may still be
+@@ -1133,7 +1152,10 @@ void interp_helper_main(InterpHelper* h) {
+     const int steps = frame_interp::frame_steps();
+     if (job.constantsCopied)
+       std::memcpy(&h->constants, &job.constants, sizeof(h->constants));
+-    if (frame_interp::blend_draw(job.input, h->constants, job.repeatsLastDraw) != nullptr) {
++    if (job.pixelCopied)
++      std::memcpy(&h->pixel, &job.pixel, sizeof(h->pixel));
++    if (frame_interp::blend_draw(job.input, h->constants, job.repeatsLastDraw, job.tev ? &h->pixel : nullptr) !=
++        nullptr) {
+       const bool repeated = frame_interp::last_blend_repeated();
+       for (int step = 0; step < steps; ++step)
+         ranges.uniform[step] =
+@@ -1144,13 +1166,16 @@ void interp_helper_main(InterpHelper* h) {
+     for (int step = 0; step < steps; ++step) {
+       if (const float* positions = frame_interp::blended_positions(step))
+         ranges.verts[step] = push_blended_vertices(job.slot, job.vertices, positions, h->vertices);
++      if (const gxc::PixelShaderConstants* pixel = frame_interp::blended_pixel(step))
++        ranges.pixel[step] = push_interp_uniform_dedup(h->pixelCache[step], job.frameId, job.slot,
++                                                       reinterpret_cast<const uint8_t*>(pixel), sizeof(*pixel), false);
+     }
+     resolve_interp_job(job.slot, ranges);
+     h->consumed.store(tail + 1, std::memory_order_release);
+   }
+ }
+ 
+-uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw) {
++uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw, bool tev, bool pixelRepeats) {
+   InterpHelper* h = g_interpHelper.load(std::memory_order_acquire);
+   if (h == nullptr) {
+     h = new InterpHelper;
+@@ -1161,6 +1186,7 @@ uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw) {
+   if (h->packet != frameId) {
+     h->packet = frameId;
+     h->jobs = 0;
++    h->pixelCarried = false;
+   }
+   const uint64_t head = h->produced.load(std::memory_order_relaxed);
+   while (head - h->consumed.load(std::memory_order_acquire) >= InterpHelper::Capacity)
+@@ -1181,6 +1207,14 @@ uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw) {
+   job.constantsCopied = !repeatsLastDraw || h->jobs == 0u;
+   if (job.constantsCopied)
+     std::memcpy(&job.constants, &plan.constants, sizeof(plan.constants));
++  // pixelRepeats: the pixel constants are those last pushed in this frame
++  // packet, which the last TEV job before this one carried (or repeated).
++  job.tev = tev;
++  job.pixelCopied = tev && (!pixelRepeats || !h->pixelCarried);
++  if (job.pixelCopied) {
++    std::memcpy(&job.pixel, &plan.pixel_constants, sizeof(plan.pixel_constants));
++    h->pixelCarried = true;
++  }
+   h->produced.store(head + 1, std::memory_order_release);
+   // Asleep, it consumes nothing, so a sleeping helper has WakeBatch or more
+   // waiting before it is woken. Only then is `sleeping` read, after a full
+@@ -1744,11 +1778,14 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+       g_vertexUniformCache, reinterpret_cast<const uint8_t*>(&plan.constants),
+       sizeof(plan.constants), repeatsLast ? 1 : 0);
+   Range pixelUniformRange{};
++  bool pixelRepeats = false;
+   if (tev) {
++    const uint64_t hits = g_pixelUniformCache.hits;
+     pixelUniformRange = push_uniform_dedup(
+         g_pixelUniformCache,
+         reinterpret_cast<const uint8_t*>(&plan.pixel_constants),
+         sizeof(plan.pixel_constants));
++    pixelRepeats = g_pixelUniformCache.hits != hits;
+   }
+   const PipelineConfig colorConfig{
+       .version = GXCorePipelineConfigVersion,
+@@ -1819,7 +1856,7 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+         g_interpUniformCache, current_frame_id(), recording_frame_slot(), reinterpret_cast<const uint8_t*>(interpConstants),
+         sizeof(*interpConstants), frame_interp::last_blend_repeated());
+   else if (interpolating && !matchHere)
+-    interpJob = queue_interp_job(plan, repeatsLast);
++    interpJob = queue_interp_job(plan, repeatsLast, tev, pixelRepeats);
+ 
+   const auto indexCount = static_cast<uint32_t>(plan.indices.size());
+   if (batch != nullptr) {
+diff --git a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+index 1704c4d9..f29d4374 100644
+--- a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
++++ b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+@@ -886,6 +886,52 @@ int main() {
+     CHECK(fi::blended_positions() == nullptr);
+   }
+ 
++  // Colours: a TEV draw's colour and konst registers and its fog colour, and
++  // the material and light colours, halfway between the two frames' (a fade,
++  // a particle's colour over its life). The rest of the pixel constants and
++  // the alpha-test references stay this frame's.
++  {
++    fi::end_game_frame();
++    fi::end_game_frame();
++    gxc::PixelShaderConstants before{};
++    before.kcolors[0][0] = 0;
++    before.kcolors[0][3] = 255;
++    before.colors[1][0] = -100;
++    before.fogcolor[2] = 10;
++    before.alpha_ref[0] = 4;
++    gxc::PixelShaderConstants after = before;
++    after.kcolors[0][0] = 200;
++    after.kcolors[0][3] = 0;
++    after.colors[1][0] = 101;
++    after.fogcolor[2] = 30;
++    after.alpha_ref[0] = 90;
++    auto lit = draw_at(0, 0, -500);
++    lit.materials[2][3] = 255;
++    lit.lights[0].color[1] = 40;
++    fi::DrawInput input;
++    input.key = 4242;
++    fi::blend_draw(input, lit, false, &before);
++    CHECK(fi::blended_pixel(0) == nullptr); // no previous frame for it
++    fi::end_game_frame();
++    auto faded = lit;
++    faded.materials[2][3] = 0;
++    faded.lights[0].color[1] = 80;
++    const auto* block = fi::blend_draw(input, faded, false, &after);
++    const auto* pixel = fi::blended_pixel(0);
++    CHECK(pixel != nullptr);
++    if (pixel != nullptr) {
++      CHECK(pixel->kcolors[0][0] == 100 && pixel->kcolors[0][3] == 128);
++      CHECK(pixel->colors[1][0] == 1); // round(-100 + 201 / 2)
++      CHECK(pixel->fogcolor[2] == 20);
++      CHECK(pixel->alpha_ref[0] == 90);
++    }
++    CHECK(block != nullptr && block->materials[2][3] == 128 && block->lights[0].color[1] == 60);
++    // The same colours the next frame: nothing to blend.
++    fi::end_game_frame();
++    fi::blend_draw(input, faded, false, &after);
++    CHECK(fi::blended_pixel(0) == nullptr);
++  }
++
+   // 120 Hz: three in-between frames at a quarter, half and three quarters of
+   // the way. A draw moving at 40 units a frame is at 10, 20 and 30; a turn of
+   // the camera by 24 degrees puts what stands still at 6, 12 and 18 degrees
+-- 
+2.45.2.windows.1
+

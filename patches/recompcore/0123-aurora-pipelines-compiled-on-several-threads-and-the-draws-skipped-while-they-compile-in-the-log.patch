@@ -1,0 +1,359 @@
+From 3be805ff443467ed3b559292a39305a34cd86e8f Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Fri, 2 Oct 2026 18:15:58 -0400
+Subject: [PATCH 123/128] Aurora: pipelines compiled on several threads, and
+ the draws skipped while they compile in the log
+
+A draw whose pipeline is still compiling is skipped, and entering a new
+place asks for dozens of pipelines at once. One thread compiled them one
+after another, so the last were missing from the picture the longest, and
+the pipelines the cache loads at start took about 4 s. With Dawn's device
+lock on (31401e5f), Dawn's pipeline creation is safe from several threads
+(its own asynchronous creation runs on worker threads), so the cache now
+starts a quarter of the logical CPUs as compile threads, 1 to 4
+(AURORA_PIPELINE_THREADS sets 1-16; without the device lock there is one).
+Dolphin compiles shaders on several threads too.
+
+A worker now waits on the queues themselves each time (another may have
+taken what it was woken for). The log says, once a second while it
+happens, how many draws were skipped and what was compiled for them (new
+shaders, or known shaders in a new blend, depth or cull state), and when
+the cached pipelines finished compiling.
+
+Measured on the i9 + RTX 5090 (BlueWake, a fresh data folder: the bundled
+seed's 213 pipelines and nothing else; two runs each):
+- The seed compiled 3.7-4.4 s after start on one thread, 1.06-1.25 s on 4.
+- Booting into save states the seed does not cover, draws skipped while
+  pipelines compiled, one thread against four: Gohma's room 15,930 and
+  20,192 against 3,259 and 3,259; Dragon Roost Cavern's lava room 30,462
+  and 32,995 against 2,178 and 2,178; its lava bridge 12,253 and 11,321
+  against 1,873 and 1,933. 70 percent of what compiled there was new
+  shaders, 30 percent known shaders in a new state.
+- Outset route (all pipelines in the seed): no draw skipped either way;
+  Smooth Motion dumps identical to the single-thread build's (62 of 62).
+---
+ .../aurora/lib/gfx/pipeline_cache.cpp         | 143 ++++++++++++++++--
+ GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp  |   7 +-
+ GXRuntime/graphics/aurora/lib/webgpu/gpu.hpp  |   3 +
+ 3 files changed, 138 insertions(+), 15 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
+index b807ac8e..e36ecbc7 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
+@@ -14,7 +14,9 @@
+ 
+ #include <algorithm>
+ #include <atomic>
++#include <chrono>
+ #include <condition_variable>
++#include <cstdio>
+ #include <cstdlib>
+ #include <deque>
+ #include <filesystem>
+@@ -22,6 +24,8 @@
+ #include <mutex>
+ #include <optional>
+ #include <thread>
++#include <type_traits>
++#include <vector>
+ 
+ #include <SDL3/SDL_iostream.h>
+ #include <absl/container/flat_hash_map.h>
+@@ -69,8 +73,46 @@ constexpr size_t BuildPipelinesPerFrame = 5;
+ #else
+ constexpr size_t BuildPipelinesPerFrame = 1;
+ #endif
+-static std::thread g_pipelineThread;
++// Pipelines compile on several threads when Dawn takes its device lock (with
++// it, Dawn's pipeline creation is safe from many threads, as its own
++// asynchronous creation does; without it only one thread may). A draw whose
++// pipeline is still compiling is skipped, and entering a new place asks for
++// dozens at once: one thread made them one after another, so the last ones
++// were missing for longer. Dolphin compiles shaders on several threads too.
++// AURORA_PIPELINE_THREADS sets how many (1-16); the default is a quarter of
++// the logical CPUs, 1 to 4.
++static std::vector<std::thread> g_pipelineThreads;
+ static std::atomic_bool g_pipelineThreadEnd = false;
++// Draws skipped because their pipeline was not compiled yet, and the
++// pipelines asked for while drawing (not loaded from the cache): new shaders,
++// and shaders already compiled in another blend, depth or cull state. Said
++// once a second while it happens (report_skipped_draws).
++static std::atomic<uint64_t> g_skippedDraws{0};
++static std::atomic<uint32_t> g_newShaders{0};
++static std::atomic<uint32_t> g_newStates{0};
++// When the cache started loading, how many it queued, and whether the time
++// they took to compile was said.
++static std::chrono::steady_clock::time_point g_cacheLoadStart;
++static size_t g_cacheLoadCount = 0;
++static bool g_cacheLoadReported = true;
++#ifdef AURORA_ENABLE_GXCORE
++// The shaders the gxcore pipelines were made with, to tell a new shader from
++// a known one in a new blend, depth or cull state (report_skipped_draws).
++static std::mutex g_gxcoreShaderMutex;
++static absl::flat_hash_set<HashType> g_gxcoreShaders;
++
++static void note_gxcore_shader(const gxcore::PipelineConfig& config, bool drawing) {
++  const HashType shader = xxh3_hash(config.key.shader);
++  bool known = false;
++  {
++    std::lock_guard lock{g_gxcoreShaderMutex};
++    known = !g_gxcoreShaders.insert(shader).second;
++  }
++  if (drawing) {
++    (known ? g_newStates : g_newShaders).fetch_add(1, std::memory_order_relaxed);
++  }
++}
++#endif
+ static std::condition_variable g_pipelineQueueCv;
+ static std::condition_variable g_pipelineReadyCv;
+ static absl::flat_hash_map<PipelineRef, CachedPipeline> g_pipelines;
+@@ -434,7 +476,8 @@ static PipelineRef g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
+ template <typename PipelineConfig>
+ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& config, NewPipelineCallback&& cb,
+                                       PipelinePriority priority = PipelinePriority::Normal,
+-                                      std::optional<uint32_t> firstFrameUsedOverride = std::nullopt) {
++                                      std::optional<uint32_t> firstFrameUsedOverride = std::nullopt,
++                                      bool* queuedNew = nullptr) {
+   ZoneScoped;
+ 
+   // GXRuntime recomp patch (0006): draws are silently skipped while their
+@@ -537,6 +580,9 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+       }
+       ++queuedPipelines;
+       notifyWorker = true;
++      if (queuedNew != nullptr) {
++        *queuedNew = true;
++      }
+     }
+   }
+ 
+@@ -993,17 +1039,16 @@ static void pipeline_worker() {
+   tracy::SetThreadName("Pipeline compilation thread");
+ #endif
+ 
+-  bool hasMore = false;
+   while (g_hasPipelineThread || g_pipelinesPerFrame < BuildPipelinesPerFrame) {
+     PendingPipeline pending;
+     {
+       std::unique_lock lock{g_pipelineMutex};
+       if (g_hasPipelineThread) {
+-        if (!hasMore) {
+-          g_pipelineQueueCv.wait(lock, [] {
+-            return !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty() || g_pipelineThreadEnd;
+-          });
+-        }
++        // Another compile thread may have taken what was queued, so wait on
++        // the queues themselves.
++        g_pipelineQueueCv.wait(lock, [] {
++          return !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty() || g_pipelineThreadEnd;
++        });
+       } else if (g_pipelineQueue.empty() && g_backgroundPipelineQueue.empty()) {
+         return;
+       }
+@@ -1015,6 +1060,7 @@ static void pipeline_worker() {
+       source.pop_front();
+     }
+     auto result = pending.create();
++    bool cacheLoaded = false;
+     {
+       std::lock_guard lock{g_pipelineMutex};
+       g_pipelines.try_emplace(pending.hash, CachedPipeline{
+@@ -1022,12 +1068,21 @@ static void pipeline_worker() {
+                                                 .firstFrameUsed = pending.firstFrameUsed,
+                                             });
+       g_pendingPipelines.erase(pending.hash);
+-      hasMore = !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty();
++      if (!g_cacheLoadReported && g_pendingPipelines.empty()) {
++        g_cacheLoadReported = true;
++        cacheLoaded = true;
++      }
+     }
+     if (!g_hasPipelineThread) {
+       ++g_pipelinesPerFrame;
+     }
+     notify_pipeline_ready(true);
++    if (cacheLoaded) {
++      const double ms =
++          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - g_cacheLoadStart).count();
++      std::fprintf(stderr, "[pipelines] the %zu cached pipelines were compiled %.0f ms after start (%zu threads)\n",
++                   g_cacheLoadCount, ms, g_pipelineThreads.size());
++    }
+   }
+ }
+ 
+@@ -1066,6 +1121,11 @@ static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersio
+     }
+ 
+     find_pipeline_impl(type, config, [=] { return create(config); }, PipelinePriority::Background, firstFrameUsed);
++#ifdef AURORA_ENABLE_GXCORE
++    if constexpr (std::is_same_v<PipelineConfig, gxcore::PipelineConfig>) {
++      note_gxcore_shader(config, false);
++    }
++#endif
+     ++acceptedRows;
+   }
+ 
+@@ -1148,7 +1208,13 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
+ #ifdef AURORA_ENABLE_GXCORE
+ template <>
+ PipelineRef find_pipeline(ShaderType type, const gxcore::PipelineConfig& config, NewPipelineCallback&& cb) {
+-  return find_pipeline_impl(type, config, std::move(cb));
++  bool queuedNew = false;
++  const PipelineRef ref = find_pipeline_impl(type, config, std::move(cb), PipelinePriority::Normal, std::nullopt,
++                                             &queuedNew);
++  if (queuedNew) {
++    note_gxcore_shader(config, true);
++  }
++  return ref;
+ }
+ #endif
+ 
+@@ -1167,10 +1233,30 @@ void initialize_pipeline_cache() {
+     g_hasPipelineThread = false;
+   } else {
+     g_hasPipelineThread = true;
+-    g_pipelineThread = std::thread(pipeline_worker);
++    size_t threads = 1;
++    if (webgpu::g_deviceLock) {
++      threads = std::clamp<size_t>(std::thread::hardware_concurrency() / 4, 1, 4);
++      if (const char* env = std::getenv("AURORA_PIPELINE_THREADS")) {
++        const long n = std::strtol(env, nullptr, 10);
++        if (n >= 1) {
++          threads = static_cast<size_t>(std::min(n, 16L));
++        }
++      }
++    }
++    for (size_t i = 0; i < threads; ++i) {
++      g_pipelineThreads.emplace_back(pipeline_worker);
++    }
++    Log.info("Pipeline compile threads: {}", threads);
+   }
+ 
++  g_cacheLoadStart = std::chrono::steady_clock::now();
++  g_cacheLoadReported = true;
+   const size_t loadedCount = load_pipeline_cache();
++  if (loadedCount > 0 && g_hasPipelineThread) {
++    std::lock_guard lock{g_pipelineMutex};
++    g_cacheLoadCount = loadedCount;
++    g_cacheLoadReported = g_pendingPipelines.empty();
++  }
+   if (!g_pipelineCacheBroken && loadedCount > 0) {
+     g_gpuCachePrunePending = true;
+   }
+@@ -1186,7 +1272,10 @@ void shutdown_pipeline_cache() {
+     g_pipelineThreadEnd = true;
+     g_pipelineQueueCv.notify_all();
+     g_pipelineReadyCv.notify_all();
+-    g_pipelineThread.join();
++    for (auto& thread : g_pipelineThreads) {
++      thread.join();
++    }
++    g_pipelineThreads.clear();
+   }
+   g_hasPipelineThread = false;
+ 
+@@ -1204,10 +1293,39 @@ void shutdown_pipeline_cache() {
+   createdPipelines = 0;
+ }
+ 
++// Once a second while draws are being skipped: how many, and what was
++// compiled for them.
++static void report_skipped_draws() {
++  static auto last = std::chrono::steady_clock::now();
++  static uint64_t lastSkipped = 0;
++  const auto now = std::chrono::steady_clock::now();
++  if (now - last < std::chrono::seconds(1)) {
++    return;
++  }
++  last = now;
++  const uint64_t skipped = g_skippedDraws.load(std::memory_order_relaxed);
++  if (skipped == lastSkipped) {
++    return;
++  }
++  const uint32_t newShaders = g_newShaders.exchange(0, std::memory_order_relaxed);
++  const uint32_t newStates = g_newStates.exchange(0, std::memory_order_relaxed);
++  size_t queued = 0;
++  {
++    std::lock_guard lock{g_pipelineMutex};
++    queued = g_pendingPipelines.size();
++  }
++  std::fprintf(stderr,
++               "[pipelines] %llu draws skipped while their pipelines compiled (%u new shaders, %u known shaders in a "
++               "new state; %zu still compiling)\n",
++               static_cast<unsigned long long>(skipped - lastSkipped), newShaders, newStates, queued);
++  lastSkipped = skipped;
++}
++
+ void begin_pipeline_frame() {
+   if (!g_hasPipelineThread) {
+     g_pipelinesPerFrame = 0;
+   }
++  report_skipped_draws();
+ }
+ 
+ void end_pipeline_frame() {
+@@ -1220,6 +1338,7 @@ bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+   std::lock_guard guard{g_pipelineMutex};
+   const auto it = g_pipelines.find(ref);
+   if (it == g_pipelines.end()) {
++    g_skippedDraws.fetch_add(1, std::memory_order_relaxed);
+     return false;
+   }
+   pipeline = it->second.pipeline;
+diff --git a/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp b/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
+index a43568da..23628e7d 100644
+--- a/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
++++ b/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
+@@ -67,6 +67,7 @@ bool g_bcTexturesSupported = false;
+ bool g_astcTexturesSupported = false;
+ bool g_textureComponentSwizzleSupported = false;
+ bool g_dualSourceBlendingSupported = false;
++bool g_deviceLock = false;
+ static std::atomic_bool g_initialized = false;
+ 
+ namespace {
+@@ -900,7 +901,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+         requiredLimits.maxStorageBuffersPerShaderStage, requiredLimits.minUniformBufferOffsetAlignment,
+         requiredLimits.minStorageBufferOffsetAlignment);
+     std::vector<wgpu::FeatureName> requiredFeatures;
+-    bool deviceLock = false;
++    g_deviceLock = false;
+     g_hasCoreFeatures = false;
+     g_bcTexturesSupported = false;
+     g_astcTexturesSupported = false;
+@@ -946,7 +947,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+         const char* env = std::getenv("DOL_AURORA_DEVICE_LOCK");
+         if (env == nullptr || env[0] != '0') {
+           requiredFeatures.push_back(feature);
+-          deviceLock = true;
++          g_deviceLock = true;
+         }
+       }
+ #endif
+@@ -962,7 +963,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+       featureList += magic_enum::enum_name(featureName);
+     }
+     Log.info("Enabling features: {}", featureList);
+-    Log.info("Device lock (implicit device synchronization): {}", deviceLock ? "on" : "off");
++    Log.info("Device lock (implicit device synchronization): {}", g_deviceLock ? "on" : "off");
+ #ifdef WEBGPU_DAWN
+     wgpu::DawnCacheDeviceDescriptor cacheDescriptor({
+         .isolationKey = nullptr,
+diff --git a/GXRuntime/graphics/aurora/lib/webgpu/gpu.hpp b/GXRuntime/graphics/aurora/lib/webgpu/gpu.hpp
+index e0102e7b..d0533220 100644
+--- a/GXRuntime/graphics/aurora/lib/webgpu/gpu.hpp
++++ b/GXRuntime/graphics/aurora/lib/webgpu/gpu.hpp
+@@ -57,6 +57,9 @@ extern bool g_bcTexturesSupported;
+ extern bool g_astcTexturesSupported;
+ extern bool g_textureComponentSwizzleSupported;
+ extern bool g_dualSourceBlendingSupported;
++// Dawn takes its device lock (ImplicitDeviceSynchronization), so it may be
++// called from several threads at once (pipelines compile on several).
++extern bool g_deviceLock;
+ 
+ bool initialize(AuroraBackend backend, bool allowCpu);
+ void shutdown();
+-- 
+2.45.2.windows.1
+
