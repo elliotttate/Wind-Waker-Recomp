@@ -1,3 +1,55 @@
+## 2026-10-03 The game by warp: where it is slow, and the GX worker's transform copies
+
+**The survey.** The 2026-10-02 build (module be22aba4) on four of the i9's E-cores (`0x000F0000`), uncapped,
+Smooth Motion off, at 47 places by test warp from the Outset save, about 12 s of Link running and turning at
+each (scratchpad survey.ps1 / survey.py over tour_run.ps1). Interiors and most dungeon rooms reach 60 game
+frames a second (the frame cap), so they are not CPU-bound here. The slow places are the big outdoor ones:
+
+| Place | Game FPS | Game thread CPU per game frame | GX worker CPU per game frame |
+| --- | --- | --- | --- |
+| Forest Haven (`sea:41`) | 29.5 | 20.9 ms | 24.9 ms |
+| Dragon Roost Island (`sea:13`) | 31.3 | 24.5 ms | 20.6 ms |
+| The sea by the Forsaken Fortress (`sea:1`) | 32.6 | 22.8 ms | 17.5 ms |
+| Hyrule Castle's room (`Hyroom`) | 33.3 | 16.9 ms | 22.8 ms |
+| The Earth Temple's boss (`M_DaiB`) | 38.3 | 13.9 ms | 18.8 ms |
+| Outset (`sea:44`) | 39.2 | 21.5 ms | 13.5 ms |
+| Hyrule (`Hyrule`) | 41.9 | 10.4 ms | 17.9 ms |
+
+In half of them the GX worker, not the game thread, is the limit.
+
+**Where the time goes.** The game thread (guest call stacks, guest_stack_sampler.py) is spread thin at most
+places: drawing (J3D draw buffers 14-20 percent inclusive), particles (7-10), animation (5-8), the attention
+system's weights (6), collision, the audio engine's channel updates (5-7). One hot spot: at Dragon Roost
+Island, `daTag_Island_c::demoProcCom_ikada` calls `fopAcM_searchFromName` every frame, which walks every
+actor and, for each, `strcmp`s the same name through the stage's object-name table (`dStage_searchName`):
+7.4 percent of the game thread (`strcmp` alone 6.4), and about 3 percent at Forest Haven. The GX worker
+(thread sampler) is flat: building draw plans, packets, and about a fifth of its working time in memory
+copies, of which the largest was each draw's transform state.
+
+**The transform copies** (RecompCore ef3e17f, patch 0130). Each draw's 2.3 KB of transform state was copied
+three times (into the draw queue, the packet, the sink's draw); about 95 percent of draws repeat the draw
+before's transform, which the transform version (0127) identifies. Now each copy is skipped when its version
+is the one already there. `DOL_GX_TRANSFORM_VERIFY=1` copies anyway and counts differences.
+- Verify mode over twelve places: 54 million draws, 95 percent kept, 0 differences.
+- Synchronous captures of the Outset route 19 of 19 identical; in Gohma's room Link's position identical at
+  every probe and Smooth Motion dumps (game frames 300-330, real and in-between) 62 of 62 identical.
+  (Gohma's room's retrace-triggered captures are not a test of this: they are asynchronous readbacks, and a
+  faster renderer captures a different game frame.)
+- Four E-cores, the heaviest places, two runs each against the same build without it: the GX worker's CPU
+  per game frame at Forest Haven 25.5-26.3 ms before, 22.3-22.7 after; Hyrule Castle's room 22.0-22.4 and
+  19.0-20.6; Dragon Roost Island 20.4-21.6 and 18.5-18.8; Hyrule 18.1-19.3 and 15.2-15.5; the sea by the
+  Fortress 16.6-18.2 and 14.8-15.4. Game frames a second up 6 to 16 percent at those places.
+
+**Tried and dropped** (exact, but no clear gain):
+- Not recording every command's FIFO bytes on the live path (nothing there reads them): about 2 percent less
+  GX worker time overall but consistently slower at the Earth Temple's boss.
+- The derived-state cache keyed on the transform version instead of comparing the XF registers (36 million
+  hits verified against a fresh derivation, 0 differences), with each vertex's unwritten slots zeroed instead
+  of the whole buffer: no faster, slightly slower at most places.
+
+**Next**: native `strcmp` and stage-name search for the Dragon Roost hot spot (in progress on a branch,
+certified against the translation the same way as the second natives).
+
 ## 2026-10-02 What we took from DeepSea: pipelines, Smooth Motion, the GX worker, training, natives, build time
 
 The borrow list in DEEPSEA_COMPARISON_2026-10-02.md, item by item, measured on the i9-13900KF + RTX 5090.
