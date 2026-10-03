@@ -1,0 +1,118 @@
+From 31401e5f3ace0b252181f3b7410235e172dd2b6a Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Fri, 2 Oct 2026 13:27:27 -0400
+Subject: [PATCH] Aurora: Dawn's device lock, so its threads do not race (a
+ crash after a save state loads)
+
+About one boot in ten straight into a save state crashed on Windows in the
+first frames after the load: an access violation reading 0x40 inside
+webgpu_dawn.dll under the GX worker's wgpuDeviceCreateBindGroup (gxcore
+submit_draw_plan's single-texture bind group, through bind_group_ref), then
+exit 0xC0000374, heap corruption.
+
+Aurora calls Dawn from several threads. The GX worker makes textures,
+samplers and bind groups; the render worker records, submits and frees each
+frame's, and an EFB copy that is scaled or converted makes a bind group with
+a sampler there every frame and frees it with the frame; the main thread
+presents, and when a state loads it frees the whole texture cache. The
+device was made without ImplicitDeviceSynchronization, so Dawn took no lock
+anywhere, and its D3D12 backend is not safe that way. Every bind group with
+samplers finds its sampler descriptors in one absl::flat_hash_set
+(SamplerHeapCache: inserted with the first bind group of a sampler set,
+erased with the last), and texture memory is freed through plain queues
+(ResourceAllocatorManager). The GX worker's lookup ran while the render
+worker's copy bind groups inserted and erased: a slot read in the middle of
+a rehash is a null entry, and an entry's sampler list ends at offset 0x40.
+After a load every texture is new, so the GX worker makes hundreds of bind
+groups in the frames the crash happened in.
+
+The device now asks for ImplicitDeviceSynchronization where the adapter
+offers it (Dawn does on every backend). Object creation, queue work,
+presents and an object's last release take the device's mutex; encoding,
+pipeline and shader-module creation and texture views do not, and Dawn runs
+callbacks with the mutex released. The log says whether it is on, and
+DOL_AURORA_DEVICE_LOCK=0 leaves it off.
+
+Checked on the i9 + RTX 5090, booting into Gohma's room
+(BLUEWAKE_LOAD_STATE=gohma-lava.bwstate, 0.3.0 module, two runs at a time):
+- Held to two logical CPUs: before, 3 of 24 runs crashed (0xC0000374, 2-5 s
+  in, at the first frames after the load); this build with the lock off,
+  2 of 32; with it on, 0 of 80.
+- Unheld: before, 1 of 40; lock off, 0 of 40; lock on, 0 of 60.
+- A two-thread Dawn program doing what the GX and render workers do (sampler
+  bind groups made and freed on both): without the lock 3 of 3 ten-second
+  runs crashed or hung; with it, 3 of 3 ran clean (about 9 million bind
+  groups each).
+- Speed, the same build with the lock off and on, interleaved, on four of
+  the i9's E-cores (Outset route, unpaced, six runs each): game FPS
+  standing 36.8 off and 35.6 on, running 36.8 and 36.2 (single runs 34-39
+  either way); game-thread CPU per game frame 23.4 and 23.4 ms standing,
+  24.3 and 24.5 running. Smooth Motion 60, paced: 30 game and 60 shown FPS
+  both ways. In steady play only the render worker takes the lock: the GX
+  worker calls Dawn only to upload a texture (263 times on the whole route)
+  and the game thread not at all.
+---
+ GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp | 26 ++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp b/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
+index 1372c178..a43568da 100644
+--- a/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
++++ b/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
+@@ -5,6 +5,7 @@
+ #include <array>
+ #include <cmath>
+ #include <cstdint>
++#include <cstdlib>
+ #include <string>
+ #include <string_view>
+ #include <utility>
+@@ -899,6 +900,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+         requiredLimits.maxStorageBuffersPerShaderStage, requiredLimits.minUniformBufferOffsetAlignment,
+         requiredLimits.minStorageBufferOffsetAlignment);
+     std::vector<wgpu::FeatureName> requiredFeatures;
++    bool deviceLock = false;
+     g_hasCoreFeatures = false;
+     g_bcTexturesSupported = false;
+     g_astcTexturesSupported = false;
+@@ -925,6 +927,29 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+         }
+         requiredFeatures.push_back(feature);
+       }
++#ifdef WEBGPU_DAWN
++      // Dawn is called from several threads: the GX worker makes textures,
++      // samplers and bind groups while the render worker records, submits and
++      // frees a frame's (an EFB copy's scaling or conversion makes a bind group
++      // with a sampler every frame), and the main thread presents and frees the
++      // texture cache when a save state loads. Without this feature Dawn takes
++      // no device lock, and its D3D12 backend keeps the sampler descriptors of
++      // every bind group in one plain hash set (SamplerHeapCache) and texture
++      // memory in plain queues (ResourceAllocatorManager). A bind group made on
++      // the GX worker while the render worker freed one read that set mid-
++      // rehash: an access violation at 0x40 in CreateBindGroup, then heap
++      // corruption, once in about ten boots into a save state. With the feature
++      // those calls take the device's lock; encoding, pipeline and shader
++      // compiles and texture views do not. DOL_AURORA_DEVICE_LOCK=0 leaves it
++      // off (diagnosis).
++      if (feature == wgpu::FeatureName::ImplicitDeviceSynchronization) {
++        const char* env = std::getenv("DOL_AURORA_DEVICE_LOCK");
++        if (env == nullptr || env[0] != '0') {
++          requiredFeatures.push_back(feature);
++          deviceLock = true;
++        }
++      }
++#endif
+ #ifdef TRACY_ENABLE
+       if (feature == wgpu::FeatureName::TimestampQuery) {
+         requiredFeatures.push_back(feature);
+@@ -937,6 +962,7 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+       featureList += magic_enum::enum_name(featureName);
+     }
+     Log.info("Enabling features: {}", featureList);
++    Log.info("Device lock (implicit device synchronization): {}", deviceLock ? "on" : "off");
+ #ifdef WEBGPU_DAWN
+     wgpu::DawnCacheDeviceDescriptor cacheDescriptor({
+         .isolationKey = nullptr,
+-- 
+2.45.2.windows.1
+
