@@ -243,8 +243,10 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
                 atexit(bluewake_native_vec_sr_report);
                 atexit(bluewake_native_mtxcalc_report);
             }
-            /* The third set: strcmp and dStage_searchName (the actor search
-             * by name), with the same switch. */
+            /* The third set: strcmp, dStage_searchName and cTgIt_JudgeFilter
+             * with fopAcM_findObjectCB (the actor search by name), and the
+             * walk the host may batch (bluewake_native_search_judge), with
+             * the same switch. */
             bluewake_native_search_enabled = on;
             if (on)
                 atexit(bluewake_native_search_report);

@@ -100,6 +100,15 @@ ENTRIES[0x8032DB44] = ("strcmp", "search", [(0x8032D6E0, 0x8032DB44, 0x8032DC6C)
 ENTRIES[0x80041544] = ("dStage_searchName", "search",
                        [(0x8003D6E0, 0x80041544, 0x800415B4), (0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
                        "bdf91cee67046b81e7b60bb4669129749a912db84cd9fd96028b74a4cac01dd7")
+# cTgIt_JudgeFilter with fopAcM_findObjectCB as its judge (one call), with the
+# callees its native stands in for: fopAcM_findObjectCB, dStage_searchName and
+# strcmp; and cNdIt_Judge's loop, which the walk native the host may call
+# (bluewake_native_search_judge) runs too - the hook arms it.
+ENTRIES[0x80245640] = ("cTgIt_JudgeFilter", "search",
+                       [(0x802416E0, 0x80245640, 0x80245674), (0x802416E0, 0x80244F78, 0x80244FB4),
+                        (0x800256E0, 0x8002833C, 0x80028410), (0x8003D6E0, 0x80041544, 0x800415B4),
+                        (0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
+                       "795c6cb80232a10a8e2ceca570ee310e52f37a4ca4931a70920261c6f75385c2")
 # --- end of the third set's entries ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
@@ -171,6 +180,39 @@ def addresses(text):
                          text):
         found.add(int(next(v for v in m.groups() if v), 16))
     return found
+
+
+# --- The third set: addresses on the watch list its hooks do not run past ---
+# The host names cTgIt_JudgeFilter's entry (0x80245640), the bctrl in
+# cNdIt_Judge that calls it (0x80244F84) and that call's return (0x80244F88)
+# for its own actor-search native (runtime/host/src/main.c,
+# BW_SEARCH_JUDGE_FILTER, BW_SEARCH_NDIT_RETURN), so all three are on the
+# watch list. None is a boundary the third set's hooks run past: the
+# JudgeFilter hook sits at the entry, which is reached only by a dispatch
+# after the host's edge service (cNdIt_Judge's bctrl goes round the loop: its
+# return is watched) or by a goto inside the chunk, as the translation reaches
+# it; its call ends at its blr, whose return to cNdIt_Judge goes through the
+# chunk's own return dispatch as before; 0x80244F84 is the middle of a block.
+# The cNdIt_Judge fragment is hashed for the walk native, which only the host
+# calls, at that boundary. And fopAcM_findObjectCB calls OSPanic (0x80006C4C,
+# which the host reports) only on a NULL search parameter, where the native
+# declines: the translation it stands in for never reaches it. So in those
+# fragments - and only there - those addresses are left out of the check.
+SEARCH_HOST_OWN = {
+    "\nlabel_80245640:\n": {0x80245640, 0x80244F84, 0x80244F88},  # cTgIt_JudgeFilter
+    "\nlabel_80244F78:\n": {0x80245640, 0x80244F84, 0x80244F88},  # cNdIt_Judge's loop
+    "\nlabel_8002833C:\n": {0x80006C4C},                          # fopAcM_findObjectCB
+}
+_addresses_of = addresses
+
+
+def addresses(text):  # noqa: F811 (the check above, less what SEARCH_HOST_OWN leaves out)
+    found = _addresses_of(text)
+    for start, own in SEARCH_HOST_OWN.items():
+        if text.startswith(start):
+            found -= own
+    return found
+# --- end of the third set's exemption ---
 
 
 def chunk_files(root, chunk):

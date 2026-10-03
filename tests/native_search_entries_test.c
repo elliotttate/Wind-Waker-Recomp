@@ -1,6 +1,7 @@
-/* The third set's hooks (scripts/windows/native_entries.py: strcmp and
- * dStage_searchName), end to end: the hooked chunks, compiled as the module
- * compiles them, against the module's unhooked translation.
+/* The third set's hooks (scripts/windows/native_entries.py: strcmp,
+ * dStage_searchName and cTgIt_JudgeFilter), end to end: the hooked chunks,
+ * compiled as the module compiles them, against the module's unhooked
+ * translation.
  *
  * The chunks are the player's own translated sources, prepared by the
  * Windows source steps and then by native_entries.py (on a copy, never the
@@ -8,7 +9,8 @@
  * HOOKED = a copy of composite-src's chunks_dol after native_entries.py and
  * COMPOSITE = that composite-src (for generated.h):
  *
- *   for each chunk in 0015_text1_8003D6E0 0203_text1_8032D6E0:
+ *   for each chunk in 0009_text1_800256E0 0015_text1_8003D6E0
+ *                     0144_text1_802416E0 0203_text1_8032D6E0:
  *     clang -c -O2 -march=x86-64-v3 -ffp-contract=off -fno-slp-vectorize
  *       -mllvm -large-interval-freq-threshold=10
  *       -DMODULE_GAME_ID="GZLE01" -DDOLRECOMP_CPU_HEADER="core/cpu.h"
@@ -18,14 +20,16 @@
  *       %HOOKED%\chunk_NNNN.c -o chunk_NNNN.o
  *   clang -O2 -march=x86-64-v3 -ffp-contract=off -DBW_GUEST_MEM1=bw_guest_mem1
  *     -DBW_GUEST_MEM1_SIZE=0x02000000u -Icmake/composite -I...GXRuntime\include
- *     -I...StaticRecomp tests/native_search_entries_test.c chunk_0015.o chunk_0203.o
- *     cmake/composite/native_search.c cmake/composite/direct_calls.c
- *     cmake/composite/gather_pipe.c cmake/composite/guest_cpu.c
+ *     -I...StaticRecomp tests/native_search_entries_test.c chunk_0009.o chunk_0015.o
+ *     chunk_0144.o chunk_0203.o cmake/composite/native_search.c cmake/composite/direct_calls.c
+ *     cmake/composite/gather_pipe.c cmake/composite/guest_cpu.c cmake/composite/simulation_timing.c
  *     ...\gxruntime.lib -o native_search_entries_test.exe
  *   native_search_entries_test MODULE.dll [CASES_PER_FUNCTION=6000]
  *
- * For both functions: random ordinary inputs (strings at every alignment, an
- * object-name table of 825 entries and a name in it or not) and some that
+ * For each function: random ordinary inputs (strings at every alignment, an
+ * object-name table of 825 entries and a name in it or not; for JudgeFilter,
+ * a node, its actor and fopAcM_findObjectCB's search for that name, the
+ * actor matching it at each test or not) and some that
  * make the natives decline (a budget spent inside the work, a deadline in
  * it, a reservation on the frame), run (1) through the module's translation,
  * run as in play (direct calls, its edge filter, the host quiet), (2) through
@@ -48,13 +52,27 @@
 #include <windows.h>
 
 /* The hooked chunks (their translated functions), by table index. */
+void func_800256E0(CPUState*);
 void func_8003D6E0(CPUState*);
+void func_802416E0(CPUState*);
 void func_8032D6E0(CPUState*);
 static const struct {
     unsigned index;
     u32 start;
     BwChunkFn fn;
-} CHUNKS[] = {{15, 0x8003D6E0u, func_8003D6E0}, {203, 0x8032D6E0u, func_8032D6E0}};
+} CHUNKS[] = {{9, 0x800256E0u, func_800256E0},
+              {15, 0x8003D6E0u, func_8003D6E0},
+              {144, 0x802416E0u, func_802416E0},
+              {203, 0x8032D6E0u, func_8032D6E0}};
+
+/* Chunk 0144's other certified hook (native_game_math.py, at 0x80245674),
+ * off as in the module here (BLUEWAKE_NATIVE_MATH=0). */
+int bluewake_native_game_math_enabled;
+int bluewake_native_game_math(CPUState* cpu, u32 address) {
+    (void)cpu;
+    (void)address;
+    return 0;
+}
 
 static void missing_chunk(CPUState* cpu) {
     fprintf(stderr, "a call into a chunk the test does not link (pc %08X)\n", cpu->pc);
@@ -99,19 +117,30 @@ static u32 next(void) {
 }
 
 static void put(u8* ram, u32 address, u32 value) { write_be32(ram + (address - GC_RAM_BASE), value); }
+static u32 get(const u8* ram, u32 address) { return read_be32(ram + (address - GC_RAM_BASE)); }
 static u8* at(u8* ram, u32 address) { return ram + (address - GC_RAM_BASE); }
 
+/* The module asks its edge service at the return address, and at a boundary
+ * it watches that the translation reaches by another way (the register
+ * save routine 0x80328F40, called out of line when a budget is too short for
+ * the inline form). Either ends the run there; the hooked chunks' run then
+ * stops at the same boundary. */
 static unsigned s_unexpected_service;
+static u32 s_stop_address;
 static int edge_service(void* user, CPUState* cpu, u32 address) {
     (void)user;
     (void)cpu;
-    if ((address & ~3u) != RETURN_ADDRESS)
+    if ((address & ~3u) != RETURN_ADDRESS) {
         s_unexpected_service++;
+        s_stop_address = address;
+    }
     return 1;
 }
 
-static const u32 FUNCTIONS[] = {BLUEWAKE_SEARCH_STRCMP, BLUEWAKE_SEARCH_STAGE_NAME};
-static const char* const NAMES[] = {"strcmp", "dStage_searchName"};
+static const u32 FUNCTIONS[] = {BLUEWAKE_SEARCH_STRCMP, BLUEWAKE_SEARCH_STAGE_NAME, BLUEWAKE_SEARCH_JUDGE_FILTER};
+static const char* const NAMES[] = {"strcmp", "dStage_searchName", "cTgIt_JudgeFilter"};
+#define FUNCTION_COUNT 3u
+#define FIND_OBJECT 0x8002833Cu
 
 static u8 character(unsigned style) {
     switch (style) {
@@ -157,6 +186,8 @@ static CPUState build(u8* ram, unsigned which, unsigned scenario) {
         c.cycle_deadline_budget = 8 + (s64)(next() % (which ? 9000u : 60u)); /* the natives decline some */
     if (scenario % 19u == 4u)
         c.downcount = -c.cycle_budget + 1 + (s64)(next() % (which ? 9000u : 60u)); /* and some for the budget */
+    if (scenario % 23u == 6u)
+        c.cycle_deadline_budget = 1 + (s64)(next() % 12u); /* before a suffix */
     const unsigned style = next() % 3u;
     if (which == 0) {
         const u32 a = AREA + 0x100u + next() % 0x3000u;
@@ -203,6 +234,33 @@ static CPUState build(u8* ram, unsigned which, unsigned scenario) {
             *at(ram, name + n) = 0u;
         }
         c.gpr[3] = name;
+        if (which == 2u) {
+            /* JudgeFilter(node, filter): the filter's judge
+             * fopAcM_findObjectCB, its search parameter for the name; the
+             * node's actor against the entry the name finds (if any). */
+            const u32 prm = AREA + 0x5000u, filter = AREA + 0x5020u, node = AREA + 0x5040u;
+            const u32 actor = AREA + 0x6000u;
+            put(ram, prm, name);
+            put(ram, prm + 4u, scenario % 4u == 0u ? 0u : next() % 2u ? 0xFFu : next());
+            put(ram, prm + 8u, next() % 4u);
+            put(ram, filter, FIND_OBJECT);
+            put(ram, filter + 4u, prm);
+            put(ram, node + 12u, actor);
+            u32 found = 0u;
+            for (u32 e = 0; e < ENTRIES && found == 0u; ++e)
+                if (strncmp((const char*)at(ram, TABLE + 12u * e), (const char*)at(ram, name), 12) == 0)
+                    found = TABLE + 12u * e;
+            if (found != 0u && next() % 2u) {
+                *at(ram, actor + 14u) = *at(ram, found + 8u);
+                *at(ram, actor + 15u) = *at(ram, found + 9u);
+                if (next() % 3u)
+                    *at(ram, actor + 449u) = *at(ram, found + 10u);
+                if (next() % 2u)
+                    put(ram, actor + 176u, get(ram, prm + 8u));
+            }
+            c.gpr[3] = node;
+            c.gpr[4] = filter;
+        }
     }
     return c;
 }
@@ -239,6 +297,8 @@ static int run_routed(u32 entry) {
             return 1;
         if (c->cycle_budget > 0 && c->downcount <= -c->cycle_budget)
             return 2;
+        if (s_stop_address != 0u && c->pc == s_stop_address)
+            return 3; /* where the module's run asked its edge service */
         BwChunkFn fn = bw_find_chunk(c->pc);
         if (fn == NULL) {
             fprintf(stderr, "no linked chunk at %08X\n", c->pc);
@@ -299,8 +359,8 @@ int main(int argc, char** argv) {
     if (source == NULL)
         return 1;
 
-    for (unsigned which = 0; which < 2u; ++which) {
-        unsigned stopped = 0;
+    for (unsigned which = 0; which < FUNCTION_COUNT; ++which) {
+        unsigned stopped = 0, serviced = 0;
         for (unsigned i = 0; i < cases; ++i) {
             const CPUState start = build(source, which, i);
             CPUState results[3];
@@ -313,11 +373,12 @@ int main(int argc, char** argv) {
                     g->ram = reference_ram;
                     mod->on_state_loaded(g);
                     s_unexpected_service = 0;
-                    if (!mod->dispatch(g, FUNCTIONS[which]) || s_unexpected_service != 0u) {
+                    s_stop_address = 0u;
+                    if (!mod->dispatch(g, FUNCTIONS[which]) || s_unexpected_service > 1u) {
                         fprintf(stderr, "case %u (%s): the translation did not finish\n", i, NAMES[which]);
                         return 1;
                     }
-                    outcome[0] = (g->pc & ~3u) == RETURN_ADDRESS ? 1 : 2;
+                    outcome[0] = (g->pc & ~3u) == RETURN_ADDRESS ? 1 : s_unexpected_service != 0u ? 3 : 2;
                     results[0] = *g;
                     results[0].ram = NULL;
                 } else {
@@ -341,6 +402,7 @@ int main(int argc, char** argv) {
                 }
             }
             stopped += outcome[0] == 2;
+            serviced += outcome[0] == 3;
             if (outcome[1] != outcome[0] || outcome[2] != outcome[0] ||
                 compare(NAMES[which], i, &results[1], &results[0]) ||
                 compare(NAMES[which], i, &results[2], &results[0])) {
@@ -354,8 +416,8 @@ int main(int argc, char** argv) {
             }
         }
         printf("%08X %s: %u cases identical through the hooked chunks, natives on and off (%u stopped for the "
-               "budget inside)\n",
-               FUNCTIONS[which], NAMES[which], cases, stopped);
+               "budget inside, %u at a watched boundary)\n",
+               FUNCTIONS[which], NAMES[which], cases, stopped, serviced);
         fflush(stdout);
     }
     bluewake_native_search_report();
@@ -369,7 +431,7 @@ int main(int argc, char** argv) {
     start.downcount = 0;
     start.cycle_budget = (s64)1 << 40;
     start.reserve_valid = false;
-    for (unsigned p = 0; p < 5u; ++p) {
+    for (unsigned p = 0; p < 6u; ++p) {
         u32 r3, r4;
         if (p < 3u) {
             r3 = AREA + 0x100u;
@@ -388,10 +450,29 @@ int main(int argc, char** argv) {
             }
             memcpy(at(source, TABLE + 12u * 383u), "ikada_h", 8u);
             r3 = AREA + 0x300u;
-            memcpy(at(source, r3), p == 3u ? "ikada_h" : "ikada_x", 8u);
+            memcpy(at(source, r3), p == 4u ? "ikada_x" : "ikada_h", 8u);
             r4 = 0u;
+            if (p == 5u) {
+                /* JudgeFilter on a node whose actor is not the entry's:
+                 * fopAcM_findObjectCB's search for "ikada_h". */
+                const u32 prm = AREA + 0x5000u, filter = AREA + 0x5020u, node = AREA + 0x5040u;
+                const u32 actor = AREA + 0x6000u;
+                put(source, prm, r3);
+                put(source, prm + 4u, 0u);
+                put(source, prm + 8u, 0u);
+                put(source, filter, FIND_OBJECT);
+                put(source, filter + 4u, prm);
+                put(source, node + 12u, actor);
+                *at(source, TABLE + 12u * 383u + 8u) = 0x01u;
+                *at(source, TABLE + 12u * 383u + 9u) = 0x23u;
+                *at(source, actor + 14u) = 0x7Fu;
+                r3 = node;
+                r4 = filter;
+            }
         }
-        const u32 entry = p < 3u ? BLUEWAKE_SEARCH_STRCMP : BLUEWAKE_SEARCH_STAGE_NAME;
+        const u32 entry = p < 3u   ? BLUEWAKE_SEARCH_STRCMP
+                          : p < 5u ? BLUEWAKE_SEARCH_STAGE_NAME
+                                   : BLUEWAKE_SEARCH_JUDGE_FILTER;
         copy_regions(routed_ram, source);
         double best[2] = {1e30, 1e30};
         for (unsigned round = 0; round < 6u; ++round) {
@@ -418,9 +499,13 @@ int main(int argc, char** argv) {
         if (p < 3u)
             printf("strcmp(\"%s\", \"%s\"): hooked chunk %.1f ns/call with the native off, %.1f on (%.2fx)\n",
                    pairs[p][0], pairs[p][1], best[0], best[1], best[0] / best[1]);
-        else
+        else if (p < 5u)
             printf("dStage_searchName(\"%s\"): hooked chunks %.1f ns/call with the natives off, %.1f on (%.2fx)\n",
                    p == 3u ? "ikada_h" : "ikada_x", best[0], best[1], best[0] / best[1]);
+        else
+            printf("cTgIt_JudgeFilter(a node, fopAcM_findObjectCB's search for \"ikada_h\"): hooked chunks %.1f "
+                   "ns/call with the natives off, %.1f on (%.2fx)\n",
+                   best[0], best[1], best[0] / best[1]);
     }
     return 0;
 }
