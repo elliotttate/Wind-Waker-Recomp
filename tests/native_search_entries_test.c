@@ -24,7 +24,7 @@
  *     chunk_0144.o chunk_0203.o cmake/composite/native_search.c cmake/composite/direct_calls.c
  *     cmake/composite/gather_pipe.c cmake/composite/guest_cpu.c cmake/composite/simulation_timing.c
  *     ...\gxruntime.lib -o native_search_entries_test.exe
- *   native_search_entries_test MODULE.dll [CASES_PER_FUNCTION=6000]
+ *   native_search_entries_test MODULE.dll [CASES_PER_FUNCTION=20000]
  *
  * For each function: random ordinary inputs (strings at every alignment, an
  * object-name table of 825 entries and a name in it or not; for JudgeFilter,
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
         return 2;
     }
     _putenv_s("BLUEWAKE_NATIVE_MATH", "0");
-    const unsigned cases = argc > 2 ? (unsigned)strtoul(argv[2], NULL, 10) : 6000u;
+    const unsigned cases = argc > 2 ? (unsigned)strtoul(argv[2], NULL, 10) : 20000u;
     HMODULE lib = LoadLibraryA(argv[1]);
     if (lib == NULL)
         return 1;
@@ -364,6 +364,7 @@ int main(int argc, char** argv) {
 
     for (unsigned which = 0; which < FUNCTION_COUNT; ++which) {
         unsigned stopped = 0, serviced = 0;
+        u32 serviced_at = 0u;
         for (unsigned i = 0; i < cases; ++i) {
             const CPUState start = build(source, which, i);
             CPUState results[3];
@@ -406,6 +407,8 @@ int main(int argc, char** argv) {
             }
             stopped += outcome[0] == 2;
             serviced += outcome[0] == 3;
+            if (outcome[0] == 3)
+                serviced_at = s_stop_address;
             if (outcome[1] != outcome[0] || outcome[2] != outcome[0] ||
                 compare(NAMES[which], i, &results[1], &results[0]) ||
                 compare(NAMES[which], i, &results[2], &results[0])) {
@@ -419,8 +422,8 @@ int main(int argc, char** argv) {
             }
         }
         printf("%08X %s: %u cases identical through the hooked chunks, natives on and off (%u stopped for the "
-               "budget inside, %u at a watched boundary)\n",
-               FUNCTIONS[which], NAMES[which], cases, stopped, serviced);
+               "budget inside, %u at a watched boundary, the last at %08X)\n",
+               FUNCTIONS[which], NAMES[which], cases, stopped, serviced, serviced_at);
         fflush(stdout);
     }
     bluewake_native_search_report();
