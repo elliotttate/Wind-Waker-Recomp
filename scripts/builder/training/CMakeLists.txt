@@ -39,8 +39,11 @@ set(_dsp_includes
     ${BLUEWAKE_REPO_ROOT}/apple/ios/dsp_generated)
 target_include_directories(bluewake_dsp_donor PUBLIC ${_dsp_includes})
 target_compile_definitions(bluewake_dsp_donor PUBLIC
-    _ARCH_64=1 _M_ARM_64=1 FMT_EXCEPTIONS=0 _DEFAULT_SOURCE
+    _ARCH_64=1 FMT_EXCEPTIONS=0 _DEFAULT_SOURCE
     __STDC_CONSTANT_MACROS __STDC_LIMIT_MACROS)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
+  target_compile_definitions(bluewake_dsp_donor PUBLIC _M_ARM_64=1)
+endif()
 target_compile_features(bluewake_dsp_donor PUBLIC cxx_std_23)
 target_compile_options(bluewake_dsp_donor PRIVATE -fno-strict-aliasing -w)
 target_link_libraries(bluewake_dsp_donor PUBLIC fmt::fmt xxhash)
@@ -50,7 +53,10 @@ add_library(bluewake_dsp_adapter STATIC
     ${BLUEWAKE_HOST_SRC}/dsp_adapter_c.cpp
     ${BLUEWAKE_HOST_SRC}/dsp_adapter_donor_stubs.cpp
     ${BLUEWAKE_HOST_SRC}/dsp_hle_backend.cpp)
-target_link_libraries(bluewake_dsp_adapter PUBLIC bluewake_dsp_donor
-    z iconv "-framework CoreFoundation" "-framework Foundation")
+target_link_libraries(bluewake_dsp_adapter PUBLIC bluewake_dsp_donor z)
+if(APPLE)
+  target_link_libraries(bluewake_dsp_adapter PUBLIC
+    iconv "-framework CoreFoundation" "-framework Foundation")
+endif()
 target_compile_definitions(bluewake_host PRIVATE BLUEWAKE_HAS_DSP_ADAPTER=1)
 target_link_libraries(bluewake_host PRIVATE bluewake_dsp_adapter)

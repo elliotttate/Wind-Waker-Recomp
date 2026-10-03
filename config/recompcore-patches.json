@@ -1,7 +1,7 @@
 {
   "base_sha": "8ab24daee9c641634fda5cac30389ad4b2cfda5e",
   "patch": "patches/recompcore/0170-mac-water-lava-and-smooth-hud.patch",
-  "sha256": "e1e89b059cd4d175fee78260c3671a3ffdafbbf8d1244e18043c15ba1bd221d5",
+  "sha256": "443bc76b34f17f0139967cede5a9c7614d3f43e8e99ef414f892b0570ec88b66",
   "includes": [
     {
       "patch": "patches/recompcore/0113-interpolate-indexed-cpu-deformed-vertices.patch",

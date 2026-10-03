@@ -15,6 +15,7 @@
 #include "Common/Hash.h"
 #include "Common/Logging/Log.h"
 #include "Common/MemoryUtil.h"
+#include "Common/PcapFile.h"
 #include "Common/MsgHandler.h"
 #include "Common/StringUtil.h"
 
@@ -164,3 +165,17 @@ IOFile::~IOFile()
     std::fclose(m_file);
 }
 }  // namespace File
+
+// Dolphin's PCAP capture writer (Common/PCAP.cpp) is not part of the trimmed
+// RecompCore tree, and the donor DSP never captures at runtime. Stub the two
+// members the capture logger links against so the donor builds self-contained.
+namespace Common
+{
+void PCAP::AddHeader(u32)
+{
+}
+
+void PCAP::AddPacket(const u8*, size_t)
+{
+}
+}  // namespace Common

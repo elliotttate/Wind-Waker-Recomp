@@ -456,9 +456,19 @@ index 547a09d1f9cbfec91a195c8929cd23b0fa9ab571..971c592a0d3869a5f1a9407c09712bda
  // Whether the last blend_draw() returned the same in-between block as the call
  // before it (its bytes unchanged), so the caller need not compare them.
 diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
-index a6203f1e5c3ca159d050ace8cc480f0cefe4af5c..b857a6525c67835ad42a7552af7fd2127f6792e5 100644
+index a6203f1e5c3ca159d050ace8cc480f0cefe4af5c..93cb17e27260958ff34aca4f61b5470a1a3fe6f3 100644
 --- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
 +++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -519,8 +519,8 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+     });
+   }
+   const wgpu::VertexBufferLayout vertexLayout{
+-      .arrayStride = gxc::kVertexStrideBytes,
+       .stepMode = wgpu::VertexStepMode::Vertex,
++      .arrayStride = gxc::kVertexStrideBytes,
+       .attributeCount = attributes.size(),
+       .attributes = attributes.data(),
+   };
 @@ -1059,15 +1059,25 @@ struct InterpJob {
    gxc::VertexShaderConstants constants;
  };

@@ -1,7 +1,13 @@
 // See disc_import.h.
 #include "disc_import.h"
 
+#if defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
+#define BW_SHA1_DIGEST_LENGTH CC_SHA1_DIGEST_LENGTH
+#else
+#include <openssl/sha.h>
+#define BW_SHA1_DIGEST_LENGTH SHA_DIGEST_LENGTH
+#endif
 #include <dirent.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -94,12 +100,16 @@ bad:
 }
 
 static void sha1_hex(const uint8_t* data, size_t size, char out[41]) {
-    uint8_t digest[CC_SHA1_DIGEST_LENGTH];
+    uint8_t digest[BW_SHA1_DIGEST_LENGTH];
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#if defined(__APPLE__)
     CC_SHA1(data, (CC_LONG)size, digest);
+#else
+    SHA1(data, size, digest);
+#endif
 #pragma clang diagnostic pop
-    for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; ++i)
+    for (int i = 0; i < BW_SHA1_DIGEST_LENGTH; ++i)
         snprintf(out + i * 2, 3, "%02x", digest[i]);
 }
 
