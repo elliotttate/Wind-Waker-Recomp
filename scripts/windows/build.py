@@ -688,9 +688,8 @@ int main(void) {
         self.source_step("native-math", "scripts/mods/prepare_native_math.py", root)
         print((self.logs / "native-game-math.log").read_text(errors="replace").strip().splitlines()[-1])
         for name in ("guest-cpu", "gpr-inline", "chunk-headers", "direct-calls", "native-skin", "fast-blocks",
-                     "lean-memory", "native-j3d", "simulation-prepare", "native-math"):
+                     "lean-memory", "native-j3d", "native-entries", "simulation-prepare", "native-math"):
             print((self.logs / f"{name}.log").read_text(errors="replace").strip().splitlines()[-1])
-        print((self.logs / "native-entries.log").read_text(errors="replace").strip().splitlines()[-1])
 
     def source_step(self, name, script, root):
         """One source step. A run that crashed (a Windows exception status, not an
