@@ -1,3 +1,55 @@
+## 2026-10-03 The Mac side's updates on Windows: water and HUD smoothing, HD packs without shimmer, Forest Water, the Wind Waker HD importer
+
+**The merge** (main e4e1401 into windows-release, a9df903): the Wind Waker HD texture importer, Forest Water
+options, the Mac's runtime delta (patches/recompcore/0170: water, lava, HUD) and its patch step. Windows
+builds from a pinned RecompCore commit that carries its changes, so the lock names no working-tree patch;
+scripts/apply_recompcore_patches.py then only checks that ref/recompcore is that commit, unmodified.
+
+**RecompCore 201e909** (patch 0131): 0170 without its lava part (this fork's 0120 already), merged with
+0125's cloth strips and 0126's blended colours. Indexed meshes the game deforms on the CPU (the sea's grid,
+with its direct UVs) are blended vertex by vertex, and 2D sprites are matched by their bounds.
+frame_interp_test passes with both sides' cases. In Smooth Motion dumps of the Outset route the 31 real
+frames are identical to ef3e17f's; the in-between frames differ where the HUD's matching changed: the
+pulsing heart was drawn doubled (one copy offset above) and is now one heart between its two sizes.
+
+**HD packs shimmered and flickered as the camera turned** (RecompCore 7310b79, patch 0132). Most of the
+game's textures have no mips, so their sampler clamps to level 0; a replacement several times their size,
+with its own mip chain (the WWHD importer writes one to 1x1), was drawn from level 0 alone. Now a
+replacement's levels are all sampled, as in Dolphin (a custom texture's max LOD is 255), blended linearly
+where the game asked for no mip filter. Tested with private packs made from the disc (all 4,641 model and
+BTI textures decoded, upscaled 4x/2x, with mip chains; scratchpad make_test_pack.py, never shipped): with a
+fine grid in every texture, the old renderer drew moire on the cliffs, beach, pier and HUD buttons that
+crawled with the camera, the new one averages it out at a distance. Thin alpha features such as the sea's
+foam now show as soft streaks at a distance, as in Dolphin with a mipped pack. No Wind Waker HD disc was
+available here, so a real WWHD import has not been tried on Windows.
+
+**The water path's cost** (RecompCore e6559e0, patch 0133). 0131 gave every small indexed mesh without
+position matrix indices its own vertex range (so no batching) and a copy of its vertices for the helper;
+nearly all are static models. Now a hash of each position array's bytes, once a game frame, says which
+meshes the game wrote; only those (and draws with direct UVs or positions) take the per-vertex path. The
+guest's dirty epochs (cache flushes) were tried first and miss small meshes written without a flush (the
+Forsaken Fortress's flag). Dumps against 201e909: Outset 62 of 62 and the sea by the Fortress 42 of 42
+identical. All cores, Smooth Motion at 60, paced, two runs each, CPU per game frame (ms):
+
+| Place | GX worker ef3e17f / 201e909 / e6559e0 | Render worker ef3e17f / 201e909 / e6559e0 |
+| --- | --- | --- |
+| Outset (`sea:44`) | 8.1 / 9.1-9.4 / 8.1-8.3 | 3.3-3.9 / 4.0-4.4 / 3.2-3.8 |
+| Forest Haven (`sea:41`) | 15.9-16.4 / 18.6-18.9 / 16.6-16.8 | 4.6-5.1 / 7.1 / 4.3-4.7 |
+| Dragon Roost Island (`sea:13`) | 13.1-13.6 / 14.8-14.9 / 13.5 | 4.4-4.8 / 5.6-5.9 / 4.2-4.4 |
+| Hyrule (`Hyrule`) | 11.1-11.4 / 13.1 / 11.1-11.3 | 3.8-4.4 / 6.1-6.4 / 3.6-4.4 |
+| Hyrule Castle's room (`Hyroom`) | 13.4-13.7 / 15.5-16.0 / 13.7-13.8 | 3.8-4.0 / 6.3-6.4 / 4.3-4.6 |
+
+(On eight E-cores the comparison is not meaningful at Forest Haven: the pacer turns the in-between frames
+off and on as the game falls below 30, so runs mix both states.)
+
+**Also in this build:** Forest Water's two helps (the Mac's forest_water.c) in the Windows settings (Mods)
+and settings.ini, its REL hook named so the builder's direct calls keep it; the WWHD importer on Windows
+(scripts/setup_wwhd_tools.ps1, %APPDATA%\BlueWake defaults, `--install` writes `hd_textures=1` and
+`texture_pack=`, which the app now honours; tests/wwhd_import_test.py passes on Windows); and the
+resumable search natives (game-natives-3b, docs/status/NATIVE_SEARCH_WINDOWS_2026-10-03.md: native entries
+15/15 certified). The game module's play is exact against the previous build: Link's position at all 621
+probes of the Outset route identical.
+
 ## 2026-10-03 The game by warp: where it is slow, and the GX worker's transform copies
 
 **The survey.** The 2026-10-02 build (module be22aba4) on four of the i9's E-cores (`0x000F0000`), uncapped,

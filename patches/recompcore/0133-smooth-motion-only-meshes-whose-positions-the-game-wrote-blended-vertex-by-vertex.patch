@@ -1,0 +1,273 @@
+From e6559e05cc39f2e66ee3360214a1758c5fcf32a4 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Sat, 3 Oct 2026 18:54:43 -0400
+Subject: [PATCH] Smooth Motion: only meshes whose positions the game wrote
+ blended vertex by vertex (the Mac's water path, at its old cost)
+
+The water change (0131) blended every small indexed mesh without position
+matrix indices vertex by vertex: each kept its own vertex range, so none
+was batched, and each copied its decoded vertices for the helper. Nearly
+all of them are the world's static models, whose positions never change, so
+the blend found nothing to do. On all of the i9's cores with Smooth Motion at
+60 that cost 1.5-2.5 ms of GX worker and 1.5-2.5 ms of render worker time per
+game frame at Forest Haven, Hyrule, Hyrule Castle and Dragon Roost.
+
+Now positions_written() hashes each position array's bytes once a game
+frame (the widest span its draws read) and remembers the frame they last
+changed in. Only an array written in this frame or the one before, or met
+for the first time, makes its draws blend vertex by vertex; the rest are
+matched by matrices and batched as before 0131. Draws with direct UVs (the
+sea's grid) and direct positions keep the 0131 path. Keys still follow the
+topology (may_blend_vertices()), so a mesh starting or stopping keeps its
+key. The guest's dirty epochs were tried first: they miss small meshes the
+game writes without a cache flush (the Forsaken Fortress's flag).
+
+Smooth Motion dumps against 201e909: Outset 62 of 62 and the sea by the
+Forsaken Fortress 42 of 42 identical. CPU per game frame back to ef3e17f's
+within run-to-run noise at six places. DOL_AURORA_INTERP_ALL_VERTICES=1 gives
+0131's behaviour; DOL_AURORA_INTERP_VERTEX_LOG=1 logs arrays and writes.
+---
+ .../graphics/aurora/lib/gfx/frame_interp.cpp  | 17 +++-
+ .../graphics/aurora/lib/gfx/frame_interp.hpp  | 11 ++-
+ .../graphics/aurora/lib/gfx/gxcore_draw.cpp   | 85 +++++++++++++++++--
+ .../include/gxruntime/gxcore/shader.hpp       |  7 ++
+ GXRuntime/graphics/gxcore/src/gxcore.cpp      |  6 ++
+ 5 files changed, 115 insertions(+), 11 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+index 8df167a8..8223be0c 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+@@ -1358,7 +1358,7 @@ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+     }
+     return h == 0 ? 1 : h;
+   }
+-  if (blends_vertices(plan) && plan.match_position_size > 0 && plan.match_position_size <= 2 &&
++  if (may_blend_vertices(plan) && plan.match_position_size > 0 && plan.match_position_size <= 2 &&
+       plan.match_position_offset + plan.match_position_size <= plan.match_vertex_stride &&
+       plan.match_payload_size == plan.vertex_count * plan.match_vertex_stride) {
+     // CPU-deformed indexed meshes retain their vertex correspondence when
+@@ -1393,14 +1393,23 @@ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+ 
+ uint64_t draw_key(const gxc::DrawPlan& plan) noexcept { return draw_key_of(plan); }
+ 
+-bool blends_vertices(const gxc::DrawPlan& plan) noexcept {
++bool may_blend_vertices(const gxc::DrawPlan& plan) noexcept {
+   const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
+   return decoded > 0 && decoded <= kMaxBlendedVertices && !plan.pipeline.shader.has_pos_mtx_idx &&
+          (!plan.match_direct_position || plan.draw_tag != 0 || plan.draw_scope_part != 0 ||
+           screen_space_sprite(plan));
+ }
+ 
+-void capture_draw(const gxc::DrawPlan& plan, DrawInput& out) noexcept {
++bool blends_vertices(const gxc::DrawPlan& plan, bool positionsWritten) noexcept {
++  // An indexed mesh whose positions stand still from frame to frame (most of
++  // the world's models) is moved by its matrices alone; blending it vertex by
++  // vertex finds nothing to do, but cost its vertices' copies and its batch.
++  // Direct UVs come with the draw, so a mesh with them may animate them alone.
++  return may_blend_vertices(plan) &&
++         (plan.match_direct_position || positionsWritten || plan.match_direct_texcoord_mask != 0);
++}
++
++void capture_draw(const gxc::DrawPlan& plan, DrawInput& out, bool positionsWritten) noexcept {
+   out.key = draw_key_of(plan);
+   out.usedMatrixRows = used_matrix_rows(plan);
+   out.haveSamples = false;
+@@ -1461,7 +1470,7 @@ void capture_draw(const gxc::DrawPlan& plan, DrawInput& out) noexcept {
+   // meshes (water, cloth, CPU skinning) need each vertex blended: fitting a
+   // rigid transform to three samples pulls adjacent strips apart. Matrix-
+   // skinned models still interpolate their bones, without a second blend.
+-  if (blends_vertices(plan)) {
++  if (blends_vertices(plan, positionsWritten)) {
+     out.positions.resize(decoded * 3u);
+     for (size_t i = 0; i < decoded; ++i)
+       std::memcpy(out.positions.data() + i * 3u,
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+index 3b39808d..5757323a 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+@@ -82,9 +82,16 @@ struct DrawInput {
+   std::array<float, 2> screenCenter{};
+   std::array<float, 2> screenExtent{};
+ };
+-void capture_draw(const gxruntime::gxcore::DrawPlan& plan, DrawInput& out) noexcept;
++// `positionsWritten`: whether the game wrote an indexed draw's position array
++// this frame or the one before (gxcore_draw's positions_written()). Only such
++// meshes (the sea, cloth, a flag) are blended vertex by vertex; the rest move
++// with their matrices, batched, without the copies that costs.
++void capture_draw(const gxruntime::gxcore::DrawPlan& plan, DrawInput& out, bool positionsWritten = true) noexcept;
++// A draw of the kind that is blended vertex by vertex when its vertices move
++// (its key follows its topology, so it is the same whether or not they do).
++bool may_blend_vertices(const gxruntime::gxcore::DrawPlan& plan) noexcept;
+ // These draws need independent vertex ranges in each in-between frame.
+-bool blends_vertices(const gxruntime::gxcore::DrawPlan& plan) noexcept;
++bool blends_vertices(const gxruntime::gxcore::DrawPlan& plan, bool positionsWritten = true) noexcept;
+ 
+ // Once per submitted gxcore draw, in draw order, on one thread at a time.
+ // Returns the constants the draw uses in the in-between frame, or nullptr
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index 995c8aba..98f711d7 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -1281,7 +1281,81 @@ void interp_helper_main(InterpHelper* h) {
+   }
+ }
+ 
+-uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw, bool tev, bool pixelRepeats) {
++// Whether the game wrote this indexed draw's position array in this game
++// frame or the one before. Per array (its guest address), a hash of the bytes
++// its draws read, taken once a game frame, and the frame it last changed in;
++// an array seen for the first time counts as written. The frame before counts
++// too, so a mesh whose next positions are written before its draw is
++// recorded is still taken as moving. (The guest's cache flushes, which give
++// the texture cache its dirty epochs, miss small meshes the game writes
++// without one: a flag on the Forsaken Fortress.)
++// DOL_AURORA_INTERP_ALL_VERTICES=1 takes every such mesh as written.
++bool positions_written(const gxc::DrawPlan& plan) {
++  static const bool s_all = [] {
++    const char* env = std::getenv("DOL_AURORA_INTERP_ALL_VERTICES");
++    return env != nullptr && env[0] == '1';
++  }();
++  if (s_all || plan.match_direct_position || plan.match_position_span == 0 || plan.match_position_data == nullptr)
++    return true;
++  struct ArrayState {
++    uint64_t hash = 0;
++    uint64_t changed = 0; // the game frame its bytes last changed in
++    uint64_t hashed = 0;  // the game frame they were last hashed in
++    uint32_t span = 0;
++  };
++  static absl::flat_hash_map<uint32_t, ArrayState> s_arrays;
++  const uint64_t frame = frame_interp::game_frame_number();
++  // A model's draws mostly index one array in turn: the last answer, while
++  // its frame holds.
++  static uint32_t s_lastBase = 0, s_lastSpan = 0;
++  static uint64_t s_lastFrame = UINT64_MAX;
++  static bool s_lastWritten = true;
++  if (plan.match_position_base == s_lastBase && plan.match_position_span <= s_lastSpan && frame == s_lastFrame)
++    return s_lastWritten;
++  auto [it, fresh] = s_arrays.try_emplace(plan.match_position_base);
++  ArrayState& state = it->second;
++  if (fresh || state.hashed != frame || plan.match_position_span > state.span) {
++    // The widest span the array's draws have read (draws of one array reach
++    // different lengths, in no fixed order), as far as this draw can read.
++    const uint32_t span = std::min(std::max(plan.match_position_span, state.span),
++                                   std::max(plan.match_position_readable, plan.match_position_span));
++    const uint64_t hash = XXH3_64bits(plan.match_position_data, span);
++    if (fresh || hash != state.hash || span != state.span)
++      state.changed = frame;
++    state.hash = hash;
++    state.span = span;
++    state.hashed = frame;
++  }
++  const bool written = state.changed + 1u >= frame;
++  s_lastBase = plan.match_position_base;
++  s_lastSpan = state.span;
++  s_lastFrame = frame;
++  s_lastWritten = written;
++  if (s_arrays.size() > 65536u)
++    s_arrays.clear(); // bounded; a cleared array counts as written once
++  // DOL_AURORA_INTERP_VERTEX_LOG=1: how many arrays, and of them written, a
++  // second (each array once per game frame).
++  static const bool s_log = [] {
++    const char* env = std::getenv("DOL_AURORA_INTERP_VERTEX_LOG");
++    return env != nullptr && env[0] == '1';
++  }();
++  if (s_log) {
++    static uint64_t s_logFrame = 0, s_seen = 0, s_written = 0;
++    ++s_seen;
++    s_written += written ? 1u : 0u;
++    if (frame >= s_logFrame + 30u) {
++      std::fprintf(stderr, "[interp-vertices] frame=%llu arrays=%llu written=%llu tracked=%zu\n",
++                   static_cast<unsigned long long>(frame), static_cast<unsigned long long>(s_seen),
++                   static_cast<unsigned long long>(s_written), s_arrays.size());
++      s_logFrame = frame;
++      s_seen = s_written = 0;
++    }
++  }
++  return written;
++}
++
++uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw, bool tev, bool pixelRepeats,
++                          bool positionsWritten) {
+   InterpHelper* h = g_interpHelper.load(std::memory_order_acquire);
+   if (h == nullptr) {
+     h = new InterpHelper;
+@@ -1298,7 +1372,7 @@ uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw, bool
+   while (head - h->consumed.load(std::memory_order_acquire) >= InterpHelper::Capacity)
+     std::this_thread::yield();
+   InterpJob& job = h->ring[head % InterpHelper::Capacity];
+-  frame_interp::capture_draw(plan, job.input);
++  frame_interp::capture_draw(plan, job.input, positionsWritten);
+   if (job.input.positions.empty())
+     job.vertices.clear();
+   else
+@@ -1842,11 +1916,12 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   // (as after a cut).
+   const bool interpolating = frame_interp::enabled() && !frame_interp::frame_skipped();
+   const bool matchHere = interpolating && frame_interp::tracing();
++  const bool positionsWritten = interpolating && frame_interp::may_blend_vertices(plan) && positions_written(plan);
+   if (matchHere)
+     wait_interp_jobs();
+   static frame_interp::DrawInput tracedInput;
+   if (matchHere)
+-    frame_interp::capture_draw(plan, tracedInput);
++    frame_interp::capture_draw(plan, tracedInput, positionsWritten);
+   const gxc::VertexShaderConstants* interpConstants =
+       matchHere ? frame_interp::blend_draw(tracedInput, plan.constants, repeatsLast) : nullptr;
+   // The helper is idle while a frame is traced, so its areas are ours.
+@@ -1924,7 +1999,7 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+     depthPipeline = pipeline_ref(depthConfig);
+   }
+   const bool ownVertices = plan.draw_tag != 0 || plan.draw_scope_part != 0 ||
+-                           (interpolating && frame_interp::blends_vertices(plan));
++                           (interpolating && frame_interp::blends_vertices(plan, positionsWritten));
+ 
+   // The ubershader (gxcore_uber.cpp): a draw whose own pipeline is still
+   // compiling is drawn with it, with the same result, rather than left out of
+@@ -2067,7 +2142,7 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+         g_interpUniformCache, current_frame_id(), recording_frame_slot(), reinterpret_cast<const uint8_t*>(interpConstants),
+         sizeof(*interpConstants), frame_interp::last_blend_repeated());
+   else if (interpolating && !matchHere)
+-    interpJob = queue_interp_job(plan, repeatsLast, tev, pixelRepeats);
++    interpJob = queue_interp_job(plan, repeatsLast, tev, pixelRepeats, positionsWritten);
+ 
+   const auto indexCount = static_cast<uint32_t>(plan.indices.size());
+   if (batch != nullptr) {
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+index 6416808f..e3b70cd3 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+@@ -498,6 +498,13 @@ struct DrawPlanFields {
+   // address may change when the game allocates a fresh frame buffer.
+   std::uint32_t match_position_offset = 0;
+   std::uint32_t match_position_size = 0;
++  // The position array's guest address, its bytes as the draw reads them and
++  // how many its indices reach (none when positions are direct): whether the
++  // game wrote it this frame. The bytes are valid while the plan is submitted.
++  std::uint32_t match_position_base = 0;
++  std::uint32_t match_position_span = 0;
++  std::uint32_t match_position_readable = 0; // bytes at match_position_data
++  const std::uint8_t* match_position_data = nullptr;
+   std::uint8_t match_direct_texcoord_mask = 0; // VCD direct UV attributes
+   // The host's tag for the object this draw is, written just before it to
+   // BP registers the retail GX never uses (kDrawTagRegister and
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore.cpp b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+index 8fa766ab..039b1535 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+@@ -684,6 +684,12 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+     if (const auto* positions = find_array(draw, 0)) {
+       plan.match_position_offset = positions->vertex_offset;
+       plan.match_position_size = positions->index_size;
++      plan.match_position_base = positions->base;
++      if (positions->resolved && positions->host_data != nullptr) {
++        plan.match_position_span = std::min(positions->span_size, positions->host_available);
++        plan.match_position_readable = positions->host_available;
++        plan.match_position_data = static_cast<const std::uint8_t*>(positions->host_data);
++      }
+     }
+   }
+ 
+-- 
+2.45.2.windows.1
+

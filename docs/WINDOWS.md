@@ -199,8 +199,10 @@ menu until you close it):
   game's own) and its turn and aim speeds, the controller's camera stick directions (for either), and the
   keyboard layout.
 - *Mods*: 4:3, 16:10 or 16:9, Better Wind Waker and each of its options, quick doors, skipping through the
-  black while loading, climbing any wall and its stamina, and an HD texture pack (a Dolphin-format pack for
-  GZLE01, in the folder the menu opens).
+  black while loading, climbing any wall and its stamina, the Forest Water challenge's two helps (keeping
+  watered trees when the water runs out, and a 30-minute timer), and an HD texture pack (a Dolphin-format
+  pack for GZLE01, in the folder the menu opens, or the folder the Wind Waker HD importer made: see
+  [WWHD_TEXTURES.md](WWHD_TEXTURES.md)).
 - *Sound and files*: fast (Dolphin's high-level) or exact (the DSP's own program) sound, and your files.
 
 Display and control settings apply at once. The mods and the sound mode are compiled paths chosen when the game
@@ -268,6 +270,8 @@ never touches it:
 - `sram.bin`: the console's settings (sound mode and the like)
 - `settings.ini`: the settings menu's choices and the window's place
 - `Load\Textures\GZLE01`: where an HD texture pack goes
+- `Load\Textures\WWHD`: the pack made from your own Wind Waker HD disc, if you import one
+  ([WWHD_TEXTURES.md](WWHD_TEXTURES.md))
 - `states\quick-*.bwstate`: save states (F5); delete any you no longer want
 - `logs\session-*.log`: the newest eight sessions, one line a second of speed and timing plus anything that went
   wrong. Attach the relevant one to a bug report. If BlueWake crashes, the log says where. It starts with the
