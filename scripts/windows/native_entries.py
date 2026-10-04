@@ -162,6 +162,75 @@ ENTRIES[0x80251D88] = ("cM3dGCyl::SetC", "cc", [(0x802516E0, 0x80251D88, 0x80252
 ENTRIES[0x8024170C] = ("cCcD_DivideArea::CalcDivideInfoOverArea", "cc", [(0x802416E0, 0x8024170C, 0x80241924)],
                        "8a3217398db768a43715377f0b10f65fe4d31ae19d1f7e8725d236a2142281c9")
 # --- end of the fourth set's area division ---
+# --- The fifth set (tests/native_gx_test.c): the GX SDK's FIFO writers
+# (cmake/composite/native_gx.c, each its translation replayed: native_gx_gen.inc).
+# Each entry's hash covers the callees its native stands in for:
+# GXLoadTexObj's region callback, GXGetTexObjFmt and GXLoadTexObjPreLoaded,
+# PreLoaded's TLUT callback, __GXSetSUTexRegs's __SetSURegs, __GXSetVCD's
+# __GXXfVtxSpecs, and GXSetTexCoordGen2's and GXSetCurrentMtx's
+# __GXSetMatrixIndex. ---
+GROUPS["gx"] = ("native_gx.h", "bluewake_native_gx_enabled", "bluewake_native_gx(ctx, 0x{entry:08X}u)")
+_GX_0199, _GX_0200, _GX_0201 = 0x8031D6E0, 0x803216E0, 0x803256E0
+_GX_SU_TEX_REGS = [(_GX_0200, 0x803253B8, 0x80325534), (_GX_0200, 0x80325300, 0x803253B8)]  # with __SetSURegs
+_GX_SET_VAT = (_GX_0200, 0x803221D8, 0x80322274)
+_GX_SET_MATRIX_INDEX = (_GX_0201, 0x80327364, 0x803273E8)
+_GX_PRELOADED = [(_GX_0200, 0x80324D50, 0x80324EE8), (_GX_0199, 0x8031FAC4, 0x8031FAE8)]  # with the TLUT callback
+ENTRIES[0x80326F38] = ("GXLoadPosMtxImm", "gx", [(_GX_0201, 0x80326F38, 0x80326F88)], "8de21439c3a30b9b500d7f19a87230030c43dee872279bc9620f66de96383f03")
+ENTRIES[0x80326F88] = ("GXLoadNrmMtxImm", "gx", [(_GX_0201, 0x80326F88, 0x80326FD8)], "afacaa53e925d22f7b988e3854cffc8430c04b59a45f4f02069d34585a3e174f")
+ENTRIES[0x80325FA8] = ("GXSetTevColor", "gx", [(_GX_0201, 0x80325FA8, 0x8032601C)], "2182408aaeaa731470b4e6a79c92e978061fe4cee0c20a57e195e55d13694e28")
+ENTRIES[0x8032601C] = ("GXSetTevColorS10", "gx", [(_GX_0201, 0x8032601C, 0x80326090)], "3cad71ba008ab04273afa4cd47dd28fe9cf65c42df33664110fa7e039b919eec")
+ENTRIES[0x80326090] = ("GXSetTevKColor", "gx", [(_GX_0201, 0x80326090, 0x80326104)], "d03989eadea5e3658468928b8e654bb4f2ce6fba0e0ea999304c3e37110f5830")
+ENTRIES[0x80322568] = ("GXSetArray", "gx", [(_GX_0200, 0x80322568, 0x803225F4)], "994bdd8537fa1d6a105929c11f72831f0049fad254a14182141cdcc376d83b0c")
+ENTRIES[0x803263A0] = ("GXSetTevOrder", "gx", [(_GX_0201, 0x803263A0, 0x80326578)], "90dd983a02547d3ba4d679dd9f8c6b3e037aed7aee6e34acb429be9c8a5ec7cc")
+ENTRIES[0x80326B80] = ("GXCallDisplayList", "gx", [(_GX_0201, 0x80326B80, 0x80326BF0)], "e621c45ae139631aca2cf9d0247f9918414e003d700b8ef57f78e6772142b37c")
+# GXBegin alone: where its dirty state needs a call, it declines, and the
+# translation makes the call, each callee native at its own hook.
+ENTRIES[0x803230C4] = ("GXBegin", "gx", [(_GX_0200, 0x803230C4, 0x803231B4)], "aa7721852ed559a5a69aaae0cf62658dfe6f292a902da2dbad164c49b0fb276d")
+ENTRIES[0x80324D50] = ("GXLoadTexObjPreLoaded", "gx", _GX_PRELOADED, "69e4d6b093571b644c0651d0c9e22177f3867b77045b05f7937500627e1f9a53")
+ENTRIES[0x80324EE8] = ("GXLoadTexObj", "gx",
+                       [(_GX_0200, 0x80324EE8, 0x80324F3C), (_GX_0199, 0x8031FA48, 0x8031FAC4),
+                        (_GX_0200, 0x80324D28, 0x80324D30)] + _GX_PRELOADED, "f1303133a4a2a5d4ac80bfa425cb2b4981b8ae5379013a50b931999c34d1bfc9")
+ENTRIES[0x803253B8] = ("__GXSetSUTexRegs", "gx", _GX_SU_TEX_REGS, "32404484f84b9606f83476964e5386ca2963a0d2edbc46ac6432a01e0ed6da3f")
+ENTRIES[0x803221D8] = ("__GXSetVAT", "gx", [_GX_SET_VAT], "09f176ea1909c6acae1f294ea142f205bf150065d26c072fd23f4d47e7bba2bc")
+ENTRIES[0x80327364] = ("__GXSetMatrixIndex", "gx", [(_GX_0201, 0x80327364, 0x803273E8)], "b7ef7243b32b9accaf763c748629310cacf5a75fa1d6902a5d54453571e6f5bd")
+ENTRIES[0x80325CD4] = ("__GXUpdateBPMask", "gx", [(_GX_0201, 0x80325CD4, 0x80325DA0)], "2868c3aff143fc5f0af338ced04c12122db31ab8fc9b91f02b1478eff4f46a92")
+ENTRIES[0x803233B0] = ("__GXSetGenMode", "gx", [(_GX_0200, 0x803233B0, 0x803233D4)], "9601c3051ea5c89cd989f1939be34ab6945c9f23db060172e7300111137631c1")
+ENTRIES[0x80321958] = ("__GXSetVCD", "gx", [(_GX_0200, 0x80321958, 0x803219AC), (_GX_0199, 0x803214B0, 0x80321608)], "a780fca6787628e28af7b5a8fa99fc241b4da5a25b1fde9b1cf6429be4809ab0")
+ENTRIES[0x803214B0] = ("__GXXfVtxSpecs", "gx", [(_GX_0199, 0x803214B0, 0x80321608)], "0bc9c3bff2f0a7622646f3cce4317e874b4910970ea3a7772e936373ea196b70")
+ENTRIES[0x803219AC] = ("__GXCalculateVLim", "gx", [(_GX_0200, 0x803219AC, 0x80321AD0)], "c143b4c616a0bf8b2f8e69f77753a7d79cc37040391d70ede2a66063110c69f3")
+# The vertex format and the TEV, channel and pixel state. GXSetVtxDesc runs
+# across the boundary between chunks 0199 and 0200.
+ENTRIES[0x80321608] = ("GXSetVtxDesc", "gx", [(_GX_0199, 0x80321608, 0x803216E0), (_GX_0200, 0x803216E0, 0x80321958)], "16b88f38d170206a39c9a99b8d7b10c52ad33258db5d3212a96e40770a147b62")
+ENTRIES[0x80321AD0] = ("GXClearVtxDesc", "gx", [(_GX_0200, 0x80321AD0, 0x80321B08)], "e9ebc2526a6a2a14a055ae5945c821cbe08ead2abc8fdc6806c52abefefde89f")
+ENTRIES[0x80321B08] = ("GXSetVtxAttrFmt", "gx", [(_GX_0200, 0x80321B08, 0x80321E60)], "232d31611a11cb2dec59d3042337b89ffb0d3e04dac384e1b25c22fd47868e93")
+ENTRIES[0x80322604] = ("GXSetTexCoordGen2", "gx", [(_GX_0200, 0x80322604, 0x803228D4), _GX_SET_MATRIX_INDEX], "1439617621dd5b80bc69edbb6ce727042f67ef8517b08799c3bc308571b951dd")
+ENTRIES[0x803228D4] = ("GXSetNumTexGens", "gx", [(_GX_0200, 0x803228D4, 0x80322914)], "5efc2b471817a42487c38ca3311e4ac35b5e53ee8dfdb9ef21543a9b9c69f5d8")
+ENTRIES[0x80323328] = ("GXSetCullMode", "gx", [(_GX_0200, 0x80323328, 0x80323374)], "13e8f0c5d0c268a7ae571e8f166430624eb8487f3e0389edb1cde0ba056ad38b")
+ENTRIES[0x80324390] = ("GXSetChanAmbColor", "gx", [(_GX_0200, 0x80324390, 0x80324484)], "1f515c934c1836f9bf37ce699f8f8ac35627f2d8b471ece8e61e8c67b38ad02a")
+ENTRIES[0x80324484] = ("GXSetChanMatColor", "gx", [(_GX_0200, 0x80324484, 0x80324578)], "fcda2494a487596bdc6dce874aabde41651f3ad68de04146171a9c23b29ac2dc")
+ENTRIES[0x80324578] = ("GXSetNumChans", "gx", [(_GX_0200, 0x80324578, 0x803245BC)], "8f4e5b4524b2f7255bb5ea17bb3374a04df56c4a9bd626be57df23d449ef4a3f")
+ENTRIES[0x803245BC] = ("GXSetChanCtrl", "gx", [(_GX_0200, 0x803245BC, 0x80324688)], "d516a0552692157aa3ada31ea64b14b381f06698739b77a72c967c33df49b539")
+ENTRIES[0x80324D28] = ("GXGetTexObjFmt", "gx", [(_GX_0200, 0x80324D28, 0x80324D30)], "bbcac18f9ee7636d2ceebd84c8a894e02ba0491f2d3d88e94d5d8b39a1bc3680")
+ENTRIES[0x80325774] = ("GXSetTevIndirect", "gx", [(_GX_0201, 0x80325774, 0x80325810)], "d4789c9ed3b98c430d0ca3f514aa7f2fb63b94c99a0246adbb3dd412e682da8a")
+ENTRIES[0x80325C00] = ("GXSetNumIndStages", "gx", [(_GX_0201, 0x80325C00, 0x80325C28)], "a0f88007ca59b2c1598302ce4bbd13a5c43afa08a096b2651525765d61001f7d")
+ENTRIES[0x80325C28] = ("GXSetTevDirect", "gx", [(_GX_0201, 0x80325C28, 0x80325C70), (_GX_0201, 0x80325774, 0x80325810)], "a218d60f24b38b3f694c1f0a7028b7bbfcb133c57a6ee93b7dff473bcd617739")
+ENTRIES[0x80325E50] = ("GXSetTevColorIn", "gx", [(_GX_0201, 0x80325E50, 0x80325E94)], "66cd3bdbff0e8c98657f221b1b10242b3288ae938515ea0907dd3702e00b4f38")
+ENTRIES[0x80325E94] = ("GXSetTevAlphaIn", "gx", [(_GX_0201, 0x80325E94, 0x80325ED8)], "a09004e8b36cf0f0af881da63a0a585b71bbc64454d871b252d7867214e44a00")
+ENTRIES[0x80325ED8] = ("GXSetTevColorOp", "gx", [(_GX_0201, 0x80325ED8, 0x80325F40)], "c39d20908f8973144905fa69428320ac2873c08f08ba4b71ba06cf1cdd1c63c2")
+ENTRIES[0x80325F40] = ("GXSetTevAlphaOp", "gx", [(_GX_0201, 0x80325F40, 0x80325FA8)], "2d76095ac298a7428e9765e48eebf4de5eae2c912a773b04242ffc5f7b0aa25d")
+ENTRIES[0x80326104] = ("GXSetTevKColorSel", "gx", [(_GX_0201, 0x80326104, 0x80326170)], "29c118d2faf08745a9689b9cbc7a5fb66e4fc30d789a5d0e4fc01be36710b14e")
+ENTRIES[0x80326170] = ("GXSetTevKAlphaSel", "gx", [(_GX_0201, 0x80326170, 0x803261DC)], "242fe3cf1112174dd10a025bbc6f77878faa84a1a8f2df31038fde2c28a9550d")
+ENTRIES[0x803261DC] = ("GXSetTevSwapMode", "gx", [(_GX_0201, 0x803261DC, 0x80326230)], "d2588aa246132a904221caef8a297c1b197604c3cc1c26c0f71e23f77756618c")
+ENTRIES[0x803262C8] = ("GXSetAlphaCompare", "gx", [(_GX_0201, 0x803262C8, 0x8032631C)], "48ddeecac3d718fd4551c7212e9394aa78c578f4202ce8684fbf4af976068c6f")
+ENTRIES[0x80326578] = ("GXSetNumTevStages", "gx", [(_GX_0201, 0x80326578, 0x803265A8)], "9941b8dc471530cf9880225c70e0886fcb7dd4d5cb497585aced88fe437089fa")
+ENTRIES[0x80326858] = ("GXSetBlendMode", "gx", [(_GX_0201, 0x80326858, 0x803268AC)], "3bd735dd16a29c53d3d018f4292b1f346fa5fa99bea725b3893323c2ac2f232b")
+ENTRIES[0x803268AC] = ("GXSetColorUpdate", "gx", [(_GX_0201, 0x803268AC, 0x803268D8)], "aa1aa19d6c291367a3fa136a82d4e5046ad11a718f1b5b1cc42b270f971209f7")
+ENTRIES[0x803268D8] = ("GXSetAlphaUpdate", "gx", [(_GX_0201, 0x803268D8, 0x80326904)], "27f8d7419dcfd645a1eb4a6ff88fa073033678bd503cb43ebaf6a21077ffa03b")
+ENTRIES[0x80326904] = ("GXSetZMode", "gx", [(_GX_0201, 0x80326904, 0x80326938)], "c8c045cbf777017fad1be07df2abe1bbb0f588e942187826f19257d8fccde1fa")
+ENTRIES[0x80326938] = ("GXSetZCompLoc", "gx", [(_GX_0201, 0x80326938, 0x80326970)], "9be877c171bc06d68bcea37b86794bcac74ad98a6bef8bcc3ac11b7e6cacd05f")
+ENTRIES[0x80326A8C] = ("GXSetDstAlpha", "gx", [(_GX_0201, 0x80326A8C, 0x80326AC8)], "b45ebd3b2c6baf040029002a94c957e6448c6891b46a43a30088bc58e2797ea6")
+ENTRIES[0x80326FD8] = ("GXSetCurrentMtx", "gx", [(_GX_0201, 0x80326FD8, 0x80327010), _GX_SET_MATRIX_INDEX], "6ab6ebcd301b1d79e5ef5878cdb8146ca72bde211818b54a5f0ed3f16ebd0f21")
+# --- end of the fifth set's entries ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
 J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"
@@ -306,6 +375,40 @@ def addresses(text):  # noqa: F811 (the checks above, less what FOURTH_HOST_OWN 
             found -= own
     return found
 # --- end of the fourth set's exemption ---
+
+
+# --- The fifth set: watched GX entries ---
+# The host names GXBegin's, GXLoadTexObj's and GXCallDisplayList's entries
+# (and their ends, and __GXSetDirtyState's) for a diagnostic trace of the pcs
+# its loop dispatches (runtime/host/src/main.c, g_gx_entry_trace), so all of
+# them are on the watch list, and every call into them from another chunk goes
+# round the chassis loop and asks the host's edge service (direct_calls.py
+# never rewrites such a call, and bw_call_translated declines it). None is a
+# boundary these hooks run past: each hook sits at its function's entry label,
+# which is reached only by a dispatch after that service has had its say or by
+# a goto inside the chunk, as the translation reaches it, and its call ends at
+# the function's blr, whose return goes through the chunk's own return
+# dispatch as before. Inside, GXCallDisplayList calls __GXSetDirtyState
+# (0x80323024) and __GXSendFlushPrim (0x803231B4), and GXBegin calls
+# __GXSendFlushPrim with a goto inside its chunk; on each of those paths the
+# native declines before the call, so the translation it stands in for never
+# reaches them. So in those fragments - and only there - those addresses are
+# left out of the check.
+FIFTH_HOST_OWN = {
+    "\nlabel_803230C4:\n": {0x803230C4, 0x803231B4},              # GXBegin
+    "\nlabel_80326B80:\n": {0x80326B80, 0x80323024, 0x803231B4},  # GXCallDisplayList
+    "\nlabel_80324EE8:\n": {0x80324EE8},                          # GXLoadTexObj
+}
+_addresses_fourth = addresses
+
+
+def addresses(text):  # noqa: F811 (the checks above, less what FIFTH_HOST_OWN leaves out)
+    found = _addresses_fourth(text)
+    for start, own in FIFTH_HOST_OWN.items():
+        if text.startswith(start):
+            found -= own
+    return found
+# --- end of the fifth set's exemption ---
 
 
 def chunk_files(root, chunk):
