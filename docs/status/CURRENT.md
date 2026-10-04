@@ -110,7 +110,7 @@ game's textures have no mips, so their sampler clamps to level 0; a replacement 
 with its own mip chain (the WWHD importer writes one to 1x1), was drawn from level 0 alone. Now a
 replacement's levels are all sampled, as in Dolphin (a custom texture's max LOD is 255), blended linearly
 where the game asked for no mip filter. Tested with private packs made from the disc (all 4,641 model and
-BTI textures decoded, upscaled 4x/2x, with mip chains; scratchpad make_test_pack.py, never shipped): with a
+BTI textures decoded, upscaled 4x/2x, with mip chains; scripts/windows/perf/make_test_pack.py, never shipped): with a
 fine grid in every texture, the old renderer drew moire on the cliffs, beach, pier and HUD buttons that
 crawled with the camera, the new one averages it out at a distance. Thin alpha features such as the sea's
 foam now show as soft streaks at a distance, as in Dolphin with a mipped pack. No Wind Waker HD disc was
@@ -147,7 +147,7 @@ probes of the Outset route identical.
 
 **The survey.** The 2026-10-02 build (module be22aba4) on four of the i9's E-cores (`0x000F0000`), uncapped,
 Smooth Motion off, at 47 places by test warp from the Outset save, about 12 s of Link running and turning at
-each (scratchpad survey.ps1 / survey.py over tour_run.ps1). Interiors and most dungeon rooms reach 60 game
+each (scripts/windows/perf: survey.ps1 / survey.py over tour_run.ps1). Interiors and most dungeon rooms reach 60 game
 frames a second (the frame cap), so they are not CPU-bound here. The slow places are the big outdoor ones:
 
 | Place | Game FPS | Game thread CPU per game frame | GX worker CPU per game frame |
