@@ -70,6 +70,11 @@ add_library(${MODULE_NAME} SHARED
 
 set_target_properties(${MODULE_NAME} PROPERTIES PREFIX "" OUTPUT_NAME "${MODULE_NAME}" UNITY_BUILD OFF C_VISIBILITY_PRESET hidden)
 target_compile_definitions(${MODULE_NAME} PRIVATE MODULE_GAME_ID="${GAME_ID}" DOLRECOMP_CPU_HEADER="core/cpu.h")
+file(STRINGS "${COMPOSITE_DIR}/generated_composite.h" COMPOSITE_X86_64_V3_DECL
+  REGEX "dolrecomp_call__x86_64_v3")
+if(COMPOSITE_X86_64_V3_DECL)
+  target_compile_definitions(${MODULE_NAME} PRIVATE BLUEWAKE_HAS_X86_64_V3_DISPATCH=1)
+endif()
 target_include_directories(${MODULE_NAME} PRIVATE "${COMPOSITE_DIR}" "${GXRUNTIME_DIR}/include" "${ABI_DIR}")
 if(APPLE)
   set_target_properties(${MODULE_NAME} PROPERTIES SUFFIX ".dylib")

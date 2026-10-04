@@ -34,7 +34,7 @@ static int host_has_x86_64_v3(void)
 
 static int selected_dispatch(CPUState* ctx, u32 address)
 {
-#if defined(__x86_64__)
+#if defined(__x86_64__) && defined(BLUEWAKE_HAS_X86_64_V3_DISPATCH)
     if (host_has_x86_64_v3())
         return dolrecomp_call__x86_64_v3(ctx, address);
 #endif

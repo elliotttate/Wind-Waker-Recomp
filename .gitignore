@@ -54,3 +54,6 @@ cmake-build-*/
 .vscode/
 *.swp
 *~
+
+# Linux AppImage build output (self-contained binary + zsync + checksums)
+dist/
