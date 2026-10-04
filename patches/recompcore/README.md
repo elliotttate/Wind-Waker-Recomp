@@ -8,7 +8,7 @@ The build uses a fork instead. BlueWake's is https://github.com/chrissotraidis/R
 `bluewake`, commit 2d6063614a9bc899f6b4d11c7e7b3cd66e4d96f3: it contains the changes here through 0097
 (some were revised by later ones), the files that were never committed on the development Mac, and the
 DolRecomp submodule pointing at https://github.com/chrissotraidis/DolRecomp (5c91d6e). Wind Waker Recomp
-builds from its own copy, https://github.com/elliotttate/RecompCore, commit e6559e0 (branch
+builds from its own copy, https://github.com/elliotttate/RecompCore, commit d687c69 (branch
 `windows-release`): 8ab24da (branch `bluewake`) plus 0117, the render worker paused while the
 swapchain changes (a fullscreen crash), 0118, guest MEM1 through a global array where the module
 provides one, 0119, up to 7 in-between frames and none while the game runs slow, 0120, the
@@ -21,7 +21,9 @@ compiling (on by default on D3D12), 0130, a draw's transform state copied only w
 version changed, and 0131, the Mac's water and HUD (0170 below without its lava part, which is 0120)
 merged with 0125's cloth and 0126's colours, and 0132, an HD replacement's own mip levels sampled
 (HD packs no longer shimmer while the camera turns), and 0133, only meshes whose positions the game
-wrote blended vertex by vertex (0131's water path without its cost for static models). 8ab24da is branch `bluewake`'s 6892947 (that tree plus 0098
+wrote blended vertex by vertex (0131's water path without its cost for static models), 0134, the present
+log's per-frame data totals, and 0135, a display list's primitives fused into one draw (a tenth of the
+draws through the GX worker and Smooth Motion's matching). 8ab24da is branch `bluewake`'s 6892947 (that tree plus 0098
 to 0110), the Windows port's 0111 to 0116
 (the shader and pipeline caches where the host says, gather-pipe writes as a run of bytes, the GX stall
 watchdog on Mac and Linux only, constant blocks compared against a copy where staging is upload memory,
@@ -39,5 +41,5 @@ vertex interpolation fix from 0113, smooth screen-sprite matching from 0160
 (RecompCore `81d7345`, with the test's line endings corrected in `7c62903`).
 The combined patch applies to the pinned `8ab24da` base. Bootstrap, desktop/iOS
 CMake and the builder verify its checksum and reject unrelated dependency edits. The Windows line's
-pin (e6559e0) already carries all of 0170, so its lock names no working-tree patch and the same
+pin (d687c69) already carries all of 0170, so its lock names no working-tree patch and the same
 script only checks that ref/recompcore is that commit, unmodified.

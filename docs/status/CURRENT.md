@@ -1,3 +1,51 @@
+## 2026-10-04 A display list's primitives fused into one draw: a tenth of the draws, 30-60 percent more frames on slow CPUs
+
+**What the GX worker was doing.** Its profile at Forest Haven was flat: no function above about 1 percent,
+vertex decoding itself about 1 percent, the cost a fixed overhead per draw (about 0.7 us) over about 21,000
+draws a game frame. Nine draws in ten arrived with no state change since the draw before (the same vertex
+format and primitive class): the strips of one display list. Each was planned (state, pipeline, textures,
+vertices), submitted and matched for Smooth Motion apart, to be batched with its neighbours at the end.
+
+**Fusion** (RecompCore d687c69, patch 0135). GxCoreSink has the consuming sink join such a primitive to the
+draw before: triangles after triangles, positions from an array (not a particle's, a 2D sprite's or a
+wake's), outside draw scopes and tagged draws, nothing but array spans between them (no texture, TLUT or
+copy), the same vertex format and transform version, up to 1,024 vertices (so a mesh the game moves vertex
+by vertex stays one Smooth Motion blends). The fused draw keeps its primitives and gets the indices they had
+apart. Over the Outset route 8.8 million draws became 0.87 million. `DOL_GX_FUSE=0` turns it off;
+gxcore_tests checks a fused plan against the two draws apart.
+
+CPU per game frame, all of the i9's cores, Smooth Motion at 60, paced (ms):
+
+| Place | GX worker | In-between matching | Render worker |
+| --- | --- | --- | --- |
+| Forest Haven (`sea:41`) | 16.4 -> 7.1 | 14.5 -> 2.9 | 3.9 -> 2.8 |
+| Hyrule (`Hyrule`) | 11.4 -> 4.5 | 9.9 -> 0.9 | 3.5 -> 2.6 |
+| Hyrule Castle's room (`Hyroom`) | 14.2 -> 5.1 | 12.4 -> 0.8 | 3.9 -> 2.6 |
+| Outset (`sea:44`) | 8.1 -> 4.1 | 7.0 -> 1.5 | 3.3 -> 2.9 |
+
+The frame's uniforms fell with the draw commands (Forest Haven 15.8 -> 4.3 MB a game frame, 5,700 -> 2,000
+commands). On four E-cores, uncapped with Smooth Motion off, game frames a second: Forest Haven 30.6 -> 40.5,
+Dragon Roost Island 35.2 -> 40.1, the sea by the Forsaken Fortress 35.0 -> 38.3, Hyrule Castle's room 36.9
+-> 45.2, the Earth Temple's boss 40.6 -> 59.1, Outset 47.6 -> 49.8, Hyrule 45.7 -> 59.8. Most of that was
+the game thread waiting at GXSetDrawDone for the GX worker to drain the frame: 7-10 ms a frame before at
+Forest Haven, Hyrule Castle's room, the Earth Temple's boss and Hyrule, 1-2.5 ms now. With Smooth Motion on
+four E-cores, the game now holds 30 at every place tried with in-between frames on (before: 27-29 at Outset,
+Forest Haven and Dragon Roost, and the pacer had turned in-between frames off at the sea, Hyrule and Hyrule
+Castle).
+
+**Exactness.** Link's position at all 621 probes of the Outset route identical. Smooth Motion dumps: real
+frames identical at Outset, the sea by the Fortress, Forest Haven, Dragon Roost, Hyrule, the Forbidden
+Woods, the Earth Temple's boss, the file select and three lava save states. In-between frames identical, or
+different at a few pixels' edges (a fused group's matrix rows and motion samples are judged together; a
+flying enemy's wing on the Dragon Roost lava bridge lands a pixel or two apart, both plausible). In Hyrule
+Castle's room and at the Earth Temple's boss the in-between frames are now drawn where the matching had
+taken the frames for camera cuts (too many single strips looked unmatched) and showed none.
+
+**What is left.** The GX worker at Forest Haven is down to about a fifth of a core; the game thread is the
+limit on slower CPUs (20-22 ms of a 25 ms frame on four E-cores at the big outdoor places). Its profile is
+flat too: particles (JPA) about 5 percent, J3D animation about 5.5, the sea's waves 2.5, collision 2.5, the
+clipper 1.4; a fourth round of natives for those is under way on `game-natives-4`.
+
 ## 2026-10-03 The Mac side's updates on Windows: water and HUD smoothing, HD packs without shimmer, Forest Water, the Wind Waker HD importer
 
 **The merge** (main e4e1401 into windows-release, a9df903): the Wind Waker HD texture importer, Forest Water

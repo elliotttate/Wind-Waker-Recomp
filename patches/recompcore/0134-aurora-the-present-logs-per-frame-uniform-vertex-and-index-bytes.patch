@@ -1,0 +1,34 @@
+From 6f1227ae7d3aa420d05bae309f933efb02852817 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Sun, 4 Oct 2026 10:52:10 -0400
+Subject: [PATCH] Aurora: the present log's per-frame line gives the frame's
+ uniform, vertex and index bytes and its draws
+
+DOL_AURORA_PRESENT_LOG=1's line for each game frame now also gives the
+bytes of vertices and indices the frame pushed and its draw commands (and
+how many draws were batched into them), the figures behind the GX worker's
+and render worker's cost per frame.
+---
+ GXRuntime/graphics/aurora/lib/gfx/common.cpp | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.cpp b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+index a11983b0..fd4a202f 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+@@ -1669,9 +1669,10 @@ void end_frame(EndFrameCallback callback) {
+   if (frame_interp::tracing() || g_presentLog ||
+       (frame.interpolate && frame_interp::dump_frame(frame_interp::game_frame_number()))) {
+     Log.info("In-between data for game frame {}: {} bytes of constants and {} of vertices, {} blocks did not fit; "
+-             "frame uniforms {} bytes",
++             "frame uniforms {} bytes, vertices {}, indices {}, draws {} ({} merged)",
+              frame_interp::game_frame_number(), interpSlot.uniformUsed, interpSlot.vertexUsed,
+-             g_interpUniformOverflows, frame.uniforms.size());
++             g_interpUniformOverflows, frame.uniforms.size(), frame.verts.size(), frame.indices.size(),
++             g_drawCallCount, g_mergedDrawCallCount);
+   }
+   g_interpUniformOverflows = 0;
+   if (frame_interp::tracing()) {
+-- 
+2.45.2.windows.1
+

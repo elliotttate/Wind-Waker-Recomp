@@ -1,0 +1,434 @@
+From d687c6983a404156c540aca9f535c775217852e0 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Sun, 4 Oct 2026 10:52:11 -0400
+Subject: [PATCH] GX front end: a display list's primitives fused into one draw
+ (the GX worker and Smooth Motion's matching per draw, at a tenth of the
+ draws)
+
+Nine draws in ten at Forest Haven follow the draw before with no state
+between them: the strips of one display list. Each was planned (state,
+pipeline, textures, vertices), submitted and matched for Smooth Motion apart,
+only to be batched with its neighbours at the end, about 21,000 draws a game
+frame.
+
+Now GxCoreSink asks the consuming sink to fuse such a primitive onto the draw
+before when: triangles follow triangles, the vertex descriptor indexes
+positions (not a particle's, a 2D sprite's or a wake's own), no draw scope or
+draw tag is under way, and together they have at most 1,024 vertices
+(frame_interp's kMaxBlendedVertices, so a mesh the game moves vertex by vertex
+stays one Smooth Motion blends). The consumer also requires that nothing but
+the draw's array spans came between them (no texture, TLUT or copy), and the
+same vertex format and transform version. A fused draw keeps its primitives
+(ConsumedDraw::segments) and gets the triangle indices they had apart,
+rebased, and the union of their array spans. DOL_GX_FUSE=0 turns it off; the
+shutdown line gives the draws fused.
+
+Over an Outset run, 8.8 million draws became 0.87 million. Smooth Motion at
+60, all of the i9's cores, CPU per game frame: GX worker 16.4 -> 7.1 ms at
+Forest Haven, 11.4 -> 4.5 at Hyrule, 14.2 -> 5.1 in Hyrule Castle's room;
+the in-between frames' matching 14.5 -> 2.9, 9.9 -> 0.9 and 12.4 -> 0.8; the
+render worker 20-35 percent less. On four E-cores the game holds 30 frames a
+second at every place tried (27-29 before at Outset, Forest Haven and Dragon
+Roost) with in-between frames on (the pacer had turned them off at the sea,
+Hyrule and Hyrule Castle).
+
+Real frames are identical in Smooth Motion dumps at Outset, the sea by the
+Forsaken Fortress, Forest Haven, Dragon Roost, Hyrule, the Forbidden Woods,
+the Earth Temple's boss and three lava save states. In-between frames are
+identical or differ at a few pixels' edges (a fused group's matrix rows and
+motion samples are judged together); in Hyrule Castle's room and at the
+Earth Temple's boss they are now drawn where the matching had taken the
+frames for camera cuts and left them out. gxcore_tests' new draw fusion test
+checks the fused plan against the two draws apart.
+---
+ GXRuntime/backends/aurora/aurora_backend.cpp  |   2 +
+ .../gxruntime/aurora_recomp/render_sink.hpp   |  15 ++
+ .../graphics/frontend/src/render_sink.cpp     |  49 ++++++-
+ .../include/gxruntime/gxcore/gxcore.hpp       |   9 ++
+ GXRuntime/graphics/gxcore/src/gxcore.cpp      |  42 +++++-
+ .../gxcore/tests/gxcore_wgsl_test.cpp         | 129 ++++++++++++++++++
+ 6 files changed, 242 insertions(+), 4 deletions(-)
+
+diff --git a/GXRuntime/backends/aurora/aurora_backend.cpp b/GXRuntime/backends/aurora/aurora_backend.cpp
+index 957d602d..fa9beb4a 100644
+--- a/GXRuntime/backends/aurora/aurora_backend.cpp
++++ b/GXRuntime/backends/aurora/aurora_backend.cpp
+@@ -572,6 +572,8 @@ void dol_aurora_shutdown(void) {
+ #if GXRUNTIME_HAS_AURORA_RECOMP
+     gx_aurora::trace_close_and_log();
+     if (gx_aurora::g_gx_core_enabled) {
++        std::fprintf(stderr, "[gx-core] draws fused onto the draw before: %llu\n",
++                     gx_aurora::g_core_sink.consumer().fused_draws());
+         const auto& gaps = gx_aurora::g_core_sink.counters();
+         std::fprintf(stderr,
+                      "[gx-core] shutdown: submitted=%llu rejected=%llu "
+diff --git a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+index 35d1daa4..5285a33c 100644
+--- a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
++++ b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+@@ -264,6 +264,10 @@ struct ConsumedDraw {
+   // per-vertex indices), retained from the Draw packet so an issuing sink can
+   // assemble vertices after submit. Empty when the packet carried no payload.
+   std::vector<std::uint8_t> vertex_payload;
++  // Primitives fused onto this draw (ConsumingAuroraRenderSink::fuse_next_draw):
++  // each (primitive << 16) | vertex count, in payload order, the first one
++  // included. Empty for a draw of one primitive (`primitive`, `vertex_count`).
++  std::vector<std::uint32_t> segments;
+   std::uint64_t xf_version = 0; // as in RenderDrawPacket
+   std::uint32_t transform_flags = 0;
+   std::uint32_t current_pn_matrix = 0;
+@@ -331,6 +335,14 @@ public:
+     draw_observer_ = observer;
+     draw_observer_user_ = user;
+   }
++  // Fusion (streaming mode): the next Draw packet joins the retained draw
++  // instead of completing it, when nothing but that draw's array spans came
++  // between them, the two share a vertex format and transform version, and
++  // together they have at most `max_vertices`. The caller vouches that no state
++  // changed between them and that both are triangle primitives. Applies to the
++  // next Draw packet only.
++  void fuse_next_draw(std::uint32_t max_vertices) { fuse_max_ = max_vertices; }
++  unsigned long long fused_draws() const { return fused_draws_; }
+ 
+   const std::vector<ConsumedDraw>& draws() const { return draws_; }
+   unsigned long long packets() const { return packets_; }
+@@ -450,6 +462,9 @@ private:
+   unsigned long long topology_index_bytes_ = 0;
+   unsigned long long storage_bytes_ = 0;
+   bool back_assembled_ = false;
++  std::uint32_t fuse_max_ = 0;
++  bool resource_since_draw_ = false; // a texture, TLUT or copy since the last draw
++  unsigned long long fused_draws_ = 0;
+   std::uint64_t last_sequence_ = 0;
+   bool has_last_sequence_ = false;
+   const char* failure_reason_ = nullptr;
+diff --git a/GXRuntime/graphics/frontend/src/render_sink.cpp b/GXRuntime/graphics/frontend/src/render_sink.cpp
+index 4176b2d6..815daca3 100644
+--- a/GXRuntime/graphics/frontend/src/render_sink.cpp
++++ b/GXRuntime/graphics/frontend/src/render_sink.cpp
+@@ -114,7 +114,24 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+       if (!draws_.empty() && packet.resource.index < kArrayCount) {
+         ConsumedDraw& draw = draws_.back();
+         const ConsumedArrayBinding& binding = arrays_[packet.resource.index];
+-        if (draw.array_input_count < ConsumedDraw::kMaxArrays) {
++        // A primitive fused onto the draw reads the arrays the draw's first
++        // did (no state changed): its span joins theirs. Spans start at the
++        // array's base, so the longer covers both.
++        ConsumedArrayInput* fused = nullptr;
++        if (!draw.segments.empty())
++          for (std::uint32_t i = 0; i < draw.array_input_count; ++i)
++            if (draw.arrays[i].attr == packet.resource.index)
++              fused = &draw.arrays[i];
++        if (fused != nullptr) {
++          if (packet.resource.size > fused->span_size) {
++            untally_array_input(fused->resolved);
++            fused->span_size = packet.resource.size;
++            fused->resolved = false;
++            fused->host_data = nullptr;
++            fused->host_available = 0;
++            tally_array_input(resolve_array_input(*fused));
++          }
++        } else if (draw.array_input_count < ConsumedDraw::kMaxArrays) {
+           ConsumedArrayInput& input = draw.arrays[draw.array_input_count++];
+           input.attr = packet.resource.index;
+           input.base = binding.base;
+@@ -129,6 +146,7 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+       }
+       break;
+     case RenderResourceKind::Texture:
++      resource_since_draw_ = true;
+       ++texture_count_;
+       if (packet.resource.size == 0u)
+         return fail("empty texture packet", packet);
+@@ -177,11 +195,13 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+         bound_textures_[bound_texture_.slot] = bound_texture_;
+       break;
+     case RenderResourceKind::Tlut:
++      resource_since_draw_ = true;
+       ++tlut_count_;
+       if (packet.resource.size == 0u)
+         return fail("empty tlut packet", packet);
+       break;
+     case RenderResourceKind::CopyDestination:
++      resource_since_draw_ = true;
+       ++copy_count_;
+       // Display copies (GXCopyDisp, format 0xF) carry no texture destination
+       // — only the copy-clear params — so zero size is their normal shape.
+@@ -193,6 +213,32 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+   case RenderPacketKind::Draw: {
+     if (packet.draw.vertex_count == 0u || packet.draw.vertex_size == 0u)
+       return fail("empty draw packet", packet);
++    const std::uint32_t fuse_max = fuse_max_;
++    const bool resources = resource_since_draw_;
++    fuse_max_ = 0;
++    resource_since_draw_ = false;
++    if (fuse_max != 0u && streaming_ && draws_.size() == 1u && !back_assembled_ && !resources) {
++      ConsumedDraw& draw = draws_[0];
++      const std::size_t bytes = static_cast<std::size_t>(packet.draw.vertex_count) * packet.draw.vertex_size;
++      if (draw.vtx_fmt == packet.draw.vtx_fmt && draw.vertex_size == packet.draw.vertex_size &&
++          draw.xf_version != 0u && draw.xf_version == packet.draw.xf_version &&
++          draw.vertex_count + packet.draw.vertex_count <= fuse_max && packet.draw.vertex_payload != nullptr &&
++          packet.draw.vertex_payload_size == bytes &&
++          draw.vertex_payload.size() == static_cast<std::size_t>(draw.vertex_count) * draw.vertex_size) {
++        if (draw.segments.empty())
++          draw.segments.push_back((draw.primitive << 16) | draw.vertex_count);
++        draw.segments.push_back((packet.draw.primitive << 16) | packet.draw.vertex_count);
++        draw.vertex_count += packet.draw.vertex_count;
++        draw.vertex_payload.insert(draw.vertex_payload.end(), packet.draw.vertex_payload,
++                                   packet.draw.vertex_payload + bytes);
++        draw.payload_pn_matrix_mask |= packet.draw.payload_pn_matrix_mask;
++        payload_bytes_ += bytes;
++        ++total_draws_;
++        ++fused_draws_;
++        total_vertices_ += packet.draw.vertex_count;
++        return true;
++      }
++    }
+     std::uint32_t active_mask = 0;
+     for (std::uint32_t i = 0; i < kArrayCount; ++i) {
+       if (arrays_[i].base_valid && arrays_[i].stride_valid)
+@@ -222,6 +268,7 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+       // draw only for the copies below to overwrite it).
+       slot->array_input_count = 0u;
+       slot->vertex_payload.clear();
++      slot->segments.clear();
+     } else {
+       if (streaming_)
+         draws_.clear();
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp
+index ab24da9c..4248397e 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/gxcore.hpp
+@@ -125,6 +125,9 @@ public:
+ 
+   std::uint32_t bp(std::uint8_t reg) const { return bp_regs_[reg]; }
+   bool bp_valid(std::uint8_t reg) const { return bp_valid_[reg]; }
++  // Whether the vertex descriptor indexes positions from an array (rather
++  // than sending them with each vertex).
++  bool position_indexed() const { return vcd_lo_valid_ && ((vcd_lo_ >> 9) & 3u) >= 2u; }
+   // The draw tag goes with one draw (DrawPlan::draw_tag); a scope starts at
+   // one draw and covers the count of draws it gives (GxCoreSink).
+   void forget_draw_tag() {
+@@ -232,6 +235,12 @@ private:
+   std::uint32_t scope_left_ = 0;
+   std::uint32_t scope_part_ = 0;
+   bool scope_indexed_ = false;
++  // Draw fusion (submit_packet): whether the last draw packet was of
++  // triangles, and the most vertices a fused draw takes, frame_interp's
++  // kMaxBlendedVertices, so a mesh the game moves vertex by vertex stays one
++  // Smooth Motion blends.
++  bool last_draw_triangles_ = false;
++  static constexpr std::uint32_t kFuseMaxVertices = 1024u;
+   PlanObserver plan_observer_ = nullptr;
+   void* plan_observer_user_ = nullptr;
+   CopyObserver copy_observer_ = nullptr;
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore.cpp b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+index 039b1535..3df68c55 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+@@ -1271,9 +1271,24 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+   } else if (primitive == ar::GxPrimitive::Points) {
+     pipe.primitive_topology = 2u;
+   }
+-  const std::uint32_t index_count = ar::build_topology_indices(
+-      primitive, 0u, static_cast<std::uint16_t>(draw.vertex_count),
+-      &plan.indices);
++  std::uint32_t index_count = 0;
++  if (draw.segments.empty()) {
++    index_count = ar::build_topology_indices(
++        primitive, 0u, static_cast<std::uint16_t>(draw.vertex_count),
++        &plan.indices);
++  } else {
++    // Primitives fused onto the draw (GxCoreSink::submit_packet), each from
++    // where the one before ends: the indices the draws apart had, rebased.
++    std::uint32_t start = 0;
++    for (const std::uint32_t segment : draw.segments) {
++      const std::uint32_t count = segment & 0xFFFFu;
++      index_count += ar::build_topology_indices(
++          static_cast<ar::GxPrimitive>((segment >> 16) & 0xF8u),
++          static_cast<std::uint16_t>(start), static_cast<std::uint16_t>(count),
++          &plan.indices);
++      start += count;
++    }
++  }
+   if (index_count == 0u) {
+     switch (primitive) {
+     case ar::GxPrimitive::Quads:
+@@ -2067,6 +2082,27 @@ bool GxCoreSink::submit_packet(const ar::RenderPacket& packet) {
+         ++counters_.efb_copy_depth;
+     }
+   }
++  // Draw fusion: a display list's primitives mostly follow one another with
++  // no state between them (nine draws in ten at Forest Haven), and each was
++  // planned, submitted and matched for Smooth Motion apart, to be batched
++  // together at the end. Such a primitive joins the draw before: triangles
++  // after triangles, positions from an array (not a particle's, a sprite's or
++  // a wake's own), outside a draw scope and a tagged draw, and up to
++  // kFuseMaxVertices. The consumer checks the rest (no texture or copy
++  // between, the same vertex format and transform). DOL_GX_FUSE=0 turns it off.
++  if (packet.kind == ar::RenderPacketKind::Draw) {
++    static const bool s_fuse = [] {
++      const char* env = std::getenv("DOL_GX_FUSE");
++      return env == nullptr || env[0] != '0';
++    }();
++    const std::uint32_t primitive = packet.draw.primitive & 0xF8u;
++    const bool triangles = primitive == 0x80u || primitive == 0x90u || primitive == 0x98u || primitive == 0xA0u;
++    if (s_fuse && triangles && last_draw_triangles_ && since_draw_.empty() && !replay_overflow_ &&
++        scope_left_ == 0u && !pending_state_.bp_valid(GxCoreState::kDrawScopeRegister) &&
++        !pending_state_.bp_valid(GxCoreState::kDrawTagRegister) && pending_state_.position_indexed())
++      consumer_.fuse_next_draw(kFuseMaxVertices);
++    last_draw_triangles_ = triangles;
++  }
+   // Forward first: a Draw packet makes the PREVIOUS draw span-complete and
+   // fires the observer, which must see the state that was current at that
+   // previous draw (pending_state_), not this packet's.
+diff --git a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+index 4dbadc97..00feda72 100644
+--- a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
++++ b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+@@ -780,6 +780,134 @@ void test_fifth_texgen_plan_decode() {
+   CHECK((texidx_hi & 0xFFu) == 33u);
+ }
+ 
++// Draw fusion: primitives that follow one another with nothing between them
++// join one consumed draw (ConsumingAuroraRenderSink::fuse_next_draw), whose
++// plan has the vertices and the triangle indices the draws apart had, the
++// second's rebased; a texture between them, or no fuse request, keeps them
++// apart.
++ar::ConsumedDraw g_fused_draws[4];
++int g_fused_draw_count = 0;
++void capture_consumed(const ar::ConsumedDraw& draw, unsigned long long, void*) {
++  if (g_fused_draw_count < 4)
++    g_fused_draws[g_fused_draw_count] = draw;
++  ++g_fused_draw_count;
++}
++
++void test_draw_fusion() {
++  gxc::GxCoreState state;
++  state.reset();
++  state.apply({.kind = ar::RenderStateKind::CpVcd, .index = 0u, .value = 1u << 9u}); // position direct
++  state.apply({.kind = ar::RenderStateKind::CpVcd, .index = 1u, .value = 0u});
++  state.apply({.kind = ar::RenderStateKind::CpVat, .index = 0u, .value = 1u | (4u << 1u), .aux0 = 0u}); // xyz f32
++  state.apply({.kind = ar::RenderStateKind::CpVat, .index = 0u, .value = 0u, .aux0 = 1u});
++  state.apply({.kind = ar::RenderStateKind::CpVat, .index = 0u, .value = 0u, .aux0 = 2u});
++
++  // Two triangle strips, of 4 and 5 vertices.
++  std::vector<std::uint8_t> payloads[2];
++  for (int strip = 0; strip < 2; ++strip)
++    for (int v = 0; v < 4 + strip; ++v) {
++      append_be_f32(payloads[strip], static_cast<float>(10 * strip + v));
++      append_be_f32(payloads[strip], static_cast<float>(v & 1));
++      append_be_f32(payloads[strip], 0.f);
++    }
++  const auto draw_packet = [&](int strip, std::uint64_t sequence) {
++    ar::RenderPacket p;
++    p.kind = ar::RenderPacketKind::Draw;
++    p.sequence = sequence;
++    p.draw.primitive = 0x98u;
++    p.draw.vtx_fmt = 0u;
++    p.draw.vertex_count = static_cast<std::uint32_t>(4 + strip);
++    p.draw.vertex_size = 12u;
++    p.draw.vertex_payload = payloads[strip].data();
++    p.draw.vertex_payload_size = static_cast<std::uint32_t>(payloads[strip].size());
++    p.draw.xf_version = 7u;
++    p.draw.transform_flags = ar::kDrawTransformProjectionValid;
++    p.draw.projection[0] = 1.f;
++    p.draw.projection[2] = 1.f;
++    p.draw.projection[4] = -1.f;
++    p.draw.projection_type = 1u;
++    p.draw.position_matrix_valid_mask = 1u;
++    p.draw.position_matrices[0][0] = 1.f;
++    p.draw.position_matrices[0][5] = 1.f;
++    p.draw.position_matrices[0][10] = 1.f;
++    return p;
++  };
++
++  // Fused: one consumed draw of both strips.
++  ar::ConsumingAuroraRenderSink consumer;
++  consumer.set_streaming(true);
++  consumer.set_assembly_totals(false);
++  consumer.set_draw_observer(capture_consumed, nullptr);
++  g_fused_draw_count = 0;
++  consumer.submit_packet(draw_packet(0, 1u));
++  consumer.fuse_next_draw(1024u);
++  consumer.submit_packet(draw_packet(1, 2u));
++  consumer.flush_assembly();
++  CHECK(g_fused_draw_count == 1);
++  CHECK(consumer.fused_draws() == 1u);
++  const ar::ConsumedDraw fused = g_fused_draws[0];
++  CHECK(fused.vertex_count == 9u);
++  CHECK(fused.segments.size() == 2u);
++  CHECK(fused.vertex_payload.size() == 9u * 12u);
++
++  // Apart: the same strips as two draws.
++  ar::ConsumingAuroraRenderSink apart;
++  apart.set_streaming(true);
++  apart.set_assembly_totals(false);
++  apart.set_draw_observer(capture_consumed, nullptr);
++  g_fused_draw_count = 0;
++  apart.submit_packet(draw_packet(0, 1u));
++  apart.submit_packet(draw_packet(1, 2u)); // no fuse request
++  apart.flush_assembly();
++  CHECK(g_fused_draw_count == 2);
++  const ar::ConsumedDraw first = g_fused_draws[0];
++  const ar::ConsumedDraw second = g_fused_draws[1];
++
++  gxc::GapCounters gaps;
++  const gxc::DrawPlan whole = state.build_draw_plan(fused, gaps);
++  const gxc::DrawPlan a = state.build_draw_plan(first, gaps);
++  const gxc::DrawPlan b = state.build_draw_plan(second, gaps);
++  CHECK(whole.ok && a.ok && b.ok);
++  std::vector<std::uint16_t> expected = a.indices;
++  for (const std::uint16_t index : b.indices)
++    expected.push_back(static_cast<std::uint16_t>(index + 4u));
++  CHECK(whole.indices == expected);
++  CHECK(whole.vertices.size() == a.vertices.size() + b.vertices.size());
++  CHECK(std::equal(a.vertices.begin(), a.vertices.end(), whole.vertices.begin()));
++  CHECK(std::equal(b.vertices.begin(), b.vertices.end(), whole.vertices.begin() + a.vertices.size()));
++
++  // A texture between the strips keeps them apart, fuse request or not.
++  ar::ConsumingAuroraRenderSink textured;
++  textured.set_streaming(true);
++  textured.set_assembly_totals(false);
++  textured.set_draw_observer(capture_consumed, nullptr);
++  g_fused_draw_count = 0;
++  textured.submit_packet(draw_packet(0, 1u));
++  ar::RenderPacket texture;
++  texture.kind = ar::RenderPacketKind::Resource;
++  texture.sequence = 2u;
++  texture.resource.kind = ar::RenderResourceKind::Texture;
++  texture.resource.size = 32u;
++  textured.submit_packet(texture);
++  textured.fuse_next_draw(1024u);
++  textured.submit_packet(draw_packet(1, 3u));
++  textured.flush_assembly();
++  CHECK(g_fused_draw_count == 2);
++  CHECK(textured.fused_draws() == 0u);
++
++  // Past the vertex cap: apart.
++  ar::ConsumingAuroraRenderSink capped;
++  capped.set_streaming(true);
++  capped.set_assembly_totals(false);
++  capped.set_draw_observer(capture_consumed, nullptr);
++  g_fused_draw_count = 0;
++  capped.submit_packet(draw_packet(0, 1u));
++  capped.fuse_next_draw(8u);
++  capped.submit_packet(draw_packet(1, 2u));
++  capped.flush_assembly();
++  CHECK(g_fused_draw_count == 2);
++}
++
+ // The dual-texture post transform is folded into a regular texgen's matrix
+ // rows: post * (texmtx * coord) for a three-row (STQ) texgen, and post *
+ // (s, t, 1) for a two-row (ST) one. The lava (d_magma.cpp) uses it.
+@@ -2016,6 +2144,7 @@ int main() {
+   test_cached_normal();
+   test_fog();
+   test_efb_copy_sink();
++  test_draw_fusion();
+   if (g_failures != 0) {
+     std::fprintf(stderr, "gxcore_tests: %d failure(s)\n", g_failures);
+     return 1;
+-- 
+2.45.2.windows.1
+
