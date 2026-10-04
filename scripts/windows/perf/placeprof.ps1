@@ -5,14 +5,16 @@ param(
     [long]$Mask = 0x000F0000,
     [int]$Seconds = 20,
     [hashtable]$Env = @{},
-    [switch]$Stacks
+    [switch]$Stacks,
+    [string]$Out = "$PSScriptRoot\..\..\..\build\windows\profiles-out"
 )
 # One place by warp (at retrace 1200), Link running and turning, uncapped on four E-cores with Smooth Motion
 # off; from retrace 1800 the game thread's guest pc is sampled (guest_sampler.py: which game functions) and,
 # at the same time, the busiest host threads' instruction pointers (thread_sampler_w32.py: the GX worker,
-# the render worker). Writes $Tag-guest.txt and $Tag-<tid>.txt here.
+# the render worker). Writes $Tag-guest.txt and $Tag-<tid>.txt to $Out (build\windows\profiles-out).
 $scratch = Split-Path -Parent $MyInvocation.MyCommand.Path
 $old = $PSScriptRoot
+New-Item -ItemType Directory -Force $Out | Out-Null
 $envs = @{ BLUEWAKE_PLAYER_PROBE = '1' }
 foreach ($k in $Env.Keys) { $envs[$k] = $Env[$k] }
 $job = Start-Job -ScriptBlock {
@@ -34,13 +36,13 @@ $state = $line.Matches[0].Groups[1].Value; $pcoff = $line.Matches[0].Groups[2].V
 $tid = python -c "import sys; sys.path.insert(0, r'$old'); import thread_sampler as ts; print(ts.threads_of($($proc.Id))[0])"
 "pid=$($proc.Id) main-thread=$tid"
 $host_job = Start-Job -ScriptBlock { param($old, $procid, $sec, $out) python "$old\thread_sampler_w32.py" $procid $sec $out 3 } `
-    -ArgumentList $old, $proc.Id, $Seconds, "$scratch\$Tag"
+    -ArgumentList $old, $proc.Id, $Seconds, "$Out\$Tag"
 if ($Stacks) {
-    python "$scratch\guest_stack_sampler.py" $proc.Id $state $Seconds "$scratch\$Tag-stack" $tid
+    python "$scratch\guest_stack_sampler.py" $proc.Id $state $Seconds "$Out\$Tag-stack" $tid
 } else {
-    python "$old\guest_sampler.py" $proc.Id $state $pcoff $Seconds "$scratch\$Tag-guest" $tid
+    python "$old\guest_sampler.py" $proc.Id $state $pcoff $Seconds "$Out\$Tag-guest" $tid
 }
 Receive-Job $host_job -Wait | Out-Null
 Stop-Process -Id $proc.Id -ErrorAction SilentlyContinue
 Receive-Job $job -Wait | Out-Null
-Get-ChildItem "$scratch\$Tag-*.txt" | ForEach-Object Name
+Get-ChildItem "$Out\$Tag-*.txt" | ForEach-Object Name
