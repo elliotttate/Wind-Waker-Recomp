@@ -24,6 +24,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from direct_calls import watched_addresses
+# The later native steps' hooks (native_entries.py, and prepare_native_j3d.py's,
+# which it strips too) are not part of the translation certified here. The
+# builder finishes a tree twice (the base with the mods' variants, then in
+# place); on the second pass this step met the fourth set's hooks inside the
+# animation fragments it certifies, took them for a different translation and
+# removed its own hooks, and native_entries.py, whose hashes include those,
+# then removed its own too (2026-10-04).
+from native_entries import strip_hooks as strip_entry_hooks
 
 MARK = "/* bluewake: certified game math (scripts/windows/native_game_math.py) */\n"
 INCLUDE = '#include "../generated.h"\n'
@@ -91,7 +99,7 @@ ENTRIES = {
 
 
 def canonical(text):
-    text = HOOK.sub("", text)
+    text = strip_entry_hooks(HOOK.sub("", text))
     text = re.sub(r"^    if \(cycle_block_prepaid\) goto bwfast_\w+;\n", "", text, flags=re.M)
     text = re.sub(r"^(?:bwslow|bwend)_\w+: ;\n", "", text, flags=re.M)
     return " ".join(text.split())
