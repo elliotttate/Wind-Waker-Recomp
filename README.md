@@ -1,5 +1,17 @@
 # Wind Waker Recomp
 
+> [!IMPORTANT]
+> **Wind Waker Recomp is moving to [BlueWake](https://github.com/chrissotraidis/bluewake).**
+> This fork and BlueWake, the project it started from, are becoming one project, maintained together by
+> Elliott and Chris. Elliott's work is being brought into BlueWake with his authorship.
+>
+> - **Please report bugs and request features on [BlueWake](https://github.com/chrissotraidis/bluewake/issues)**,
+>   not here. Mention whether you use a Wind Waker Recomp release or a BlueWake build.
+> - Open issues and pull requests here will be moved to BlueWake with a link back.
+> - On Windows, saves carry over: both keep them in `%APPDATA%\BlueWake`.
+> - Questions: the [Discord](https://discord.gg/xwHfUD2bxW), shared by both projects.
+> - Details of the move: [migration log](https://github.com/chrissotraidis/bluewake/blob/main/docs/WIND_WAKER_RECOMP_MIGRATION.md).
+
 Source fork of [BlueWake](https://github.com/chrissotraidis/bluewake), based on upstream commit
 [`31b8a722fee3`](https://github.com/chrissotraidis/bluewake/commit/31b8a722fee33457585df336093f70eea07f6382).
 The app and build scripts retain the BlueWake name and bundle identifier. Upstream license and
@@ -8,7 +20,7 @@ credits are preserved below and in [RIGHTS_AND_LICENSES.md](RIGHTS_AND_LICENSES.
 <p align="center">
   <strong>The Legend of Zelda: The Wind Waker, running natively on Windows, Mac, iPhone and iPad.</strong><br>
   A static recompilation of the GameCube original, with Direct3D 12 and Metal rendering, Smooth Motion
-  at 60 or 120 FPS, widescreen, save states, wall climbing, controllers, mouse and keyboard, touch
+  at 60, 120 or up to 240 FPS, widescreen, save states, wall climbing, controllers, mouse and keyboard, touch
   controls and mods.
 </p>
 
@@ -17,7 +29,7 @@ credits are preserved below and in [RIGHTS_AND_LICENSES.md](RIGHTS_AND_LICENSES.
   <img alt="macOS Apple Silicon" src="https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple">
   <img alt="iPhone and iPad" src="https://img.shields.io/badge/iPhone%20%2F%20iPad-build%20your%20own-0A84FF?logo=apple">
   <img alt="Direct3D 12 and Metal" src="https://img.shields.io/badge/renderer-Direct3D%2012%20%7C%20Metal-5E5CE6">
-  <img alt="Smooth Motion 60 or 120 FPS" src="https://img.shields.io/badge/Smooth%20Motion-60%20%7C%20120%20FPS-30D158">
+  <img alt="Smooth Motion 60, 120 or 240 FPS" src="https://img.shields.io/badge/Smooth%20Motion-60%20%7C%20120%20%7C%20240%20FPS-30D158">
   <img alt="Ahead-of-time static recompilation" src="https://img.shields.io/badge/PowerPC-static%20recompilation-FF9F0A">
   <img alt="Game data not included" src="https://img.shields.io/badge/game%20data-not%20included-FF453A">
   <img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-lightgrey">
@@ -43,7 +55,7 @@ credits are preserved below and in [RIGHTS_AND_LICENSES.md](RIGHTS_AND_LICENSES.
 > documentation and debugging. The status log records what has actually been checked, and on what.
 
 **Questions or bugs?** Join the [Discord](https://discord.gg/xwHfUD2bxW) or
-[open an issue](https://github.com/elliotttate/Wind-Waker-Recomp/issues).
+[open an issue on BlueWake](https://github.com/chrissotraidis/bluewake/issues).
 
 [Features](#features) · [Controls](#controls) · [Windows](#windows) · [Mac](#mac) ·
 [iPhone and iPad](#iphone-and-ipad) · [Performance](#performance) · [Mods](#mods) ·
@@ -66,14 +78,18 @@ this is a static recompilation with a hardware compatibility layer, not an "emul
 What Wind Waker Recomp adds to the game. Most of it is an option in the settings (F1), so you can play
 with as much or as little of it as you like.
 
-**New in 0.2.0:** [save states](#save-states) and [climbing any wall](#climb-any-wall) on Windows and
-Mac, and a faster graphics thread for slower CPUs on both.
+**New in 0.4.0 (Windows):** the lava in Dragon Roost Cavern glows in its colours again (it drew white),
+and the game's own vibration reaches your controller, shaped by its strength, with Xbox and DualSense
+trigger feedback. **New in 0.3.0 (Windows):** the game runs about 13 percent faster, slower CPUs no
+longer play in slow motion with frame interpolation on, and frame interpolation can match the display,
+up to 240 FPS. **New in 0.2.0:** [save states](#save-states) and [climbing any wall](#climb-any-wall) on
+Windows and Mac.
 
 ### Picture and frame rate
 
 | Feature | What it adds |
 | --- | --- |
-| **Smooth Motion** (frame interpolation; Windows, Mac) | The game runs at its own 30 frames a second, and the renderer draws in-between frames blended from the game's own: **60 FPS** by default, or **120 FPS** on a display of 100 Hz or more. It follows the camera and what the game moves itself. On by default; F10 turns it off and on (Windows) |
+| **Smooth Motion** (frame interpolation; Windows, Mac) | The game runs at its own 30 frames a second, and the renderer draws in-between frames blended from the game's own: **60 FPS** by default, **120 FPS** on a display of 100 Hz or more, or on Windows as many as the display shows (**up to 240 FPS** on a 240 Hz display). It follows the camera and what the game moves itself, and on Windows steps aside when the CPU cannot keep up rather than slow the game. On by default; F10 turns it off and on (Windows) |
 | **60 Hz game logic** (Windows; experimental, not recommended) | The game itself runs 60 times a second instead of interpolating, on a fast CPU. Movement, cutscenes and some timers are still being converted, so parts run too fast ([docs/SIMULATION_60HZ.md](https://github.com/elliotttate/Wind-Waker-Recomp/blob/windows-release/docs/SIMULATION_60HZ.md)) |
 | **Widescreen** | 16:9 or 16:10, with the camera, culling and HUD widened; or the game's own 4:3 |
 | **Resolution and filtering** | Render at up to 4× the GameCube's 480 lines, or at the window's own pixels, with texture filtering up to 16× anisotropic |
@@ -97,6 +113,7 @@ Mac, and a faster graphics thread for slower CPUs on both.
 | --- | --- |
 | **Controllers** | Xbox, PlayStation, Switch Pro and other controllers work as a GameCube pad, next to the keyboard and mouse |
 | **Fast right-stick camera** (Windows, Mac) | The right stick turns the view directly, like a mouse, instead of the game's eased C-stick camera, and aims in first person and with items; its click is first person. The left stick zooms the telescope and the Picto Box. The game's own camera is an option |
+| **Controller vibration** (Windows; the Mac with its next build) | The game's own vibration (hits, falls, explosions, bosses, quakes), felt as it was timed but shaped by its strength on both motors instead of the GameCube's on and off, with Xbox impulse triggers and DualSense trigger vibration on the strong ones. Enhanced (the default), Classic (the game's on and off) or Off, and a strength, under Controls |
 | **Mouse camera** (Windows, Mac) | Click the game and move the mouse to turn the camera; left click is A, the wheel zooms |
 | **Camera that stays out of the ground** | By stick or mouse, the camera stays out of the ground and the water |
 | **Touch controls** (iPhone, iPad) | On-screen controls with a layout editor, plus controllers and keyboards |
@@ -151,7 +168,7 @@ inversion and button remapping are under **⋯ › Controller**, and the game's 
 Needs Windows 10 or 11 (64-bit), a Direct3D 12 GPU and a CPU with AVX2 (Intel Haswell, AMD Zen or newer).
 
 The settings (F1) have four tabs: **Display** (fullscreen; the frame rate: 30 FPS, 60 or 120 FPS with frame
-interpolation, or the experimental 60 Hz game logic; resolution, filtering), **Controls** (mouse and stick cameras), **Mods** (aspect ratio, Better Wind Waker,
+interpolation, the display's own rate up to 240, or the experimental 60 Hz game logic; resolution, filtering), **Controls** (mouse and stick cameras), **Mods** (aspect ratio, Better Wind Waker,
 quick doors, climbing, HD textures) and **Sound and files**, with **Save state** and **Load latest state**
 at the bottom. Saves, settings, save states (`states`), the prepared disc and session logs are in
 `%APPDATA%\BlueWake`.
@@ -212,6 +229,7 @@ GZLE01.card**, and **⋯ › Game Data & Saves** backs them up, restores them an
 | --- | --- |
 | Windows PC (Core i9-13900KF, RTX 5090) | Smooth Motion: 60 FPS shown with the game at its full 30, Link running on Outset (lowest second 58.7). 60 Hz game logic: 59-60 game frames a second on the same route |
 | Windows, a slower CPU (12 of the i9's efficiency cores, standing in) | Full speed (60 shown, the game at 30) at Outset's busiest view, standing and running, since 0.1.1; 0.1.0 managed 23-26 game frames a second there |
+| Windows, a 4-core CPU (4 of the i9's efficiency cores, standing in for a laptop CPU) | 0.3.0: the game at its full 30 at Outset's busiest view, standing and running, with frame interpolation stepping aside (0.2.2: 24-28, slow motion); unthrottled, 37-38 game frames a second against 0.2.2's 33 |
 | Mac (Apple Silicon) | Smooth Motion at 60 or 120; the busiest scenes can dip below 120 at 120 Hz, 60 is steadier |
 | iPad Pro 12.9" (M2) | Steady 30 FPS at full speed; a 44-minute session had 14 seconds below 29 FPS, all brief dips at area loads |
 | iPhone 14 (A15) | 30 FPS in most play; dips to about 25-27 FPS in the busiest scenes and the title-screen flyover |
@@ -244,7 +262,9 @@ game's code. Details are in [docs/MODS.md](docs/MODS.md).
 ## Known issues
 
 - **First minutes of a new install:** rendering pipelines compile as new scenes appear, so the first
-  visits hitch briefly; later launches reuse them.
+  visits can miss a few objects for a moment; later launches reuse them. On Windows a draw whose pipeline
+  is still compiling is drawn with an ubershader once that has compiled (in the first minute of the first
+  launch), and Settings, Display, "Compile shaders before playing" waits for the known pipelines first.
 - **Loading hitches.** Changing areas can briefly stall.
 - **Save states** belong to the version of the app that made them: a later version may refuse one. The
   memory card is not part of a state, so keep saving in the game as well.
@@ -254,9 +274,12 @@ game's code. Details are in [docs/MODS.md](docs/MODS.md).
   the latest release.
 - **Laptops with integrated graphics** (such as Intel UHD) can run slowly. Turn Smooth Motion off (F10)
   and set **Render resolution** to 1x: Smooth Motion draws each frame a second time to show 60 FPS.
-- **Mac:** lava in Dragon Roost Cavern's areas renders as flat orange instead of its bright pattern.
+  Before 0.3.0, Smooth Motion on a CPU with few cores could also slow the game itself down.
+- **Mac:** lava in Dragon Roost Cavern's areas renders as flat orange instead of its bright pattern. Windows
+  0.4.0 fixes it (it drew white there); the Mac gets the fix with its next build.
 - **120 FPS** needs a display of 100 Hz or more (on a 60 Hz display Windows shows 60 instead), and the
-  busiest scenes can dip below 120.
+  busiest scenes can dip below 120. **Match the display** (up to 240 FPS) needs a fast PC, and has been
+  tested with a simulated 240 Hz display, not yet a real one.
 - **60 Hz game logic** (Windows) is experimental and not recommended: dialogue, cutscenes and transitions
   keep their original timing, so parts run too fast.
 - **Busy scenes on iPhone** drop below 30 FPS on chips older than the M-series iPads.
@@ -285,7 +308,9 @@ with, are read from your disc. None of it is included.
 ### Which version of the game works?
 
 Only the GameCube USA release, `GZLE01` revision 0. The app checks the disc and refuses others. The
-Wii U *Wind Waker HD* is a different game and is not supported.
+Wii U *Wind Waker HD* is a different game and cannot be used as the game disc.
+You can optionally [import its compatible textures from your own HD disc](docs/WWHD_TEXTURES.md)
+into a replacement pack while continuing to play from your GameCube disc.
 
 ### Is this an emulator?
 
@@ -293,10 +318,10 @@ Not in the usual sense. The game's code is translated to native x86-64 or arm64 
 is no JIT; only a few rare instructions fall back to an interpreter. The hardware around the CPU
 (graphics, audio, memory card, timing) comes from a Dolphin-derived runtime.
 
-### Why 30 FPS, and how does it show 60 or 120?
+### Why 30 FPS, and how does it show 60, 120 or 240?
 
 30 is the game's own frame rate on the GameCube, and the game runs at that rate at full speed. Smooth
-Motion draws in-between frames, blended from the game's own, to show 60 or 120 without changing how the
+Motion draws in-between frames, blended from the game's own, to show 60, 120 or up to 240 without changing how the
 game plays. The experimental 60 Hz game logic on Windows runs the game itself at 60 instead.
 
 ### What are save states for, and do they replace saving?
@@ -311,7 +336,9 @@ longer need from the `states` folder.
 Yes. On Windows and Mac, controllers work as a GameCube pad (Xbox, PlayStation, Switch Pro and others),
 next to the keyboard and mouse. The right stick turns the camera directly and aims, its click goes into
 first person and back out, and the left bumper jumps; the game's own eased right-stick camera is an option
-under Controls. On iPhone and iPad, controllers that iOS supports work, with camera
+under Controls. On Windows the game's vibration is felt on both motors, shaped by how strong the game
+made it, with an Xbox controller's impulse triggers and a DualSense's trigger vibration on strong hits
+(the Mac gets it with its next build). On iPhone and iPad, controllers that iOS supports work, with camera
 inversion and button remapping under **⋯ › Controller**, and the game's rumble is passed to the controller.
 
 ### Will updates keep my saves?

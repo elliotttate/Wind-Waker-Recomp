@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "gxruntime/aurora_backend.h"
+#include <aurora/gfx.h>
 
 extern "C" {
 // runtime/host/src/mouse_camera.h and game_options.h, declared here with plain
@@ -53,6 +54,9 @@ bool bluewake_mouse_camera_captured(void);
 // Reads the BLUEWAKE_STICK_CAMERA settings again (and the mouse's, which
 // bluewake_mouse_camera_configure then sets back to the menu's).
 void bluewake_mouse_camera_reload(void);
+// runtime/host/src/haptics.h: the controller's haptics (BLUEWAKE_HAPTICS*).
+void bluewake_haptics_reload(void);
+void bluewake_haptics_block(bool blocked);
 // runtime/host/src/simulation_mode.h: the experimental 60 Hz gameplay.
 bool bluewake_simulation_supported(void);
 bool bluewake_simulation_enabled(void);
@@ -63,6 +67,8 @@ void bluewake_fast_load_reload(void);
 // climb.h: BLUEWAKE_CLIMB and BLUEWAKE_CLIMB_STAMINA read again, and the
 // stamina wheel's place in the game's picture.
 void bluewake_climb_reload(void);
+// forest_water.h: BLUEWAKE_FOREST_WATER_KEEP_TREES and _30_MINUTES read again.
+void bluewake_forest_water_reload(void);
 bool bluewake_climb_hud(float* fraction, bool* exhausted, float* x, float* y, float* aspect, float* alpha);
 // save_state.h: a save (false) or a load of the latest state (true), done by
 // the game thread at its next clean point.
@@ -95,10 +101,17 @@ struct Settings {
     bool show_fps = false;
     int fps_position = FPS_OVERLAY_TOP_CENTER;  // where the counter is (kFpsPositions)
     bool pause_unfocused = false;
+    // At start, the game waits until the pipelines saved from earlier play
+    // (and the bundled seed) are compiled (shader_wait_hold).
+    bool shaders_first = false;
     bool fast_forward = true;  // skip through the black while loading (fast_load.h)
     bool quick_doors = true;   // no walk-in or door closing behind Link (quick_doors.h)
     bool climb = false;        // climb any wall on a stamina wheel (climb.h)
     int climb_stamina = 12;    // seconds of climbing on a full wheel
+    // The Forest Water challenge (forest_water.h): watered trees kept when the
+    // water runs out, and a 30-minute timer for the next scoop. Both off.
+    bool forest_keep_trees = false;
+    bool forest_30_minutes = false;
     // Controls: apply at once.
     bool mouse_camera = true;
     double mouse_sensitivity = 1.0;
@@ -109,12 +122,20 @@ struct Settings {
     bool stick_camera = true;
     int stick_speed = 360;      // degrees a second at full tilt
     int stick_aim_speed = 180;  // the same when aiming
+    // Controller haptics (haptics.h): 0 off, 1 classic (the game's own on and
+    // off), 2 enhanced (its vibration rendered, triggers too).
+    int haptics = 2;
+    int haptics_strength = 80;  // percent
+    bool haptics_triggers = true;
     // At the next launch.
     std::string aspect = "4:3";
     bool keep_aspect = true;
     bool betterww = false;
     std::map<std::string, bool> options;  // only those changed from their default
     bool hd_textures = false;
+    // The pack's folder when it is not Load\Textures\GZLE01: the Wind Waker HD
+    // importer's --install names its own (docs/WWHD_TEXTURES.md).
+    std::string texture_pack;
     bool native_60hz = false;  // experimental 60 Hz gameplay (docs/SIMULATION_60HZ.md)
     bool lle_audio = false;
 };
@@ -182,9 +203,12 @@ void load_file() {
         else if (k == "quick_doors") d.quick_doors = parse_bool(v);
         else if (k == "climb") d.climb = parse_bool(v);
         else if (k == "climb_stamina") d.climb_stamina = std::clamp(std::atoi(v.c_str()), 4, 30);
+        else if (k == "forest_water_keep_trees") d.forest_keep_trees = parse_bool(v);
+        else if (k == "forest_water_30_minutes") d.forest_30_minutes = parse_bool(v);
         else if (k == "show_fps") d.show_fps = parse_bool(v);
         else if (k == "fps_position") d.fps_position = parse_fps_position(v);
         else if (k == "pause_unfocused") d.pause_unfocused = parse_bool(v);
+        else if (k == "compile_shaders_first") d.shaders_first = parse_bool(v);
         else if (k == "mouse_camera") d.mouse_camera = parse_bool(v);
         else if (k == "mouse_sensitivity") d.mouse_sensitivity = std::clamp(std::atof(v.c_str()), 0.1, 10.0);
         else if (k == "mouse_invert_y") d.mouse_invert_y = parse_bool(v);
@@ -193,11 +217,15 @@ void load_file() {
         else if (k == "stick_camera") d.stick_camera = parse_bool(v);
         else if (k == "stick_camera_speed") d.stick_speed = std::clamp(std::atoi(v.c_str()), 60, 1080);
         else if (k == "stick_aim_speed") d.stick_aim_speed = std::clamp(std::atoi(v.c_str()), 30, 720);
+        else if (k == "haptics") d.haptics = v == "off" ? 0 : v == "classic" ? 1 : 2;
+        else if (k == "haptics_strength") d.haptics_strength = std::clamp(std::atoi(v.c_str()), 0, 100);
+        else if (k == "haptics_triggers") d.haptics_triggers = parse_bool(v);
         else if (k == "aspect") d.aspect = (v == "16:9" || v == "16:10") ? v : "4:3";
         else if (k == "keep_aspect") d.keep_aspect = parse_bool(v);
         else if (k == "betterww") d.betterww = parse_bool(v);
         else if (k.rfind("option.", 0) == 0) d.options[k.substr(7)] = parse_bool(v);
         else if (k == "hd_textures") d.hd_textures = parse_bool(v);
+        else if (k == "texture_pack") d.texture_pack = v;
         else if (k == "lle_audio") d.lle_audio = parse_bool(v);
         else if (k == "native_60hz") d.native_60hz = parse_bool(v);
     }
@@ -219,18 +247,26 @@ void save_file() {
     std::fprintf(f, "render_scale=%d\nanisotropy=%d\nsmooth_motion=%d\nshow_fps=%d\npause_unfocused=%d\n",
                  d.render_scale, d.anisotropy, d.smooth_motion, d.show_fps, d.pause_unfocused);
     std::fprintf(f, "fps_position=%s\n", kFpsPositions[d.fps_position]);
+    std::fprintf(f, "compile_shaders_first=%d\n", d.shaders_first);
     std::fprintf(f, "smooth_motion_fps=%s\nfast_forward=%d\nquick_doors=%d\n",
                  d.smooth_steps == kStepsDisplay ? "display" : d.smooth_steps >= 3 ? "120" : "60",
                  d.fast_forward, d.quick_doors);
     std::fprintf(f, "climb=%d\nclimb_stamina=%d\n", d.climb, d.climb_stamina);
+    std::fprintf(f, "forest_water_keep_trees=%d\nforest_water_30_minutes=%d\n", d.forest_keep_trees,
+                 d.forest_30_minutes);
     std::fprintf(f, "mouse_camera=%d\nmouse_sensitivity=%.2f\nmouse_invert_y=%d\n", d.mouse_camera,
                  d.mouse_sensitivity, d.mouse_invert_y);
     std::fprintf(f, "controller_invert_x=%d\ncontroller_invert_y=%d\n", d.pad_invert_x, d.pad_invert_y);
     std::fprintf(f, "stick_camera=%d\nstick_camera_speed=%d\nstick_aim_speed=%d\n", d.stick_camera, d.stick_speed,
                  d.stick_aim_speed);
+    std::fprintf(f, "haptics=%s\nhaptics_strength=%d\nhaptics_triggers=%d\n",
+                 d.haptics == 0 ? "off" : d.haptics == 1 ? "classic" : "enhanced", d.haptics_strength,
+                 d.haptics_triggers);
     std::fprintf(f, "aspect=%s\nkeep_aspect=%d\nbetterww=%d\nhd_textures=%d\nlle_audio=%d\n", d.aspect.c_str(),
                  d.keep_aspect, d.betterww, d.hd_textures, d.lle_audio);
     std::fprintf(f, "native_60hz=%d\n", d.native_60hz);
+    if (!d.texture_pack.empty())
+        std::fprintf(f, "texture_pack=%s\n", d.texture_pack.c_str());
     for (const auto& [name, on] : d.options)
         std::fprintf(f, "option.%s=%d\n", name.c_str(), on);
     const bool ok = std::fclose(f) == 0;
@@ -281,6 +317,10 @@ void default_window(double ratio, int* w, int* h) {
 }
 
 std::string texture_folder() { return g_data_dir + "Load\\Textures\\GZLE01"; }
+// The folder the pack is loaded from: the one chosen, else texture_folder().
+std::string texture_pack_folder(const Settings& d) {
+    return d.texture_pack.empty() ? texture_folder() : d.texture_pack;
+}
 
 // --- the window -------------------------------------------------------------
 
@@ -427,6 +467,17 @@ void apply_stick() {
     bluewake_mouse_camera_configure(d.mouse_camera, d.mouse_sensitivity, d.mouse_invert_y);
 }
 
+const char* haptics_name(int haptics) { return haptics == 0 ? "off" : haptics == 1 ? "classic" : "enhanced"; }
+
+// The host reads the haptics settings from its environment (haptics.c).
+void apply_haptics() {
+    const Settings& d = g_saved;
+    _putenv_s("BLUEWAKE_HAPTICS", haptics_name(d.haptics));
+    _putenv_s("BLUEWAKE_HAPTICS_STRENGTH", std::to_string(d.haptics_strength).c_str());
+    _putenv_s("BLUEWAKE_HAPTICS_TRIGGERS", d.haptics_triggers ? "1" : "0");
+    bluewake_haptics_reload();
+}
+
 void apply_live() {
     const Settings& d = g_saved;
     note_refresh(game_window());
@@ -449,6 +500,7 @@ void set_menu_open(bool open) {
     // The menu's keys and clicks are not the game's.
     PADSetKeyboardActive(0, open ? FALSE : TRUE);
     bluewake_mouse_camera_block(open);
+    bluewake_haptics_block(open);  // nothing is felt while the menu is up
     std::fprintf(stderr, "[windows] settings menu %s\n", open ? "open" : "closed");
     if (!open && g_dirty)
         save_file();
@@ -484,8 +536,8 @@ void restart() {
 bool needs_restart() {
     const Settings &a = g_saved, &b = g_launched;
     return a.aspect != b.aspect || a.keep_aspect != b.keep_aspect || a.betterww != b.betterww ||
-           a.options != b.options || a.hd_textures != b.hd_textures || a.lle_audio != b.lle_audio ||
-           a.native_60hz != b.native_60hz;
+           a.options != b.options || a.hd_textures != b.hd_textures || a.texture_pack != b.texture_pack ||
+           a.lle_audio != b.lle_audio || a.native_60hz != b.native_60hz;
 }
 
 void restart_note(bool differs) {
@@ -596,6 +648,12 @@ void tab_display(SDL_Window* w) {
         aurora_set_pause_on_focus_lost(d.pause_unfocused);
         changed();
     }
+    if (ImGui::Checkbox("Compile shaders before playing", &d.shaders_first))
+        changed();
+    restart_note(d.shaders_first != g_launched.shaders_first);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("At start, wait until the shaders from earlier play are ready, so nothing is missing "
+                          "from the picture the first time it is drawn. Otherwise they are made while you play.");
     ImGui::Spacing();
     if (ImGui::Button("Reset the window"))
         reset_window(w);
@@ -638,6 +696,29 @@ void tab_controls() {
         apply_controller();
     if (pad || stick) {
         apply_stick();
+        changed();
+    }
+    ImGui::Spacing();
+    ImGui::SeparatorText("Haptics");
+    // The game's vibration on an Xbox controller, a DualSense and others:
+    // rendered from what the game asked for, or its own on-off motor.
+    static const char* const kHaptics[] = {"Off", "Classic (the game's own on and off)",
+                                           "Enhanced (shaped, with the triggers)"};
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16);
+    bool haptics = ImGui::Combo("Controller vibration", &d.haptics, kHaptics, IM_ARRAYSIZE(kHaptics));
+    ImGui::BeginDisabled(d.haptics == 0);
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16);
+    haptics |= ImGui::SliderInt("Vibration strength", &d.haptics_strength, 0, 100, "%d%%");
+    ImGui::EndDisabled();
+    ImGui::BeginDisabled(d.haptics != 2);
+    haptics |= ImGui::Checkbox("Trigger feedback (Xbox impulse triggers, DualSense trigger vibration)",
+                               &d.haptics_triggers);
+    ImGui::EndDisabled();
+    ImGui::TextDisabled(d.haptics == 2   ? "    Hits, falls, explosions and quakes as the game times them, shaped by their strength."
+                        : d.haptics == 1 ? "    The motor on and off, as a GameCube controller's."
+                                         : "    No vibration. (The game's own Vibration option turns it off too.)");
+    if (haptics) {
+        apply_haptics();
         changed();
     }
     ImGui::Spacing();
@@ -744,13 +825,38 @@ void tab_enhancements() {
     ImGui::Unindent();
     ImGui::EndDisabled();
     ImGui::Spacing();
+    ImGui::TextUnformatted("Forest Water challenge");
+    if (ImGui::Checkbox("Keep watered trees when time runs out", &d.forest_keep_trees)) {
+        _putenv_s("BLUEWAKE_FOREST_WATER_KEEP_TREES", d.forest_keep_trees ? "1" : "0");
+        bluewake_forest_water_reload();
+        changed();
+    }
+    ImGui::TextDisabled("    Forest Water still expires. Refill and carry on with the trees still to water.");
+    if (ImGui::Checkbox("30-minute Forest Water timer", &d.forest_30_minutes)) {
+        _putenv_s("BLUEWAKE_FOREST_WATER_30_MINUTES", d.forest_30_minutes ? "1" : "0");
+        bluewake_forest_water_reload();
+        changed();
+    }
+    ImGui::TextDisabled("    Applies the next time Link scoops Forest Water.");
+    ImGui::Spacing();
     if (ImGui::Checkbox("HD texture pack", &d.hd_textures))
         changed();
     restart_note(d.hd_textures != g_launched.hd_textures);
     ImGui::SameLine();
     if (ImGui::SmallButton("Open the texture folder"))
-        open_folder(texture_folder());
-    ImGui::TextDisabled("    A Dolphin-format pack for GZLE01 (its folder of .png or .dds files) goes in that folder.");
+        open_folder(texture_pack_folder(d));
+    if (d.texture_pack.empty()) {
+        ImGui::TextDisabled("    A Dolphin-format pack for GZLE01 (its folder of .png or .dds files) goes in that folder.");
+    } else {
+        ImGui::TextDisabled("    The pack in %s", d.texture_pack.c_str());
+        restart_note(d.texture_pack != g_launched.texture_pack);
+        ImGui::Indent();
+        if (ImGui::SmallButton("Use Load\\Textures\\GZLE01 instead")) {
+            d.texture_pack.clear();
+            changed();
+        }
+        ImGui::Unindent();
+    }
 }
 
 void tab_game() {
@@ -964,6 +1070,58 @@ void draw_climb_wheel() {
     list->PathStroke(color, 0, thick);
 }
 
+// Compile shaders before playing: the game is held at its first present
+// (dol_aurora_set_hold, the picture redrawn under this overlay) until every
+// pipeline the cache queued at start is compiled, or two minutes have passed.
+// They compile on several threads (Aurora's pipeline cache), and while the
+// game is held it asks for nothing new. Otherwise they compile while the game
+// runs, and a draw whose pipeline is not ready yet is left out of its frame.
+bool g_shader_wait;
+Uint64 g_shader_wait_since;
+uint32_t g_shader_wait_first;
+
+bool shader_wait_hold(void*) {
+    if (!g_shader_wait)
+        return false;
+    const AuroraStats* stats = aurora_get_stats();
+    const uint32_t left = stats != nullptr ? stats->queuedPipelines : 0u;
+    if (g_shader_wait_since == 0) {
+        g_shader_wait_since = SDL_GetTicks();
+        g_shader_wait_first = left;
+    }
+    const Uint64 waited = SDL_GetTicks() - g_shader_wait_since;
+    if (left == 0u || waited > 120000) {
+        g_shader_wait = false;
+        std::fprintf(stderr, "[windows] shaders compiled before play: %u in %.1f s%s\n", g_shader_wait_first,
+                     waited / 1000.0, left != 0u ? " (stopped waiting)" : "");
+        return false;
+    }
+    return true;
+}
+
+void draw_shader_wait(SDL_Window* w) {
+    if (!g_shader_wait)
+        return;
+    const AuroraStats* stats = aurora_get_stats();
+    const uint32_t left = stats != nullptr ? stats->queuedPipelines : 0u;
+    ImGuiIO& io = ImGui::GetIO();
+    const float scale = ui_scale(w);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowBgAlpha(0.75f);
+    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs |
+                                   ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
+                                   ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    if (ImGui::Begin("##bluewake-shaders", nullptr, flags)) {
+        ImGui::SetWindowFontScale(scale / g_font_scale);
+        ImGui::Text("Compiling shaders: %u to go", left);
+        if (g_shader_wait_first > 0u)
+            ImGui::ProgressBar(1.f - static_cast<float>(left) / static_cast<float>(g_shader_wait_first),
+                               ImVec2(260.f * scale, 0.f), "");
+    }
+    ImGui::End();
+}
+
 // For the first few seconds, where the settings and fullscreen are.
 void draw_hint(SDL_Window* w) {
     const Uint64 shown = SDL_GetTicks() - g_first_frame_at;
@@ -1076,6 +1234,7 @@ void frame(void*) {
         }
     }
     draw_climb_wheel();
+    draw_shader_wait(w);
     if (g_menu_open)
         draw_menu(w);
     draw_hint(w);
@@ -1138,6 +1297,18 @@ extern "C" void bw_settings_apply_launch(void) {
         env_default("BLUEWAKE_STICK_CAMERA_INVERT_X", "1");
     if (d.pad_invert_y)
         env_default("BLUEWAKE_STICK_CAMERA_INVERT_Y", "1");
+    // Haptics, the same way.
+    if (env_set("BLUEWAKE_HAPTICS")) {
+        const char m = std::getenv("BLUEWAKE_HAPTICS")[0];
+        d.haptics = m == 'o' || m == '0' ? 0 : m == 'c' ? 1 : 2;
+    }
+    if (env_set("BLUEWAKE_HAPTICS_STRENGTH"))
+        d.haptics_strength = std::clamp(std::atoi(std::getenv("BLUEWAKE_HAPTICS_STRENGTH")), 0, 100);
+    if (env_set("BLUEWAKE_HAPTICS_TRIGGERS"))
+        d.haptics_triggers = std::getenv("BLUEWAKE_HAPTICS_TRIGGERS")[0] != '0';
+    env_default("BLUEWAKE_HAPTICS", haptics_name(d.haptics));
+    env_default("BLUEWAKE_HAPTICS_STRENGTH", std::to_string(d.haptics_strength));
+    env_default("BLUEWAKE_HAPTICS_TRIGGERS", d.haptics_triggers ? "1" : "0");
     if (d.aspect != "4:3")
         env_default("BLUEWAKE_ASPECT", d.aspect);
     env_default("DOL_AURORA_ASPECT_FIT", d.keep_aspect ? "1" : "0");
@@ -1153,7 +1324,7 @@ extern "C" void bw_settings_apply_launch(void) {
     CreateDirectoryA((g_data_dir + "Load\\Textures").c_str(), nullptr);
     CreateDirectoryA(texture_folder().c_str(), nullptr);
     if (d.hd_textures)
-        env_default("DOL_AURORA_TEXTURE_PACK", texture_folder());
+        env_default("DOL_AURORA_TEXTURE_PACK", texture_pack_folder(d));
     if (d.lle_audio)
         env_default("BLUEWAKE_DSP_MODE", "lle");
     if (env_set("BLUEWAKE_QUICK_DOORS"))
@@ -1172,6 +1343,14 @@ extern "C" void bw_settings_apply_launch(void) {
         d.climb_stamina = std::clamp(std::atoi(std::getenv("BLUEWAKE_CLIMB_STAMINA")), 4, 30);
     else
         env_default("BLUEWAKE_CLIMB_STAMINA", std::to_string(d.climb_stamina));
+    if (env_set("BLUEWAKE_FOREST_WATER_KEEP_TREES"))
+        d.forest_keep_trees = std::getenv("BLUEWAKE_FOREST_WATER_KEEP_TREES")[0] == '1';
+    else
+        env_default("BLUEWAKE_FOREST_WATER_KEEP_TREES", d.forest_keep_trees ? "1" : "0");
+    if (env_set("BLUEWAKE_FOREST_WATER_30_MINUTES"))
+        d.forest_30_minutes = std::getenv("BLUEWAKE_FOREST_WATER_30_MINUTES")[0] == '1';
+    else
+        env_default("BLUEWAKE_FOREST_WATER_30_MINUTES", d.forest_30_minutes ? "1" : "0");
     if (env_set("BLUEWAKE_SIMULATION_60HZ"))
         d.native_60hz = std::getenv("BLUEWAKE_SIMULATION_60HZ")[0] == '1';
     else if (d.native_60hz)
@@ -1238,6 +1417,13 @@ extern "C" int bw_settings_finish_restart(void) {
 
 extern "C" void bw_settings_install(void) {
     dol_aurora_set_overlay(frame, nullptr);
+    // BLUEWAKE_SHADERS_FIRST=0/1 overrides the setting (testing).
+    const char* first = std::getenv("BLUEWAKE_SHADERS_FIRST");
+    g_shader_wait = first != nullptr && first[0] != '\0' ? first[0] != '0' : g_saved.shaders_first;
+    if (g_shader_wait) {
+        dol_aurora_set_hold(shader_wait_hold, nullptr);
+        dol_aurora_set_hold_redraw(true);
+    }
     std::atexit(save_at_exit);
 }
 

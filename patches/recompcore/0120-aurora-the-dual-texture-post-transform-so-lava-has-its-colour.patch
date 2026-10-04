@@ -1,0 +1,406 @@
+From 585ad2a4547cd3c9f01361b706b217eb4bcb1eab Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Thu, 1 Oct 2026 21:26:47 -0400
+Subject: [PATCH] Aurora: the dual-texture post transform, so lava has its
+ colour
+
+GX can send a texgen's result through a second matrix from post-transform
+memory (XF 0x500-0x5FF, chosen per texgen by XF 0x1050-0x1057, on since
+GXInit writes XF 0x1012 = 1). The renderer never read either, so a texgen
+used its texture matrix alone. Wind Waker's lava (d_magma.cpp) is the one
+user: its crust pattern and its colour ramp (the ramp indexed by height) are
+both projected through post matrices, and without them the lava in Dragon
+Roost Cavern and Gohma's room drew white (orange-brown blotches on the Mac).
+
+The front end keeps post-transform memory beside DolGxRecompState (so the
+saved front-end state keeps its size and 0.3.0 save states still load), and
+each draw carries the rows of any regular texgen whose post matrix is not
+the identity. gxcore folds them into that texgen's matrix rows, post * tex,
+as Dolphin's VertexShaderGen applies them; no shader or pipeline key
+changes, so shader caches stay valid. A post transform that normalizes
+first is not folded (nothing in Wind Waker uses one).
+
+Checked: gxcore_tests (with a fold test for three- and two-row texgens);
+Gohma's room draws orange lava with its dark crust, real and in-between
+frames; Outset's synchronous captures 19 of 19 and Smooth Motion dumps
+62 of 62 identical to the release's.
+---
+ .../gxruntime/aurora_recomp/render_sink.hpp   |  11 ++
+ .../aurora_recomp/retail_gx_frontend.hpp      |  18 ++++
+ .../graphics/frontend/src/render_sink.cpp     |   6 ++
+ .../frontend/src/retail_gx_frontend.cpp       | 100 +++++++++++++++++-
+ GXRuntime/graphics/gxcore/src/gxcore.cpp      |  21 ++++
+ .../gxcore/tests/gxcore_wgsl_test.cpp         |  77 ++++++++++++++
+ 6 files changed, 232 insertions(+), 1 deletion(-)
+
+diff --git a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+index 7f287243..fb024086 100644
+--- a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
++++ b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+@@ -142,6 +142,13 @@ struct RenderDrawPacket {
+   std::uint16_t tex_matrix_word_mask[DOL_GX_RECOMP_TEX_MATRIX_COUNT]{};
+   std::uint32_t xf_regs[DOL_GX_RECOMP_XF_REG_COUNT]{};
+   std::uint64_t xf_reg_mask = 0;
++  // Dual-texture post-transform (XF 0x1012 on, post info 0x1050.., matrices
++  // 0x500..0x5FF): bit i of post_tex_mask when texgen i's post matrix is not
++  // the identity or it normalizes first; its three rows are post_tex_rows[i]
++  // (only set bits are written).
++  std::uint8_t post_tex_mask = 0;
++  std::uint8_t post_tex_normalize = 0;
++  float post_tex_rows[8][12]{};
+ };
+ 
+ struct RenderPacket {
+@@ -275,6 +282,10 @@ struct ConsumedDraw {
+   std::uint16_t tex_matrix_word_mask[DOL_GX_RECOMP_TEX_MATRIX_COUNT]{};
+   std::uint32_t xf_regs[DOL_GX_RECOMP_XF_REG_COUNT]{};
+   std::uint64_t xf_reg_mask = 0;
++  // Dual-texture post-transform, as in RenderDrawPacket.
++  std::uint8_t post_tex_mask = 0;
++  std::uint8_t post_tex_normalize = 0;
++  float post_tex_rows[8][12]{};
+ };
+ 
+ using ConsumedDrawObserver = void (*)(const ConsumedDraw& draw,
+diff --git a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
+index 487fa233..5750d1e3 100644
+--- a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
++++ b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
+@@ -42,6 +42,23 @@ struct DrawTransformSnapshot {
+   std::uint16_t tex_matrix_word_mask[DOL_GX_RECOMP_TEX_MATRIX_COUNT]{};
+   std::uint32_t xf_regs[DOL_GX_RECOMP_XF_REG_COUNT]{};
+   std::uint64_t xf_reg_mask = 0;
++  // Dual-texture post-transform at draw time (see RenderDrawPacket).
++  std::uint8_t post_tex_mask = 0;
++  std::uint8_t post_tex_normalize = 0;
++  float post_tex_rows[8][12]{};
++};
++
++// XF post-transform ("dual texture") matrix memory, 0x500..0x5FF: 64 rows of
++// four floats. Kept beside DolGxRecompState rather than in it, so the saved
++// front-end state keeps its size; after a load the rows read as identity
++// until the game loads them again.
++struct PostTexMatrices {
++  float rows[64][4]{};
++  std::uint64_t written = 0;  // rows the game has loaded
++  // identity[k] bit r: row r is row k of the identity (or was never loaded),
++  // so a texgen whose three post rows all read as identity needs no transform.
++  std::uint64_t identity[3] = {~0ull, ~0ull, ~0ull};
++  bool off = false; // XF 0x1012 written 0; GXInit writes 1
+ };
+ 
+ class RetailGxFrontend {
+@@ -144,6 +161,7 @@ private:
+   bool display_copy_stopped_ = false;
+ 
+   DolGxRecompState state_{};
++  PostTexMatrices post_tex_{};
+   std::vector<std::uint8_t> fifo_buffer_;
+   // Raw per-vertex payload bytes for each parsed draw, in trace order. Popped in
+   // lockstep as Draw events are emitted (emit_new_packets) so each Draw packet
+diff --git a/GXRuntime/graphics/frontend/src/render_sink.cpp b/GXRuntime/graphics/frontend/src/render_sink.cpp
+index af2e63b7..1752b41c 100644
+--- a/GXRuntime/graphics/frontend/src/render_sink.cpp
++++ b/GXRuntime/graphics/frontend/src/render_sink.cpp
+@@ -259,6 +259,12 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+                 sizeof(draw.tex_matrix_word_mask));
+     std::memcpy(draw.xf_regs, packet.draw.xf_regs, sizeof(draw.xf_regs));
+     draw.xf_reg_mask = packet.draw.xf_reg_mask;
++    draw.post_tex_mask = packet.draw.post_tex_mask;
++    draw.post_tex_normalize = packet.draw.post_tex_normalize;
++    for (std::uint32_t i = 0; i < 8u; ++i)
++      if ((draw.post_tex_mask & (1u << i)) != 0u)
++        std::memcpy(draw.post_tex_rows[i], packet.draw.post_tex_rows[i],
++                    sizeof(draw.post_tex_rows[i]));
+     back_assembled_ = false; // the just-placed draw is not yet assembled
+     // Retain the draw's raw per-vertex bytes (valid only during this call) so an
+     // issuing sink can assemble vertices after submit.
+diff --git a/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp b/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
+index 1d15a452..4bdc62ef 100644
+--- a/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
++++ b/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
+@@ -248,6 +248,91 @@ std::uint32_t payload_pn_matrix_mask(const DolGxRecompState& state,
+   return mask;
+ }
+ 
++constexpr std::uint32_t kXfDualTex = 0x1012u;
++constexpr std::uint32_t kXfPostMatrixBase = 0x500u;
++constexpr std::uint32_t kXfPostMatrixEnd = 0x600u;
++constexpr std::uint32_t kPtIdentityRow = 61u; // GX_PTIDENTITY - GX_PTTEXMTX0
++
++// An XF load's words that land on the dual-texture switch (0x1012) or the
++// post-transform matrix memory (0x500..0x5FF). Wind Waker's lava is the one
++// user of a post matrix that is not the identity: its pattern and its colour
++// ramp are both projected through one (d_magma.cpp).
++void capture_post_tex(PostTexMatrices& post, std::uint32_t base,
++                      std::uint32_t count, const std::uint8_t* data_be) {
++  const std::span<const std::uint8_t> data(data_be, count * 4u);
++  const std::uint32_t last = base + count - 1u;
++  if (base <= kXfDualTex && last >= kXfDualTex)
++    post.off = (read_be32(data, (kXfDualTex - base) * 4u) & 1u) == 0u;
++  if (last < kXfPostMatrixBase || base >= kXfPostMatrixEnd)
++    return;
++  const std::uint32_t first = base > kXfPostMatrixBase ? base : kXfPostMatrixBase;
++  const std::uint32_t end = last < kXfPostMatrixEnd - 1u ? last : kXfPostMatrixEnd - 1u;
++  for (std::uint32_t address = first; address <= end; ++address) {
++    const std::uint32_t bits = read_be32(data, (address - base) * 4u);
++    const std::uint32_t row = (address - kXfPostMatrixBase) / 4u;
++    std::memcpy(&post.rows[row][(address - kXfPostMatrixBase) % 4u], &bits,
++                sizeof bits);
++    post.written |= 1ull << row;
++  }
++  for (std::uint32_t row = (first - kXfPostMatrixBase) / 4u;
++       row <= (end - kXfPostMatrixBase) / 4u; ++row) {
++    const float* r = post.rows[row];
++    for (std::uint32_t k = 0; k < 3u; ++k) {
++      const bool is_identity = r[0] == (k == 0u ? 1.f : 0.f) &&
++                               r[1] == (k == 1u ? 1.f : 0.f) &&
++                               r[2] == (k == 2u ? 1.f : 0.f) && r[3] == 0.f;
++      if (is_identity)
++        post.identity[k] |= 1ull << row;
++      else
++        post.identity[k] &= ~(1ull << row);
++    }
++  }
++}
++
++// The post transform of each regular texgen at draw time: nothing for the
++// usual identity (GXSetTexCoordGen's GX_PTIDENTITY), else its three rows.
++void snapshot_post_tex(DrawTransformSnapshot& out,
++                       const DolGxRecompState& state,
++                       const PostTexMatrices& post) {
++  out.post_tex_mask = 0u;
++  out.post_tex_normalize = 0u;
++  if (post.off)
++    return;
++  constexpr std::uint32_t kNumTexGens = 0x103Fu - DOL_GX_XF_REG_WINDOW_BASE;
++  std::uint32_t num = 8u;
++  if ((state.xf_reg_mask & (1ull << kNumTexGens)) != 0u &&
++      (state.xf_regs[kNumTexGens] & 0xFu) < num)
++    num = state.xf_regs[kNumTexGens] & 0xFu;
++  for (std::uint32_t i = 0; i < num; ++i) {
++    const std::uint32_t info = 0x1040u - DOL_GX_XF_REG_WINDOW_BASE + i;
++    if ((state.xf_reg_mask & (1ull << info)) != 0u &&
++        ((state.xf_regs[info] >> 4u) & 7u) != 0u)
++      continue; // only regular (matrix) texgens are post-transformed
++    const std::uint32_t reg = 0x1050u - DOL_GX_XF_REG_WINDOW_BASE + i;
++    const std::uint32_t post_info =
++        (state.xf_reg_mask & (1ull << reg)) != 0u ? state.xf_regs[reg] : kPtIdentityRow;
++    const std::uint32_t rows[3] = {post_info & 0x3Fu, (post_info + 1u) & 0x3Fu,
++                                   (post_info + 2u) & 0x3Fu};
++    const bool normalize = ((post_info >> 8u) & 1u) != 0u;
++    if (!normalize && ((post.identity[0] >> rows[0]) & 1u) != 0u &&
++        ((post.identity[1] >> rows[1]) & 1u) != 0u &&
++        ((post.identity[2] >> rows[2]) & 1u) != 0u)
++      continue;
++    out.post_tex_mask |= static_cast<std::uint8_t>(1u << i);
++    if (normalize)
++      out.post_tex_normalize |= static_cast<std::uint8_t>(1u << i);
++    for (std::uint32_t k = 0; k < 3u; ++k) {
++      float* dst = &out.post_tex_rows[i][4u * k];
++      if ((post.written & (1ull << rows[k])) != 0u) {
++        std::memcpy(dst, post.rows[rows[k]], 4u * sizeof(float));
++      } else {
++        dst[0] = dst[1] = dst[2] = dst[3] = 0.f;
++        dst[k] = 1.f;
++      }
++    }
++  }
++}
++
+ // Fills a queue slot in place. Every field is written (the arrays by a copy or,
+ // for an invalid position matrix, a zero of that slot), so a reused slot reads
+ // exactly as a value-initialized one would, without zeroing 2.3 KB first and
+@@ -255,6 +340,7 @@ std::uint32_t payload_pn_matrix_mask(const DolGxRecompState& state,
+ // memmoves on the GX worker, about 18,000 draws a frame in heavy scenes).
+ void snapshot_transform_into(DrawTransformSnapshot& out,
+                              const DolGxRecompState& state,
++                             const PostTexMatrices& post,
+                              const DolGxRecompVertexLayout& layout,
+                              std::span<const std::uint8_t> vertex_data,
+                              std::uint16_t vertex_count) {
+@@ -301,6 +387,7 @@ void snapshot_transform_into(DrawTransformSnapshot& out,
+               sizeof(out.tex_matrix_word_mask));
+   std::memcpy(out.xf_regs, state.xf_regs, sizeof(out.xf_regs));
+   out.xf_reg_mask = state.xf_reg_mask;
++  snapshot_post_tex(out, state, post);
+ }
+ 
+ } // namespace
+@@ -313,6 +400,7 @@ RetailGxFrontend::RetailGxFrontend(const DolGuestAddressResolver& resolver) {
+ 
+ void RetailGxFrontend::reset(const DolGuestAddressResolver* resolver) {
+   dol_gx_recomp_init(&state_, resolver);
++  post_tex_ = PostTexMatrices{};
+   fifo_buffer_.clear();
+   draw_payload_queue_.clear();
+   draw_transform_queue_.clear();
+@@ -659,6 +747,7 @@ bool RetailGxFrontend::parse_stream(std::span<const std::uint8_t> bytes,
+       // viewport/projection registers if this load covers them (transform-diff).
+       dol_gx_recomp_capture_xf_transform(&state_, base, count,
+                                          bytes.data() + pos + 5u);
++      capture_post_tex(post_tex_, base, count, bytes.data() + pos + 5u);
+       pos += command_size;
+       continue;
+     }
+@@ -689,6 +778,9 @@ bool RetailGxFrontend::parse_stream(std::span<const std::uint8_t> bytes,
+           &state_, base, count,
+           static_cast<const std::uint8_t*>(array.range.data) +
+               index * state_.arrays[attr].stride);
++      capture_post_tex(post_tex_, base, count,
++                       static_cast<const std::uint8_t*>(array.range.data) +
++                           index * state_.arrays[attr].stride);
+       if (!dol_gx_recomp_note_xf_load(&state_, base, count))
+         return false;
+       // `dol_gx_recomp_note_xf_load` records the generic XF event; retain the
+@@ -1055,7 +1147,7 @@ bool RetailGxFrontend::handle_draw(std::uint8_t command,
+     draw_payload_queue_[draw_queue_count_].assign(vertex_data.begin(),
+                                                   vertex_data.end());
+     snapshot_transform_into(draw_transform_queue_[draw_queue_count_], state_,
+-                            *layout, vertex_data, vertex_count);
++                            post_tex_, *layout, vertex_data, vertex_count);
+     ++draw_queue_count_;
+   }
+ 
+@@ -1177,6 +1269,12 @@ bool RetailGxFrontend::emit_new_packets(AuroraRenderSink& sink,
+       std::memcpy(packet.draw.xf_regs, transform.xf_regs,
+                   sizeof(packet.draw.xf_regs));
+       packet.draw.xf_reg_mask = transform.xf_reg_mask;
++      packet.draw.post_tex_mask = transform.post_tex_mask;
++      packet.draw.post_tex_normalize = transform.post_tex_normalize;
++      for (std::uint32_t i = 0; i < 8u; ++i)
++        if ((transform.post_tex_mask & (1u << i)) != 0u)
++          std::memcpy(packet.draw.post_tex_rows[i], transform.post_tex_rows[i],
++                      sizeof(packet.draw.post_tex_rows[i]));
+     }
+     if (!sink.submit_packet(packet))
+       return false;
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore.cpp b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+index c6eadd3f..c12e610f 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+@@ -1560,6 +1560,27 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+       identity_rows(rows);
+       ++counters.unresolved_tex_matrix;
+     }
++    // Dual-texture post transform (XF 0x1012, on since GXInit): the texture
++    // matrix's result goes through a second matrix from post-transform memory
++    // (Dolphin VertexShaderGen WriteTexCoordTransforms). Without normalization
++    // the two are one 3x4 matrix, folded here so the shader is unchanged:
++    // coord.w is 1, so each post row's w joins the fourth column, and a
++    // two-row (ST) texgen's third coordinate is the constant 1. The lava's
++    // pattern and colour ramp are projected this way (d_magma.cpp).
++    if ((draw.post_tex_mask & (1u << i)) != 0u &&
++        (draw.post_tex_normalize & (1u << i)) == 0u) {
++      const float* p = draw.post_tex_rows[i];
++      const bool stq = key.tex_gens[i].projection != 0u;
++      float folded[3][4];
++      for (std::uint32_t r = 0; r < 3u; ++r) {
++        const float* pr = p + 4u * r;
++        for (std::uint32_t col = 0; col < 4u; ++col)
++          folded[r][col] = pr[0] * rows[0][col] + pr[1] * rows[1][col] +
++                           (stq ? pr[2] * rows[2][col] : 0.f);
++        folded[r][3] += pr[3] + (stq ? 0.f : pr[2]);
++      }
++      std::memcpy(rows, folded, sizeof rows);
++    }
+     for (std::uint32_t k = 0; k < 3u; ++k)
+       std::memcpy(c.texmatrices[3u * i + k], rows[k], sizeof rows[k]);
+     if (i < kMaxTexGens)
+diff --git a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+index 408ae31d..4dbadc97 100644
+--- a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
++++ b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+@@ -780,6 +780,82 @@ void test_fifth_texgen_plan_decode() {
+   CHECK((texidx_hi & 0xFFu) == 33u);
+ }
+ 
++// The dual-texture post transform is folded into a regular texgen's matrix
++// rows: post * (texmtx * coord) for a three-row (STQ) texgen, and post *
++// (s, t, 1) for a two-row (ST) one. The lava (d_magma.cpp) uses it.
++void test_post_tex_matrix_fold() {
++  for (const bool stq : {true, false}) {
++    gxc::GxCoreState state;
++    state.reset();
++    state.apply(bp(0x00u, 1u));
++    state.apply({.kind = ar::RenderStateKind::CpVcd,
++                 .index = 0u,
++                 .value = 1u << 9u}); // position direct
++    state.apply({.kind = ar::RenderStateKind::CpVcd, .index = 1u, .value = 0u});
++    state.apply({.kind = ar::RenderStateKind::CpVat,
++                 .index = 0u,
++                 .value = 1u | (4u << 1u),
++                 .aux0 = 0u});
++    state.apply({.kind = ar::RenderStateKind::CpVat, .index = 0u, .value = 0u, .aux0 = 1u});
++    state.apply({.kind = ar::RenderStateKind::CpVat, .index = 0u, .value = 0u, .aux0 = 2u});
++
++    ar::ConsumedDraw draw{};
++    draw.primitive = 0x80u;
++    draw.vertex_count = 4u;
++    draw.vertex_size = 12u;
++    constexpr float vertices[4][3] = {
++        {-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}};
++    for (const auto& vertex : vertices)
++      for (float value : vertex)
++        append_be_f32(draw.vertex_payload, value);
++    draw.transform_flags = ar::kDrawTransformProjectionValid;
++    draw.projection[0] = 1.f;
++    draw.projection[2] = 1.f;
++    draw.projection[4] = -1.f;
++    draw.projection_type = 1u;
++    draw.position_matrix_valid_mask = 1u;
++    draw.position_matrices[0][0] = 1.f;
++    draw.position_matrices[0][5] = 1.f;
++    draw.position_matrices[0][10] = 1.f;
++
++    draw.xf_regs[0] = 30u << 6u; // texgen 0 from GX_TEXMTX0 (row 30)
++    draw.xf_regs[0x27] = 1u;
++    // Regular, position source (row 0), ABC1; MTX3x4 sets the projection bit.
++    draw.xf_regs[0x28] = (stq ? 1u << 1u : 0u) | (1u << 2u);
++    draw.xf_reg_mask = (1ull << 0u) | (1ull << 0x27u) | (1ull << 0x28u);
++    const float tex[12] = {2.f, 0.f, 0.f, 0.5f, 0.f, 3.f, 0.f, 0.25f,
++                           0.f, 0.f, 4.f, 1.f};
++    std::memcpy(draw.tex_matrices[0], tex, sizeof tex);
++    draw.tex_matrix_word_mask[0] = 0xFFFu;
++    const float post[12] = {0.5f, 0.f, 2.f, 0.125f, 0.f, 0.25f, 0.f, 0.5f,
++                            0.f, 0.f, 1.f, 0.f};
++    draw.post_tex_mask = 1u;
++    std::memcpy(draw.post_tex_rows[0], post, sizeof post);
++
++    gxc::GapCounters gaps;
++    const gxc::DrawPlan plan = state.build_draw_plan(draw, gaps);
++    CHECK(plan.ok);
++    CHECK(plan.pipeline.shader.tex_gens[0].projection == (stq ? 1u : 0u));
++    const float(*m)[4] = plan.constants.texmatrices;
++    // Row 0: 0.5 * tex row 0, plus 2 * tex row 2 (STQ) or 2 * the constant 1
++    // (ST), plus the post row's w.
++    CHECK(m[0][0] == 1.f);
++    CHECK(m[0][2] == (stq ? 8.f : 0.f));
++    CHECK(m[0][3] == (stq ? 0.25f + 2.f + 0.125f : 0.25f + 2.f + 0.125f));
++    CHECK(m[1][1] == 0.75f);
++    CHECK(m[1][3] == 0.0625f + 0.5f);
++    CHECK(m[2][2] == (stq ? 4.f : 0.f));
++    CHECK(m[2][3] == (stq ? 1.f : 1.f));
++
++    // Without the mask bit (the identity post matrix) the rows are the
++    // texture matrix's.
++    draw.post_tex_mask = 0u;
++    const gxc::DrawPlan plain = state.build_draw_plan(draw, gaps);
++    CHECK(plain.constants.texmatrices[0][0] == 2.f);
++    CHECK(plain.constants.texmatrices[0][3] == 0.5f);
++  }
++}
++
+ // Item 5: Emboss texgen (Dolphin VertexShaderGen) adds the view-space light dir
+ // projected onto tangent/binormal to the emboss-source texgen's coords. Needs
+ // the lights uniform + NBT vertex inputs even on an unlit draw.
+@@ -1926,6 +2002,7 @@ int main() {
+   test_texgen_normal_source();
+   test_five_texgens();
+   test_fifth_texgen_plan_decode();
++  test_post_tex_matrix_fold();
+   test_texgen_emboss();
+   test_texgen_per_vertex_mtx();
+   test_tev_indirect_matrix();
+-- 
+2.45.2.windows.1

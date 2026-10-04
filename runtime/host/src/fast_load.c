@@ -71,11 +71,16 @@ static unsigned long long g_retrace;
 static unsigned long long g_cpu_us;
 static unsigned long long g_wall_us;
 
-// BLUEWAKE_TEST_WARP=retrace:stage:room:point[:layer] (testing only): asks the
-// game for that scene change at that retrace, as a door or an exit does.
-static unsigned long long g_warp_retrace;
-static char g_warp_stage[8];
-static int g_warp_room, g_warp_point, g_warp_layer = -1;
+// BLUEWAKE_TEST_WARP=retrace:stage:room:point[:layer][,...] (testing only): asks
+// the game for that scene change at that retrace, as a door or an exit does;
+// up to 32, in order (a tour of places: the optimization training, shaders).
+typedef struct TestWarp {
+    unsigned long long retrace;
+    char stage[8];
+    int room, point, layer;
+} TestWarp;
+static TestWarp g_warps[32];
+static unsigned g_warp_count, g_warp_next;
 
 static unsigned long long now_us(clockid_t clock) {
     struct timespec ts;
@@ -99,29 +104,37 @@ void bluewake_fast_load_attach(CPUState* cpu) {
     bluewake_fast_load_reload();
     const char* trace = getenv("BLUEWAKE_LOAD_TRACE");
     g_trace = trace != NULL && trace[0] == '1';
-    const char* warp = getenv("BLUEWAKE_TEST_WARP");
-    if (warp != NULL && warp[0] != '\0') {
+    g_warp_count = g_warp_next = 0;
+    for (const char* at = getenv("BLUEWAKE_TEST_WARP"); at != NULL && *at != '\0' && g_warp_count < 32u;) {
+        TestWarp* w = &g_warps[g_warp_count];
         char stage[16] = "";
-        if (sscanf(warp, "%llu:%15[^:]:%d:%d:%d", &g_warp_retrace, stage, &g_warp_room, &g_warp_point,
-                   &g_warp_layer) >= 4) {
-            snprintf(g_warp_stage, sizeof g_warp_stage, "%s", stage);
-            g_trace = true;
-        } else {
-            g_warp_retrace = 0;
-        }
+        w->layer = -1;
+        if (sscanf(at, "%llu:%15[^:]:%d:%d:%d", &w->retrace, stage, &w->room, &w->point, &w->layer) < 4)
+            break;
+        // A layer is the fifth field only within this entry.
+        const char* end = strchr(at, ',');
+        int fields = 0;
+        for (const char* c = at; *c != '\0' && c != end; ++c)
+            fields += *c == ':';
+        if (fields < 4)
+            w->layer = -1;
+        snprintf(w->stage, sizeof w->stage, "%s", stage);
+        g_warp_count++;
+        g_trace = true;
+        at = end != NULL ? end + 1 : NULL;
     }
 }
 
-static void warp(CPUState* cpu) {
+static void warp(CPUState* cpu, const TestWarp* w) {
     for (u32 i = 0; i < 8u; ++i)
-        mem_write8(cpu, kNextStage + i, (u8)g_warp_stage[i]);
-    mem_write16(cpu, kNextStage + 0x8u, (u16)g_warp_point);
-    mem_write8(cpu, kNextStage + 0xAu, (u8)g_warp_room);
-    mem_write8(cpu, kNextStage + 0xBu, (u8)g_warp_layer);
+        mem_write8(cpu, kNextStage + i, (u8)w->stage[i]);
+    mem_write16(cpu, kNextStage + 0x8u, (u16)w->point);
+    mem_write8(cpu, kNextStage + 0xAu, (u8)w->room);
+    mem_write8(cpu, kNextStage + 0xBu, (u8)w->layer);
     mem_write8(cpu, kNextStage + 0xDu, 0u); // wipe 0: the plain fade
     mem_write8(cpu, kNextStage + 0xCu, 1u); // enable
-    fprintf(stderr, "[load] test warp retrace=%llu to %s room %d point %d layer %d\n", g_retrace, g_warp_stage,
-            g_warp_room, g_warp_point, g_warp_layer);
+    fprintf(stderr, "[load] test warp retrace=%llu to %s room %d point %d layer %d\n", g_retrace, w->stage,
+            w->room, w->point, w->layer);
 }
 
 // Shortens a plain fade the game has just started (the fader at its 26 frames).
@@ -158,8 +171,11 @@ void bluewake_fast_load_retrace(unsigned long long cpu_us) {
     CPUState* cpu = g_cpu;
     if (cpu == NULL)
         return;
-    if (g_warp_retrace != 0u && g_retrace == g_warp_retrace)
-        warp(cpu);
+    while (g_warp_next < g_warp_count && g_retrace >= g_warps[g_warp_next].retrace) {
+        if (g_retrace == g_warps[g_warp_next].retrace)
+            warp(cpu, &g_warps[g_warp_next]);
+        g_warp_next++;
+    }
     const u32 overlap = mem_read32(cpu, kOverlap);
     if (g_fade_frames != 0u && guest_pointer(overlap))
         shorten_fade(cpu, overlap);

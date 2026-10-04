@@ -1,7 +1,11 @@
 ---
 name: Bug report
-about: Report a build failure or an issue while playing
+about: Wind Waker Recomp is moving to BlueWake. Please report it at github.com/chrissotraidis/bluewake/issues
 ---
+
+> **Wind Waker Recomp is moving to BlueWake.** Please open this report on
+> [BlueWake](https://github.com/chrissotraidis/bluewake/issues/new/choose) instead. Reports opened here
+> will be moved there.
 
 ## What happened?
 

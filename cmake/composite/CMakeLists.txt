@@ -70,6 +70,12 @@ add_library(${MODULE_NAME} SHARED
   native_j3d.c
   # Certified game math entry hooks (scripts/windows/native_game_math.py).
   native_game_math.c
+  # Certified native entries, the second set (scripts/windows/native_entries.py).
+  native_fifo.c
+  native_bg.c
+  native_mtxcalc.c
+  # Certified native entries, the third set: the actor search by name.
+  native_search.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c
@@ -210,6 +216,22 @@ else()
   target_link_libraries(${MODULE_NAME} PRIVATE m)
 endif()
 target_compile_options(${MODULE_NAME} PRIVATE -O${COMPOSITE_OPTIMIZATION_LEVEL} -ffp-contract=off)
+
+# The builder's --tiered: chunks the optimization training never ran, one
+# composite-relative path a line, compiled at -O1 without GVN's memory
+# dependence analysis instead of -O2 (scripts/windows/build.py cold_sources).
+set(COMPOSITE_COLD_SOURCES_FILE "" CACHE FILEPATH "Chunks compiled at O1 when the target uses O2")
+if(COMPOSITE_OPTIMIZATION_LEVEL STREQUAL "2" AND COMPOSITE_COLD_SOURCES_FILE)
+  file(STRINGS "${COMPOSITE_COLD_SOURCES_FILE}" COLD_SOURCES)
+  list(LENGTH COLD_SOURCES COLD_COUNT)
+  foreach(COLD_SOURCE IN LISTS COLD_SOURCES)
+    set(COLD_PATH "${COMPOSITE_DIR}/${COLD_SOURCE}")
+    if(EXISTS "${COLD_PATH}")
+      set_property(SOURCE "${COLD_PATH}" APPEND PROPERTY COMPILE_OPTIONS -O1 -mllvm -enable-gvn-memdep=false)
+    endif()
+  endforeach()
+  message(STATUS "Tiered: ${COLD_COUNT} cold chunks at O1")
+endif()
 
 if(COMPOSITE_OPTIMIZATION_LEVEL STREQUAL "2")
   foreach(FALLBACK_SOURCE IN LISTS COMPOSITE_O1_FALLBACK_SOURCES)

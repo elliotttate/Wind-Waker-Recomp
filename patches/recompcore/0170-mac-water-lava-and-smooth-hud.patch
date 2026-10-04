@@ -1,0 +1,1293 @@
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+index 331d581421263e80ab04c22542c0bf7d59e9d08e..d57ae1e508dfaa2df5fb95a61fdc8257556dc172 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+@@ -75,17 +75,23 @@ struct Record {
+   uint32_t positions;
+   uint32_t positionCount;
+   uint32_t age;
++  uint32_t texcoords = kNoSamples;
++  uint8_t texcoordMask = 0;
++  std::array<float, 2> screenExtent{};
++  bool screenConsumed = false;
+ };
+ struct FrameRecords {
+   std::vector<gxc::VertexShaderConstants> pool;
+   std::vector<Record> records;
+   std::vector<VertexSamples> samples;
+   std::vector<float> positions; // x, y, z per vertex
++  std::vector<float> texcoords;
+   void clear() {
+     pool.clear();
+     records.clear();
+     samples.clear();
+     positions.clear();
++    texcoords.clear();
+   }
+ };
+ 
+@@ -94,6 +100,8 @@ constexpr uint32_t kMaxBlendedVertices = 1024;
+ // blend_draw()'s in-between positions for its draw (x, y, z per vertex), per step.
+ std::vector<float> g_blendedPositions[kMaxSteps];
+ bool g_haveBlendedPositions = false;
++std::vector<float> g_blendedTexcoords[kMaxSteps];
++uint8_t g_blendedTexcoordMask = 0;
+ 
+ FrameRecords g_frames[2];
+ unsigned g_current = 0;
+@@ -1236,7 +1244,10 @@ bool blend_positions(const float* before, const float* now, uint32_t count, cons
+     for (int k = 0; k < 3; ++k) {
+       const double q = q0[k] + (q1[k] - q0[k]) * t;
+       out[i * 3u + k] = static_cast<float>(q);
+-      moves = moves || std::fabs(q - p1[k]) > 1e-3 * (1.0 + std::fabs(p1[k]));
++      // World coordinates can be hundreds of thousands of units: a relative
++      // tolerance of .1% discarded visible wave and model motion there.
++      const double tolerance = tagged ? 1e-3 * (1.0 + std::fabs(p1[k])) : 1e-3 + 2e-7 * std::fabs(p1[k]);
++      moves = moves || std::fabs(q - p1[k]) > tolerance;
+     }
+   }
+   return moves;
+@@ -1259,10 +1270,16 @@ void log_counts() {
+ bool enabled() noexcept { return g_enabled.load(std::memory_order_relaxed); }
+ void set_enabled(bool enabled) noexcept { g_enabled.store(enabled, std::memory_order_relaxed); }
+ 
++static bool screen_space_sprite(const gxc::DrawPlan& plan) noexcept {
++  return plan.match_direct_position && plan.constants.projection[3][2] == 0.f &&
++         !plan.pipeline.depth_test && !plan.pipeline.depth_update;
++}
++
+ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+   if (plan.match_payload == nullptr || plan.match_payload_size == 0)
+     return 0;
+-  if (plan.match_direct_position && plan.draw_scope_part != 0) {
++  const bool screenSpace = screen_space_sprite(plan);
++  if (!screenSpace && plan.match_direct_position && plan.draw_scope_part != 0) {
+     // One of the draws a wake's emitter makes (its fans and strips), by its
+     // place among them: its vertices are the wake's particles in order (see
+     // blend_positions()).
+@@ -1289,8 +1306,43 @@ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+     // New positions every frame: the same shape with the same texture, and
+     // for a particle the host tagged, that particle (see blend_positions()).
+     h = mix64(h ^ 0xD1u ^ (uint64_t(plan.tex_address) << 8) ^ (uint64_t(plan.texmap_mask) << 40));
+-    if (plan.draw_tag != 0)
++    if (screenSpace) {
++      // Keep atlas regions and vertex RGB tints (not fade alpha) distinct.
++      // Position and scale may animate, so those are compared as bounds by
++      // match_draw(). A particle tag left in GX state is not a UI identity.
++      h = mix64(h ^ 0x53435245454Eull);
++      const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
++      if (decoded == 0 || decoded > kMaxBlendedVertices)
++        return 0;
++      for (size_t v = 0; v < decoded; ++v) {
++        const float* vertex = plan.vertices.data() + v * gxc::kVertexFloats;
++        for (unsigned uv = 0; uv < plan.pipeline.shader.num_tex_gens && uv < gxc::kMaxTexGens; ++uv)
++          for (unsigned st = 0; st < 2; ++st)
++            h = mix64(h ^ std::bit_cast<uint32_t>(vertex[gxc::kVertexUvOffset / sizeof(float) + uv * 2 + st]));
++        for (unsigned rgb = 0; rgb < 3; ++rgb)
++          h = mix64(h ^ std::bit_cast<uint32_t>(vertex[gxc::kVertexColor0Offset / sizeof(float) + rgb]));
++      }
++    } else if (plan.draw_tag != 0) {
+       h = mix64(h ^ (uint64_t(plan.draw_tag) << 20) ^ 0x7A6u);
++    }
++    return h == 0 ? 1 : h;
++  }
++  if (blends_vertices(plan) && plan.match_position_size > 0 && plan.match_position_size <= 2 &&
++      plan.match_position_offset + plan.match_position_size <= plan.match_vertex_stride &&
++      plan.match_payload_size == plan.vertex_count * plan.match_vertex_stride) {
++    // CPU-deformed indexed meshes retain their vertex correspondence when
++    // direct UVs animate or the ocean grid follows the player. Frame-allocated
++    // position buffers change address, so use the material and topology;
++    // repeated meshes are paired by the existing copy-motion checks.
++    h = mix64(h ^ (uint64_t(plan.tex_address) << 32) ^
++              (uint64_t(plan.texmap_mask) << 24));
++    for (uint32_t v = 0; v < plan.vertex_count; ++v) {
++      const uint8_t* index = plan.match_payload + v * plan.match_vertex_stride + plan.match_position_offset;
++      uint32_t value = index[0];
++      if (plan.match_position_size == 2)
++        value = (value << 8) | index[1];
++      h = (h ^ mix64(value)) * 0x9E3779B97F4A7C15ull;
++    }
+     return h == 0 ? 1 : h;
+   }
+   const uint8_t* bytes = plan.match_payload;
+@@ -1310,27 +1362,88 @@ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+ 
+ uint64_t draw_key(const gxc::DrawPlan& plan) noexcept { return draw_key_of(plan); }
+ 
++bool blends_vertices(const gxc::DrawPlan& plan) noexcept {
++  const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
++  return decoded > 0 && decoded <= kMaxBlendedVertices && !plan.pipeline.shader.has_pos_mtx_idx &&
++         (!plan.match_direct_position || plan.draw_tag != 0 || plan.draw_scope_part != 0 ||
++          screen_space_sprite(plan));
++}
++
+ void capture_draw(const gxc::DrawPlan& plan, DrawInput& out) noexcept {
+   out.key = draw_key_of(plan);
+   out.usedMatrixRows = used_matrix_rows(plan);
+   out.haveSamples = false;
+   out.positions.clear();
++  out.texcoords.clear();
++  out.texcoordMask = 0;
++  out.tagged = false;
+   out.age = 0;
++  out.screenSpace = screen_space_sprite(plan);
++  out.screenCenter = {};
++  out.screenExtent = {};
+   if (out.key == 0)
+     return;
+-  // Only the positions of particles the host tagged: an untagged draw of one
++  // Screen sprites and particles the host tagged: an untagged world draw of one
+   // shape is not the same points from one frame to the next (the boat's
+   // shadow is cast on the sea's triangles under it, a different list as it
+   // moves), and blending one list toward the other drew the shadow torn.
+   const size_t decoded = plan.vertices.size() / gxc::kVertexFloats;
+   if (plan.match_direct_position) {
+-    if ((plan.draw_tag != 0 || plan.draw_scope_part != 0) && decoded > 0 && decoded <= kMaxBlendedVertices) {
++    if ((out.screenSpace || plan.draw_tag != 0 || plan.draw_scope_part != 0) && decoded > 0 &&
++        decoded <= kMaxBlendedVertices) {
+       out.positions.resize(decoded * 3u);
+       for (size_t i = 0; i < decoded; ++i)
+         std::memcpy(out.positions.data() + i * 3u,
+                     plan.vertices.data() + i * gxc::kVertexFloats + gxc::kVertexPosOffset / sizeof(float),
+                     sizeof(float) * 3);
+-      out.age = plan.draw_scope_part != 0 ? 0u : plan.draw_tag_age;
++      out.age = out.screenSpace || plan.draw_scope_part != 0 ? 0u : plan.draw_tag_age;
++      out.tagged = !out.screenSpace;
++      if (out.screenSpace) {
++        std::array<float, 2> low{INFINITY, INFINITY}, high{-INFINITY, -INFINITY};
++        for (size_t i = 0; i < decoded; ++i) {
++          const float* p = out.positions.data() + i * 3u;
++          for (unsigned r = 0; r < 2; ++r) {
++            const auto& m = plan.constants.posnormalmatrix[r];
++            const float value = m[0] * p[0] + m[1] * p[1] + m[2] * p[2] + m[3];
++            if (!std::isfinite(value)) {
++              out.key = 0;
++              out.positions.clear();
++              return;
++            }
++            low[r] = std::min(low[r], value);
++            high[r] = std::max(high[r], value);
++          }
++        }
++        for (unsigned r = 0; r < 2; ++r) {
++          out.screenCenter[r] = (low[r] + high[r]) * .5f;
++          out.screenExtent[r] = high[r] - low[r];
++        }
++      }
++    }
++    return;
++  }
++  // Indexed topology identifies the same vertices across frames. CPU-deformed
++  // meshes (water, cloth, CPU skinning) need each vertex blended: fitting a
++  // rigid transform to three samples pulls adjacent strips apart. Matrix-
++  // skinned models still interpolate their bones, without a second blend.
++  if (blends_vertices(plan)) {
++    out.positions.resize(decoded * 3u);
++    for (size_t i = 0; i < decoded; ++i)
++      std::memcpy(out.positions.data() + i * 3u,
++                  plan.vertices.data() + i * gxc::kVertexFloats + gxc::kVertexPosOffset / sizeof(float),
++                  sizeof(float) * 3);
++    out.texcoordMask = plan.match_direct_texcoord_mask & ((1u << gxc::kMaxTexGens) - 1u);
++    const size_t uvStride = 2u * std::popcount(out.texcoordMask);
++    out.texcoords.resize(decoded * uvStride);
++    for (size_t v = 0; v < decoded; ++v) {
++      size_t at = v * uvStride;
++      for (unsigned uv = 0; uv < gxc::kMaxTexGens; ++uv)
++        if ((out.texcoordMask >> uv) & 1u) {
++          std::memcpy(out.texcoords.data() + at,
++                      plan.vertices.data() + v * gxc::kVertexFloats + gxc::kVertexUvOffset / sizeof(float) + uv * 2u,
++                      sizeof(float) * 2);
++          at += 2;
++        }
+     }
+     return;
+   }
+@@ -1364,7 +1477,7 @@ uint64_t used_matrix_rows(const gxc::DrawPlan& plan) noexcept {
+ 
+ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedMatrixRows,
+                                                    const gxc::VertexShaderConstants& current, bool repeatsLastDraw,
+-                                                   const VertexSamples* samples) {
++                                                   const VertexSamples* samples, const DrawInput* screenSprite) {
+   g_outcome = "no key";
+   g_blendRepeated = false;
+   const uint64_t serial = ++g_drawSerial;
+@@ -1414,6 +1527,13 @@ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedM
+   }
+   frame.records.push_back(
+       {key, constantsIndex, samplesIndex, {here[0][3], here[1][3], here[2][3]}, false, kNoSamples, 0, g_currentAge});
++  if (screenSprite != nullptr) {
++    auto& record = frame.records.back();
++    for (unsigned r = 0; r < 2; ++r)
++      record.position[r] = screenSprite->screenCenter[r];
++    record.position[2] = 0.f;
++    record.screenExtent = screenSprite->screenExtent;
++  }
+   ++g_frameCounts.draws;
+   KeyState& state = g_keys[key];
+   const uint32_t occurrence = state.occurrence++;
+@@ -1469,6 +1589,65 @@ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedM
+     return copy == 0 && movedPrevious != nullptr ? *movedPrevious : previousFrame.pool[copies[copy].constants];
+   };
+   const size_t candidates = static_cast<size_t>(range.second - range.first);
++  if (screenSprite != nullptr) {
++    // The nearest matching screen rectangle, consumed once. Occurrence can
++    // change when a counter reuses a glyph or a heart adds an animated copy.
++    // A newly visible digit must not borrow a distant rupee/heart sprite.
++    size_t best = candidates;
++    double score = HUGE_VAL;
++    for (size_t i = 0; i < candidates; ++i) {
++      if (copies[i].screenConsumed)
++        continue;
++      const double width = std::min(screenSprite->screenExtent[0], copies[i].screenExtent[0]);
++      const double height = std::min(screenSprite->screenExtent[1], copies[i].screenExtent[1]);
++      if (!(width > 0.0 && height > 0.0))
++        continue;
++      const double reach = std::max(2.0, 0.2 * std::min(width, height));
++      const double dx = screenSprite->screenCenter[0] - copies[i].position[0];
++      const double dy = screenSprite->screenCenter[1] - copies[i].position[1];
++      const double distance = dx * dx + dy * dy;
++      if (distance > reach * reach || !plausible(current, constantsOf(i), usedMatrixRows, kOwnTurnLimit))
++        continue;
++      const double dw = screenSprite->screenExtent[0] - copies[i].screenExtent[0];
++      const double dh = screenSprite->screenExtent[1] - copies[i].screenExtent[1];
++      const double candidateScore = distance + .05 * (dw * dw + dh * dh);
++      if (candidateScore < score) {
++        best = i;
++        score = candidateScore;
++      }
++    }
++    if (best == candidates) {
++      ++g_frameCounts.rejected;
++      g_outcome = "screen sprite new or discontinuous";
++      return nullptr;
++    }
++    range.first[best].screenConsumed = true;
++    const auto& previous = constantsOf(best);
++    g_match = {&copies[best], &previous, nullptr};
++    ++g_frameCounts.matched;
++    if (repeat(BlendPath::Main, &previous, nullptr)) {
++      if (g_lastBlend.identical) {
++        ++g_frameCounts.identical;
++        g_outcome = "screen sprite identical";
++        return nullptr;
++      }
++      ++g_frameCounts.blended;
++      g_outcome = "screen sprite blended";
++      g_blendRepeated = true;
++      return &g_blended[0];
++    }
++    g_lastBlend.identical = std::memcmp(&previous, &current, sizeof(current)) == 0;
++    if (g_lastBlend.identical) {
++      ++g_frameCounts.identical;
++      g_outcome = "screen sprite identical";
++      return nullptr;
++    }
++    for (int step = 0; step < g_frameSteps; ++step)
++      blend(previous, current, float(step_weight(step)), g_blended[step], usedMatrixRows);
++    ++g_frameCounts.blended;
++    g_outcome = "screen sprite blended";
++    return &g_blended[0];
++  }
+   const double turnLimit = candidates == 1 && occurrence == 0 ? kOwnTurnLimit : kTurnLimit;
+   const gxc::VertexShaderConstants* previous = nullptr;
+   size_t chosen = 0; // previous's copy
+@@ -1737,15 +1916,17 @@ static const gxc::VertexShaderConstants* match_draw(uint64_t key, uint64_t usedM
+ const gxc::VertexShaderConstants* blend_draw(const DrawInput& input, const gxc::VertexShaderConstants& current,
+                                              bool repeatsLastDraw) {
+   g_haveBlendedPositions = false;
++  g_blendedTexcoordMask = 0;
+   g_match = {};
+   const bool havePositions = !input.positions.empty();
+   const uint32_t count = static_cast<uint32_t>(input.positions.size() / 3u);
+-  g_currentTagged = havePositions;
+-  g_currentAge = havePositions ? input.age : 0u;
++  g_currentTagged = input.tagged;
++  g_currentAge = input.tagged ? input.age : 0u;
+   FrameRecords& frame = g_frames[g_current];
+   const size_t recorded = frame.records.size();
+   const gxc::VertexShaderConstants* result = match_draw(input.key, input.usedMatrixRows, current, repeatsLastDraw,
+-                                                        input.haveSamples ? &input.samples : nullptr);
++                                                        input.haveSamples ? &input.samples : nullptr,
++                                                        input.screenSpace ? &input : nullptr);
+   g_currentTagged = false;
+   g_currentAge = 0;
+   // A particle's positions: kept for the next frame, and blended when the
+@@ -1756,6 +1937,12 @@ const gxc::VertexShaderConstants* blend_draw(const DrawInput& input, const gxc::
+   record.positions = static_cast<uint32_t>(frame.positions.size() / 3u);
+   record.positionCount = count;
+   frame.positions.insert(frame.positions.end(), input.positions.begin(), input.positions.end());
++  const size_t uvStride = 2u * std::popcount(input.texcoordMask);
++  if (uvStride != 0 && input.texcoords.size() == count * uvStride) {
++    record.texcoords = static_cast<uint32_t>(frame.texcoords.size());
++    record.texcoordMask = input.texcoordMask;
++    frame.texcoords.insert(frame.texcoords.end(), input.texcoords.begin(), input.texcoords.end());
++  }
+   const Record* before = g_match.record;
+   if (before == nullptr || g_match.block == nullptr || before->positions == kNoSamples ||
+       before->positionCount != count)
+@@ -1763,21 +1950,68 @@ const gxc::VertexShaderConstants* blend_draw(const DrawInput& input, const gxc::
+   const FrameRecords& previousFrame = g_frames[g_current ^ 1u];
+   const float* now = frame.positions.data() + static_cast<size_t>(record.positions) * 3u;
+   const float* then = previousFrame.positions.data() + static_cast<size_t>(before->positions) * 3u;
++  // Static geometry already gets its camera motion from the matrix blend.
++  const bool staticPositions = !input.tagged &&
++      std::memcmp(then, now, static_cast<size_t>(count) * 3u * sizeof(float)) == 0;
+   // Each step's, through that step's in-between matrix; none unless every
+   // step's is plausible and one moves.
+   bool moves = false;
+-  for (int step = 0; step < g_frameSteps; ++step) {
++  for (int step = 0; !staticPositions && step < g_frameSteps; ++step) {
+     const float(*inBetween)[4] = result != nullptr ? g_blended[step].posnormalmatrix : current.posnormalmatrix;
+     const bool moved = blend_positions(then, now, count, g_match.block->posnormalmatrix, current.posnormalmatrix,
+-                                       g_match.motion, step, inBetween, step_weight(step), true,
++                                       g_match.motion, step, inBetween, step_weight(step), input.tagged,
+                                        g_blendedPositions[step]);
+     if (!moved && g_blendedPositions[step].size() != static_cast<size_t>(count) * 3u)
+       return result; // implausible
+     moves = moves || moved;
+   }
+   g_haveBlendedPositions = moves;
+-  if (g_haveBlendedPositions)
++  if (g_haveBlendedPositions) {
+     ++g_frameCounts.positions;
++    // UI geometry can animate without changing its uniform matrix. A menu
++    // consisting only of those sprites still needs its in-between frames.
++    if (input.screenSpace && result == nullptr)
++      ++g_frameCounts.blended;
++  }
++  // The ocean's grid follows the player. Using current-frame UVs on blended
++  // positions makes its texture slide in 30-Hz steps despite smooth waves.
++  // Only interpolate direct UVs with indexed vertex correspondence; particles
++  // and matrix-skinned geometry retain their existing paths.
++  if (record.texcoords != kNoSamples && before->texcoords != kNoSamples &&
++      before->texcoordMask == record.texcoordMask) {
++    const float* uv0 = previousFrame.texcoords.data() + before->texcoords;
++    const float* uv1 = frame.texcoords.data() + record.texcoords;
++    if (std::memcmp(uv0, uv1, count * uvStride * sizeof(float)) == 0)
++      return result;
++    bool uvMoves = false;
++    for (int step = 0; step < g_frameSteps; ++step)
++      g_blendedTexcoords[step].assign(uv1, uv1 + count * uvStride);
++    for (size_t channel = 0; channel < uvStride; channel += 2) {
++      bool continuous = true;
++      for (uint32_t v = 0; continuous && v < count; ++v)
++        for (unsigned st = 0; st < 2; ++st) {
++          const size_t at = v * uvStride + channel + st;
++          continuous = continuous && std::isfinite(uv0[at]) && std::isfinite(uv1[at]) &&
++                       std::fabs(uv1[at] - uv0[at]) <= .5f;
++        }
++      if (!continuous)
++        continue; // an atlas switch or wrap: keep this channel's current UVs
++      for (uint32_t v = 0; v < count; ++v)
++        for (unsigned st = 0; st < 2; ++st) {
++          const size_t at = v * uvStride + channel + st;
++          uvMoves = uvMoves || std::fabs(uv1[at] - uv0[at]) > 1e-7f * (1.f + std::fabs(uv1[at]));
++          for (int step = 0; step < g_frameSteps; ++step)
++            g_blendedTexcoords[step][at] = uv0[at] + (uv1[at] - uv0[at]) * float(step_weight(step));
++        }
++    }
++    if (uvMoves) {
++      g_blendedTexcoordMask = record.texcoordMask;
++      // UV-only animation still needs the frame to be interpolated even if
++      // every matrix is unchanged and match_draw() returned no uniform block.
++      if (result == nullptr)
++        ++g_frameCounts.blended;
++    }
++  }
+   return result;
+ }
+ 
+@@ -1793,6 +2027,11 @@ const float* blended_positions(int step) noexcept {
+   return g_haveBlendedPositions && step < g_frameSteps ? g_blendedPositions[step].data() : nullptr;
+ }
+ 
++const float* blended_texcoords(int step) noexcept {
++  return g_blendedTexcoordMask != 0 && step >= 0 && step < g_frameSteps ? g_blendedTexcoords[step].data() : nullptr;
++}
++uint8_t blended_texcoord_mask() noexcept { return g_blendedTexcoordMask; }
++
+ const gxc::VertexShaderConstants* blended_step(int step) noexcept {
+   return &g_blended[std::clamp(step, 0, kMaxSteps - 1)];
+ }
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+index 547a09d1f9cbfec91a195c8929cd23b0fa9ab571..971c592a0d3869a5f1a9407c09712bdab48652ef 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.hpp
+@@ -61,17 +61,28 @@ uint64_t used_matrix_rows(const gxruntime::gxcore::DrawPlan& plan) noexcept;
+ // What blend_draw() needs of a draw besides its constants, captured from its
+ // plan on the recording thread (the draw may be matched later, on another
+ // thread): its key and indexed matrix rows, three of its vertices (for a
+-// model the game skins on the CPU; see vertex_motion()), and a tagged
+-// particle's positions (x, y, z per decoded vertex) and age.
++// model the game skins on the CPU; see vertex_motion()), and stable indexed
++// meshes' or tagged particles' positions (x, y, z per decoded vertex).
+ struct DrawInput {
+   uint64_t key = 0;
+   uint64_t usedMatrixRows = 0;
+   bool haveSamples = false;
+   std::array<float, 9> samples{};
+   std::vector<float> positions;
++  // Direct UVs of indexed meshes, packed per vertex in mask-bit order.
++  std::vector<float> texcoords;
++  uint8_t texcoordMask = 0;
++  bool tagged = false;
+   uint32_t age = 0;
++  // A depth-disabled direct-position 2D sprite: match its transformed bounds
++  // rather than its occurrence among copies of one texture.
++  bool screenSpace = false;
++  std::array<float, 2> screenCenter{};
++  std::array<float, 2> screenExtent{};
+ };
+ void capture_draw(const gxruntime::gxcore::DrawPlan& plan, DrawInput& out) noexcept;
++// These draws need independent vertex ranges in each in-between frame.
++bool blends_vertices(const gxruntime::gxcore::DrawPlan& plan) noexcept;
+ 
+ // Once per submitted gxcore draw, in draw order, on one thread at a time.
+ // Returns the constants the draw uses in the in-between frame, or nullptr
+@@ -95,6 +106,10 @@ const gxruntime::gxcore::VertexShaderConstants* blended_step(int step) noexcept;
+ // trail): after blend_draw(), a step's in-between positions (x, y, z per
+ // decoded vertex), valid until the next call, or nullptr when it draws its own.
+ const float* blended_positions(int step = 0) noexcept;
++// A matched indexed mesh's direct UVs, packed in mask-bit order, or nullptr.
++// Their mask and data remain valid until the next blend_draw().
++const float* blended_texcoords(int step = 0) noexcept;
++uint8_t blended_texcoord_mask() noexcept;
+ 
+ // Whether the last blend_draw() returned the same in-between block as the call
+ // before it (its bytes unchanged), so the caller need not compare them.
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index a6203f1e5c3ca159d050ace8cc480f0cefe4af5c..b857a6525c67835ad42a7552af7fd2127f6792e5 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -1059,15 +1059,25 @@ struct InterpJob {
+   gxc::VertexShaderConstants constants;
+ };
+ 
+-// A particle's in-between vertices: its own, with the blended positions, in
+-// the in-between vertex area of `slot`.
++// A draw's in-between vertices: replace its blended positions and direct UVs
++// while preserving all other attributes in the current vertex stream.
+ Range push_blended_vertices(size_t slot, const std::vector<float>& vertices, const float* positions,
+-                            std::vector<float>& scratch) {
++                            const float* texcoords, uint8_t texcoordMask, std::vector<float>& scratch) {
+   scratch.assign(vertices.begin(), vertices.end());
+   const size_t count = scratch.size() / gxc::kVertexFloats;
+-  for (size_t i = 0; i < count; ++i)
+-    std::memcpy(scratch.data() + i * gxc::kVertexFloats + gxc::kVertexPosOffset / sizeof(float), positions + i * 3u,
+-                sizeof(float) * 3u);
++  size_t uvAt = 0;
++  for (size_t i = 0; i < count; ++i) {
++    float* vertex = scratch.data() + i * gxc::kVertexFloats;
++    if (positions != nullptr)
++      std::memcpy(vertex + gxc::kVertexPosOffset / sizeof(float), positions + i * 3u, sizeof(float) * 3u);
++    if (texcoords != nullptr)
++      for (unsigned uv = 0; uv < gxc::kMaxTexGens; ++uv)
++        if ((texcoordMask >> uv) & 1u) {
++          std::memcpy(vertex + gxc::kVertexUvOffset / sizeof(float) + uv * 2u,
++                      texcoords + uvAt, sizeof(float) * 2u);
++          uvAt += 2;
++        }
++  }
+   return push_interp_vertices(slot, reinterpret_cast<const uint8_t*>(scratch.data()), scratch.size() * sizeof(float));
+ }
+ 
+@@ -1142,8 +1152,11 @@ void interp_helper_main(InterpHelper* h) {
+                                       sizeof(gxc::VertexShaderConstants), repeated);
+     }
+     for (int step = 0; step < steps; ++step) {
+-      if (const float* positions = frame_interp::blended_positions(step))
+-        ranges.verts[step] = push_blended_vertices(job.slot, job.vertices, positions, h->vertices);
++      const float* positions = frame_interp::blended_positions(step);
++      const float* texcoords = frame_interp::blended_texcoords(step);
++      if (positions != nullptr || texcoords != nullptr)
++        ranges.verts[step] = push_blended_vertices(job.slot, job.vertices, positions, texcoords,
++                                                 frame_interp::blended_texcoord_mask(), h->vertices);
+     }
+     resolve_interp_job(job.slot, ranges);
+     h->consumed.store(tail + 1, std::memory_order_release);
+@@ -1268,12 +1281,12 @@ static void dump_draw(const gxc::DrawPlan& plan) {
+     const auto& t = sh.tev_stages[i];
+     std::fprintf(stderr,
+                  "[draw-dump]   s%u tc%u map%u en%u ras%u  C=%u,%u,%u,%u op%u b%u s%u cl%u ->%u  "
+-                 "A=%u,%u,%u,%u op%u b%u s%u cl%u ->%u  k=%u/%u  ind: st%u fmt%u bias%u mtx%u id%u wrap%u,%u add%u\n",
++                 "A=%u,%u,%u,%u op%u b%u s%u cl%u ->%u  k=%u/%u  ind: st%u fmt%u bias%u mtx%u id%u wrap%u,%u add%u lod%u\n",
+                  i, t.tevorders_texcoord, t.tevorders_texmap, t.tevorders_enable, t.tevorders_colorchan, t.cc_a,
+                  t.cc_b, t.cc_c, t.cc_d, t.cc_op, t.cc_bias, t.cc_scale, t.cc_clamp, t.cc_dest, t.ac_a, t.ac_b, t.ac_c,
+                  t.ac_d, t.ac_op, t.ac_bias, t.ac_scale, t.ac_clamp, t.ac_dest, t.ksel_kc, t.ksel_ka, t.ind_stage,
+                  t.ind_format, t.ind_bias, t.ind_matrix_index, t.ind_matrix_id, t.ind_wrap_s, t.ind_wrap_t,
+-                 t.ind_add_prev);
++                 t.ind_add_prev, t.ind_use_original_lod);
+   }
+   for (uint32_t i = 0; i < sh.num_ind_stages && i < 4u; ++i)
+     std::fprintf(stderr, "[draw-dump]   ind%u map%u tc%u scale=%u,%u\n", i, sh.ind_stages[i].texmap,
+@@ -1702,16 +1715,18 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   // The helper is idle while a frame is traced, so its areas are ours.
+   static std::vector<float> tracedVertices;
+   const float* tracedPositions = matchHere ? frame_interp::blended_positions() : nullptr;
++  const float* tracedTexcoords = matchHere ? frame_interp::blended_texcoords() : nullptr;
+   const Range interpVertRange =
+-      tracedPositions != nullptr
+-          ? push_blended_vertices(recording_frame_slot(), plan.vertices, tracedPositions, tracedVertices)
++      tracedPositions != nullptr || tracedTexcoords != nullptr
++          ? push_blended_vertices(recording_frame_slot(), plan.vertices, tracedPositions, tracedTexcoords,
++                                  frame_interp::blended_texcoord_mask(), tracedVertices)
+           : Range{};
+   if (frame_interp::tracing()) {
+     const auto& m = plan.constants.posnormalmatrix;
+     std::fprintf(stderr,
+                  "[frame-interp-trace] frame=%llu %s key=%016llx prim=0x%02X fmt=%u verts=%u payload=%u idx=%d "
+                  "t=(%.1f,%.1f,%.1f) s=%.3f proj00=%.3f proj32=%.1f tex=%08X bt=(%.1f,%.1f,%.1f) bt0=(%.1f,%.1f,%.1f) "
+-                 "direct=%d tag=%06X age=%u positions=%d\n",
++                 "direct=%d tag=%06X age=%u positions=%d uv_mask=%u uv0=(%.7f,%.7f) buv0=(%.7f,%.7f) bp0=(%.3f,%.3f,%.3f)\n",
+                  static_cast<unsigned long long>(frame_interp::game_frame_number()), frame_interp::last_outcome(),
+                  static_cast<unsigned long long>(frame_interp::draw_key(plan)),
+                  plan.match_primitive, plan.match_vtx_fmt, plan.vertex_count, plan.match_payload_size,
+@@ -1725,7 +1740,14 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+                  interpConstants ? interpConstants->transformmatrices[1][3] - plan.constants.transformmatrices[1][3] : 0.f,
+                  interpConstants ? interpConstants->transformmatrices[2][3] - plan.constants.transformmatrices[2][3] : 0.f,
+                  plan.match_direct_position ? 1 : 0, plan.draw_tag, plan.draw_tag_age,
+-                 tracedPositions != nullptr ? 1 : 0);
++                 tracedPositions != nullptr ? 1 : 0, frame_interp::blended_texcoord_mask(),
++                 plan.vertices.empty() ? 0.f : plan.vertices[gxc::kVertexUvOffset / sizeof(float)],
++                 plan.vertices.empty() ? 0.f : plan.vertices[gxc::kVertexUvOffset / sizeof(float) + 1],
++                 tracedTexcoords != nullptr ? tracedTexcoords[0] : 0.f,
++                 tracedTexcoords != nullptr ? tracedTexcoords[1] : 0.f,
++                 tracedPositions != nullptr ? tracedPositions[0] : 0.f,
++                 tracedPositions != nullptr ? tracedPositions[1] : 0.f,
++                 tracedPositions != nullptr ? tracedPositions[2] : 0.f);
+   }
+   if (!staging_has_capacity(vertBytes + gxc::kVertexStrideBytes, indexBytes, sizeof(plan.constants),
+                             pixelUniformBytes)) {
+@@ -1759,7 +1781,8 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+     depthConfig.depthOnly = 1u;
+     depthPipeline = pipeline_ref(depthConfig);
+   }
+-  const bool ownVertices = plan.draw_tag != 0 || plan.draw_scope_part != 0;
++  const bool ownVertices = plan.draw_tag != 0 || plan.draw_scope_part != 0 ||
++                           (interpolating && frame_interp::blends_vertices(plan));
+ 
+   // Batching: a draw of the state of the pass's last command (pipeline,
+   // constants, pixel constants, textures), with nothing between them, whose
+@@ -1775,7 +1798,9 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   const size_t vertexOffset = next_vertex_offset(gxc::kVertexStrideBytes);
+   DrawData* batch = nullptr;
+   uint32_t firstVertex = 0;
+-  if (batching && !matchHere) {
++  // Independently blended vertices cannot share a batch's rebased index
++  // range. Keep their original draw order, including each depth/color pair.
++  if (batching && !matchHere && !ownVertices) {
+     DrawData* last = last_recorded_draw();
+     if (last != nullptr && last->pipeline == pipeline && last->depthPipeline == depthPipeline &&
+         last->uniformRange.offset == uniformRange.offset && last->tev == tev &&
+diff --git a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+index 696cb1a5ce8fe4ef65da99b38b42d8df90a94fef..b88bd8ef931495164e8c6dbfd7a53631073f1dd7 100644
+--- a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
++++ b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+@@ -99,7 +99,11 @@ static bool halfway(const Result& result, const Camera& before, const Camera& no
+ // A draw submitted as gxcore_draw.cpp does: its inputs captured from the plan.
+ static const gxc::VertexShaderConstants* blend_plan(const gxc::DrawPlan& plan, const gxc::VertexShaderConstants& c) {
+   static fi::DrawInput input;
+-  fi::capture_draw(plan, input);
++  // Production captures the same constants it then blends. Most synthetic
++  // plans above describe only geometry, so supply their transform here too.
++  auto submitted = plan;
++  submitted.constants = c;
++  fi::capture_draw(submitted, input);
+   return fi::blend_draw(input, c);
+ }
+ 
+@@ -109,6 +113,142 @@ int main() {
+   fi::set_enabled(true);
+   const uint64_t kShip = 11, kTree = 22, kHud = 33;
+ 
++  // Reused glyphs stay paired with their screen slot despite changing draw
++  // order/counts. Nearby UI movement and heart pulses still interpolate.
++  {
++    gxc::DrawPlan hud;
++    const uint8_t payload[96]{};
++    hud.match_payload = payload;
++    hud.match_payload_size = sizeof(payload);
++    hud.match_primitive = 0x80;
++    hud.match_direct_position = true;
++    hud.vertex_count = 4;
++    hud.tex_address = 0x00EA78A0;
++    hud.pipeline.shader.num_tex_gens = 1;
++    hud.vertices.resize(4 * gxc::kVertexFloats);
++    const auto quad = [&](float width, float height) {
++      for (unsigned v = 0; v < 4; ++v) {
++        auto* vertex = hud.vertices.data() + v * gxc::kVertexFloats;
++        vertex[gxc::kVertexPosOffset / sizeof(float)] = (v == 1 || v == 2) ? width : 0.f;
++        vertex[gxc::kVertexPosOffset / sizeof(float) + 1] = v >= 2 ? height : 0.f;
++        vertex[gxc::kVertexUvOffset / sizeof(float)] = (v == 1 || v == 2) ? 1.f : 0.f;
++        vertex[gxc::kVertexUvOffset / sizeof(float) + 1] = v >= 2 ? 1.f : 0.f;
++        for (unsigned c = 0; c < 4; ++c)
++          vertex[gxc::kVertexColor0Offset / sizeof(float) + c] = 1.f;
++      }
++    };
++    quad(20.f, 30.f);
++    const auto at = [](float x, float y) {
++      auto c = draw_at(x, y, 0.f);
++      std::memset(c.projection, 0, sizeof(c.projection));
++      c.projection[0][0] = 2.f / 640.f;
++      c.projection[1][1] = -2.f / 480.f;
++      c.projection[3][3] = 1.f;
++      return c;
++    };
++    hud.constants = at(412.f, 412.f);
++    // A stale particle tag must not distinguish otherwise identical UI.
++    hud.draw_tag = 123;
++    const auto key = fi::draw_key(hud);
++    CHECK(key != 0);
++    hud.draw_tag = 456;
++    CHECK(fi::draw_key(hud) == key);
++    hud.vertices[gxc::kVertexColor0Offset / sizeof(float) + 3] = .5f;
++    CHECK(fi::draw_key(hud) == key); // fade alpha may animate
++    hud.vertices[gxc::kVertexUvOffset / sizeof(float)] = .25f;
++    CHECK(fi::draw_key(hud) != key); // another atlas region is another glyph
++    quad(20.f, 30.f);
++    hud.vertices[gxc::kVertexColor0Offset / sizeof(float)] = 0.f;
++    CHECK(fi::draw_key(hud) != key); // a shadow is distinct from its foreground
++    quad(20.f, 30.f);
++    fi::set_steps(3);
++
++    blend_plan(hud, at(643.f, 443.f));
++    blend_plan(hud, at(412.f, 412.f));
++    fi::end_game_frame();
++    for (const auto c : {at(413.f, 412.f), at(642.f, 443.f)}) {
++      const auto* blended = blend_plan(hud, c);
++      CHECK(blended != nullptr);
++      if (blended != nullptr) {
++        const float beforeX = c.posnormalmatrix[0][3] == 413.f ? 412.f : 643.f;
++        for (int step = 0; step < 3; ++step)
++          CHECK(near(fi::blended_step(step)->posnormalmatrix[0][3],
++                     beforeX + (c.posnormalmatrix[0][3] - beforeX) * float(step + 1) / 4.f));
++      }
++    }
++    CHECK(fi::frame_verdict());
++    fi::end_game_frame();
++    // The timer changes to another digit; next frame the shared glyph returns
++    // without borrowing the only remaining copy, at the distant rupee counter.
++    blend_plan(hud, at(642.f, 443.f));
++    fi::end_game_frame();
++    CHECK(blend_plan(hud, at(412.f, 412.f)) == nullptr);
++    CHECK(fi::blended_positions() == nullptr);
++    CHECK(blend_plan(hud, at(641.f, 443.f)) != nullptr);
++    // A new copy cannot reuse the same counterpart already consumed above.
++    CHECK(blend_plan(hud, at(640.f, 443.f)) == nullptr);
++    fi::end_game_frame();
++
++    // The last heart grows about its own centre, not a neighbouring heart.
++    blend_plan(hud, at(170.f, 40.f));
++    blend_plan(hud, at(195.f, 40.f));
++    fi::end_game_frame();
++    auto pulse = at(168.f, 37.f);
++    pulse.posnormalmatrix[0][0] = pulse.posnormalmatrix[1][1] = 1.2f;
++    CHECK(blend_plan(hud, pulse) != nullptr);
++    for (int step = 0; step < 3; ++step) {
++      const auto* b = fi::blended_step(step);
++      CHECK(b != nullptr);
++      if (b != nullptr) {
++        CHECK(near(b->posnormalmatrix[0][0], 1.f + .2f * float(step + 1) / 4.f));
++        CHECK(near(b->posnormalmatrix[0][3] + 10.f * b->posnormalmatrix[0][0], 180.f));
++        CHECK(near(b->posnormalmatrix[1][3] + 15.f * b->posnormalmatrix[1][1], 55.f));
++      }
++    }
++    CHECK(blend_plan(hud, at(195.f, 40.f)) == nullptr); // the neighbour stays still
++    fi::end_game_frame();
++
++    // A UI pulse can also resize its direct vertices with a fixed matrix.
++    quad(20.f, 30.f);
++    blend_plan(hud, at(170.f, 40.f));
++    fi::end_game_frame();
++    quad(22.f, 32.f);
++    blend_plan(hud, at(170.f, 40.f));
++    for (int step = 0; step < 3; ++step) {
++      const auto* b = fi::blended_positions(step);
++      CHECK(b != nullptr);
++      if (b != nullptr) {
++        CHECK(near(b[3], 20.f + 2.f * float(step + 1) / 4.f));
++        CHECK(near(b[7], 30.f + 2.f * float(step + 1) / 4.f));
++      }
++    }
++    CHECK(fi::frame_verdict());
++    fi::end_game_frame();
++
++    // Invalid bounds do not leave a stale interpolated vertex buffer behind.
++    hud.constants = at(170.f, 40.f);
++    hud.vertices[0] = INFINITY;
++    fi::DrawInput invalid;
++    fi::capture_draw(hud, invalid);
++    CHECK(invalid.key == 0);
++    CHECK(fi::blend_draw(invalid, hud.constants) == nullptr);
++    CHECK(fi::blended_positions() == nullptr);
++    quad(20.f, 30.f);
++    // Orthographic depth-buffer geometry and perspective particles retain
++    // their existing identities and interpolation paths.
++    hud.pipeline.depth_test = 1;
++    CHECK(fi::draw_key(hud) != key);
++    hud.pipeline.depth_test = 0;
++    hud.pipeline.depth_update = 1;
++    CHECK(fi::draw_key(hud) != key);
++    hud.pipeline.depth_update = 0;
++    hud.constants.projection[3][2] = -1.f;
++    CHECK(fi::draw_key(hud) != key);
++    fi::set_steps(1);
++    fi::end_game_frame();
++    fi::end_game_frame();
++  }
++
+   // Frame 1: the ship, two trees, the HUD.
+   CHECK(fi::blend_draw(kShip, 0, draw_at(0, 0, -500)) == nullptr); // no previous frame yet
+   fi::blend_draw(kTree, 0, draw_at(-200, 0, -800));
+@@ -575,10 +715,11 @@ int main() {
+         seen_at(view.posnormalmatrix, &plan.vertices[v * gxc::kVertexFloats], drawn[frame][v]);
+       const auto* got = blend_plan(plan, view);
+       if (frame == 2) {
+-        hullHalfway = got != nullptr;
++        const float* vertices = fi::blended_positions();
++        hullHalfway = vertices != nullptr;
+         for (int v = 0; hullHalfway && v < 6; ++v) {
+           float at[3];
+-          seen_at(got->posnormalmatrix, &plan.vertices[v * gxc::kVertexFloats], at);
++          seen_at(got != nullptr ? got->posnormalmatrix : view.posnormalmatrix, vertices + v * 3, at);
+           for (int r = 0; r < 3; ++r)
+             hullHalfway = hullHalfway && std::fabs(at[r] - (drawn[1][v][r] + drawn[2][v][r]) / 2.f) < 1.f;
+         }
+@@ -589,6 +730,135 @@ int main() {
+     CHECK(hullHalfway);
+   }
+ 
++  // Adjacent CPU-deformed ocean strips share a vertex, but have different
++  // wave heights elsewhere. Every 120-Hz step must keep that shared edge
++  // together, including at large world coordinates and with camera motion.
++  for (bool movingCamera : {false, true}) {
++    fi::end_game_frame();
++    fi::end_game_frame();
++    fi::set_steps(3);
++    uint8_t payload[2][40]{};
++    float shared[3][2][3]{};
++    for (int frame = 0; frame < 3; ++frame) {
++      const Camera c{0.f, -200000.f + (movingCamera ? 20.f * frame : 0.f), 2000.f};
++      const auto view = seen(c.yaw, c.x, c.z, 0.f, 0.f, 0.f);
++      for (int room = 0; room < 8; ++room)
++        fi::blend_draw(18000 + room, 0, seen(c.yaw, c.x, c.z, -200000.f + room * 500.f, 0.f, -5000.f));
++      for (int strip = 0; strip < 2; ++strip) {
++        gxc::DrawPlan plan;
++        for (int v = 0; v < 4; ++v) {
++          payload[strip][v * 10 + 1] = static_cast<uint8_t>(strip * 2 + v);
++          const float uv[2] = {float(frame), float(v)};
++          std::memcpy(payload[strip] + v * 10 + 2, uv, sizeof(uv));
++        }
++        plan.match_payload = payload[strip];
++        plan.match_payload_size = sizeof(payload[strip]);
++        plan.match_primitive = 0x98;
++        plan.match_vertex_stride = 10;
++        plan.match_position_size = 2;
++        plan.match_direct_texcoord_mask = (1u << 0) | (1u << 2);
++        plan.vertex_count = 4;
++        plan.vertices.assign(4 * gxc::kVertexFloats, 0.f);
++        for (int v = 0; v < 4; ++v) {
++          const int index = strip * 2 + v;
++          float* p = plan.vertices.data() + v * gxc::kVertexFloats;
++          p[0] = -200000.f + 800.f * (index / 2) + (movingCamera ? 20.f * frame : 0.f);
++          p[1] = float((index * index + 3) * frame); // non-rigid deformation
++          p[2] = -800.f * (index % 2);
++          float* uv = p + gxc::kVertexUvOffset / sizeof(float);
++          uv[0] = p[0] * .0005f;
++          uv[1] = p[2] * .0005f;
++          uv[4] = .02f * frame; // another direct channel, also animated
++          uv[5] = .1f * index;
++        }
++        const auto* got = blend_plan(plan, view);
++        if (frame == 2) {
++          for (int step = 0; step < 3; ++step) {
++            const float* vertices = fi::blended_positions(step);
++            const float* texcoords = fi::blended_texcoords(step);
++            CHECK(vertices != nullptr);
++            CHECK(texcoords != nullptr);
++            CHECK(fi::blended_texcoord_mask() == ((1u << 0) | (1u << 2)));
++            if (vertices == nullptr)
++              continue;
++            const float t = float(step + 1) / 4.f;
++            for (int v = 0; v < 4; ++v) {
++              const int index = strip * 2 + v;
++              CHECK(std::fabs(vertices[v * 3 + 1] - (index * index + 3) * (1.f + t)) < .01f);
++              CHECK(std::fabs(vertices[v * 3] - (-200000.f + 800.f * (index / 2) +
++                    (movingCamera ? 20.f * (1.f + t) : 0.f))) < .05f);
++              if (texcoords != nullptr) {
++                // Both attributes describe the same intermediate world point.
++                CHECK(std::fabs(texcoords[v * 4] - vertices[v * 3] * .0005f) < 2e-5f);
++                CHECK(std::fabs(texcoords[v * 4 + 1] - vertices[v * 3 + 2] * .0005f) < 2e-5f);
++                CHECK(std::fabs(texcoords[v * 4 + 2] - .02f * (1.f + t)) < 1e-6f);
++                CHECK(std::fabs(texcoords[v * 4 + 3] - .1f * index) < 1e-6f);
++              }
++            }
++            const float* p = vertices + (strip == 0 ? 2 : 0) * 3;
++            const float (*m)[4] = got != nullptr ? fi::blended_step(step)->posnormalmatrix : view.posnormalmatrix;
++            for (int r = 0; r < 3; ++r)
++              shared[step][strip][r] = m[r][0] * p[0] + m[r][1] * p[1] + m[r][2] * p[2] + m[r][3];
++          }
++        }
++      }
++      if (frame == 2)
++        for (int step = 0; step < 3; ++step)
++          for (int r = 0; r < 3; ++r)
++            CHECK(std::fabs(shared[step][0][r] - shared[step][1][r]) < .01f);
++      fi::end_game_frame();
++    }
++    fi::set_steps(1);
++  }
++
++  // Direct UV animation also blends when the mesh itself stays still. An
++  // atlas switch/wrap keeps its current channel instead of sweeping across it.
++  for (bool wraps : {false, true}) {
++    fi::end_game_frame();
++    fi::end_game_frame();
++    fi::set_steps(3);
++    uint8_t payload[8] = {0, 0, 0, 1, 0, 2, 0, 3};
++    for (int frame = 0; frame < 2; ++frame) {
++      gxc::DrawPlan plan;
++      plan.match_payload = payload;
++      plan.match_payload_size = sizeof(payload);
++      plan.match_primitive = 0x98;
++      plan.match_vertex_stride = 2;
++      plan.match_position_size = 2;
++      plan.match_direct_texcoord_mask = (1u << 0) | (1u << 2);
++      plan.vertex_count = 4;
++      plan.vertices.assign(4 * gxc::kVertexFloats, 0.f);
++      for (int v = 0; v < 4; ++v) {
++        float* p = plan.vertices.data() + v * gxc::kVertexFloats;
++        p[0] = v * 20.f;
++        p[2] = -400.f;
++        float* uv = p + gxc::kVertexUvOffset / sizeof(float);
++        uv[0] = wraps ? (frame == 0 ? .98f : .02f) : .1f + .04f * frame;
++        uv[1] = .2f;
++        uv[4] = .3f + .02f * frame;
++        uv[5] = .4f;
++      }
++      blend_plan(plan, draw_at(0, 0, 0));
++      if (frame == 1) {
++        CHECK(fi::blended_positions() == nullptr);
++        CHECK(fi::blended_texcoord_mask() == ((1u << 0) | (1u << 2)));
++        CHECK(fi::frame_verdict());
++        for (int step = 0; step < 3; ++step) {
++          const float* uv = fi::blended_texcoords(step);
++          CHECK(uv != nullptr);
++          if (uv != nullptr)
++            for (int v = 0; v < 4; ++v) {
++              const float t = float(step + 1) / 4.f;
++              CHECK(std::fabs(uv[v * 4] - (wraps ? .02f : .1f + .04f * t)) < 1e-6f);
++              CHECK(std::fabs(uv[v * 4 + 2] - (.3f + .02f * t)) < 1e-6f);
++            }
++        }
++      }
++      fi::end_game_frame();
++    }
++    fi::set_steps(1);
++  }
++
+   // A bone of Link's sword arm turns 100 degrees in one game frame: a draw
+   // with a key of its own is still blended, halfway along the turn (50
+   // degrees, its size kept, not a straight blend shrunk to 64 percent), with
+diff --git a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+index 7f287243e5f0a6f8cde645793fea0b4c5ca7d59c..fb02408648323ac5337596aa31c252455dba4a81 100644
+--- a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
++++ b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+@@ -142,6 +142,13 @@ struct RenderDrawPacket {
+   std::uint16_t tex_matrix_word_mask[DOL_GX_RECOMP_TEX_MATRIX_COUNT]{};
+   std::uint32_t xf_regs[DOL_GX_RECOMP_XF_REG_COUNT]{};
+   std::uint64_t xf_reg_mask = 0;
++  // Dual-texture post-transform (XF 0x1012 on, post info 0x1050.., matrices
++  // 0x500..0x5FF): bit i of post_tex_mask when texgen i's post matrix is not
++  // the identity or it normalizes first; its three rows are post_tex_rows[i]
++  // (only set bits are written).
++  std::uint8_t post_tex_mask = 0;
++  std::uint8_t post_tex_normalize = 0;
++  float post_tex_rows[8][12]{};
+ };
+ 
+ struct RenderPacket {
+@@ -275,6 +282,10 @@ struct ConsumedDraw {
+   std::uint16_t tex_matrix_word_mask[DOL_GX_RECOMP_TEX_MATRIX_COUNT]{};
+   std::uint32_t xf_regs[DOL_GX_RECOMP_XF_REG_COUNT]{};
+   std::uint64_t xf_reg_mask = 0;
++  // Dual-texture post-transform, as in RenderDrawPacket.
++  std::uint8_t post_tex_mask = 0;
++  std::uint8_t post_tex_normalize = 0;
++  float post_tex_rows[8][12]{};
+ };
+ 
+ using ConsumedDrawObserver = void (*)(const ConsumedDraw& draw,
+diff --git a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
+index 487fa233e9851451eac0cd7ee3522de00a9116c9..5750d1e37128e6029c2f2f682883adcae79693f1 100644
+--- a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
++++ b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
+@@ -42,6 +42,23 @@ struct DrawTransformSnapshot {
+   std::uint16_t tex_matrix_word_mask[DOL_GX_RECOMP_TEX_MATRIX_COUNT]{};
+   std::uint32_t xf_regs[DOL_GX_RECOMP_XF_REG_COUNT]{};
+   std::uint64_t xf_reg_mask = 0;
++  // Dual-texture post-transform at draw time (see RenderDrawPacket).
++  std::uint8_t post_tex_mask = 0;
++  std::uint8_t post_tex_normalize = 0;
++  float post_tex_rows[8][12]{};
++};
++
++// XF post-transform ("dual texture") matrix memory, 0x500..0x5FF: 64 rows of
++// four floats. Kept beside DolGxRecompState rather than in it, so the saved
++// front-end state keeps its size; after a load the rows read as identity
++// until the game loads them again.
++struct PostTexMatrices {
++  float rows[64][4]{};
++  std::uint64_t written = 0;  // rows the game has loaded
++  // identity[k] bit r: row r is row k of the identity (or was never loaded),
++  // so a texgen whose three post rows all read as identity needs no transform.
++  std::uint64_t identity[3] = {~0ull, ~0ull, ~0ull};
++  bool off = false; // XF 0x1012 written 0; GXInit writes 1
+ };
+ 
+ class RetailGxFrontend {
+@@ -144,6 +161,7 @@ private:
+   bool display_copy_stopped_ = false;
+ 
+   DolGxRecompState state_{};
++  PostTexMatrices post_tex_{};
+   std::vector<std::uint8_t> fifo_buffer_;
+   // Raw per-vertex payload bytes for each parsed draw, in trace order. Popped in
+   // lockstep as Draw events are emitted (emit_new_packets) so each Draw packet
+diff --git a/GXRuntime/graphics/frontend/src/render_sink.cpp b/GXRuntime/graphics/frontend/src/render_sink.cpp
+index af2e63b7929a9024d61de7b890d1a2e0690026d7..1752b41c0ce2832551dbecd11727b9f703f5bd90 100644
+--- a/GXRuntime/graphics/frontend/src/render_sink.cpp
++++ b/GXRuntime/graphics/frontend/src/render_sink.cpp
+@@ -259,6 +259,12 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+                 sizeof(draw.tex_matrix_word_mask));
+     std::memcpy(draw.xf_regs, packet.draw.xf_regs, sizeof(draw.xf_regs));
+     draw.xf_reg_mask = packet.draw.xf_reg_mask;
++    draw.post_tex_mask = packet.draw.post_tex_mask;
++    draw.post_tex_normalize = packet.draw.post_tex_normalize;
++    for (std::uint32_t i = 0; i < 8u; ++i)
++      if ((draw.post_tex_mask & (1u << i)) != 0u)
++        std::memcpy(draw.post_tex_rows[i], packet.draw.post_tex_rows[i],
++                    sizeof(draw.post_tex_rows[i]));
+     back_assembled_ = false; // the just-placed draw is not yet assembled
+     // Retain the draw's raw per-vertex bytes (valid only during this call) so an
+     // issuing sink can assemble vertices after submit.
+diff --git a/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp b/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
+index 1d15a452dac52e2e022b23f7fc1e7d28c6329082..4bdc62efbb1eace74482e047f0c03301d63a1f79 100644
+--- a/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
++++ b/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
+@@ -248,6 +248,91 @@ std::uint32_t payload_pn_matrix_mask(const DolGxRecompState& state,
+   return mask;
+ }
+ 
++constexpr std::uint32_t kXfDualTex = 0x1012u;
++constexpr std::uint32_t kXfPostMatrixBase = 0x500u;
++constexpr std::uint32_t kXfPostMatrixEnd = 0x600u;
++constexpr std::uint32_t kPtIdentityRow = 61u; // GX_PTIDENTITY - GX_PTTEXMTX0
++
++// An XF load's words that land on the dual-texture switch (0x1012) or the
++// post-transform matrix memory (0x500..0x5FF). Wind Waker's lava is the one
++// user of a post matrix that is not the identity: its pattern and its colour
++// ramp are both projected through one (d_magma.cpp).
++void capture_post_tex(PostTexMatrices& post, std::uint32_t base,
++                      std::uint32_t count, const std::uint8_t* data_be) {
++  const std::span<const std::uint8_t> data(data_be, count * 4u);
++  const std::uint32_t last = base + count - 1u;
++  if (base <= kXfDualTex && last >= kXfDualTex)
++    post.off = (read_be32(data, (kXfDualTex - base) * 4u) & 1u) == 0u;
++  if (last < kXfPostMatrixBase || base >= kXfPostMatrixEnd)
++    return;
++  const std::uint32_t first = base > kXfPostMatrixBase ? base : kXfPostMatrixBase;
++  const std::uint32_t end = last < kXfPostMatrixEnd - 1u ? last : kXfPostMatrixEnd - 1u;
++  for (std::uint32_t address = first; address <= end; ++address) {
++    const std::uint32_t bits = read_be32(data, (address - base) * 4u);
++    const std::uint32_t row = (address - kXfPostMatrixBase) / 4u;
++    std::memcpy(&post.rows[row][(address - kXfPostMatrixBase) % 4u], &bits,
++                sizeof bits);
++    post.written |= 1ull << row;
++  }
++  for (std::uint32_t row = (first - kXfPostMatrixBase) / 4u;
++       row <= (end - kXfPostMatrixBase) / 4u; ++row) {
++    const float* r = post.rows[row];
++    for (std::uint32_t k = 0; k < 3u; ++k) {
++      const bool is_identity = r[0] == (k == 0u ? 1.f : 0.f) &&
++                               r[1] == (k == 1u ? 1.f : 0.f) &&
++                               r[2] == (k == 2u ? 1.f : 0.f) && r[3] == 0.f;
++      if (is_identity)
++        post.identity[k] |= 1ull << row;
++      else
++        post.identity[k] &= ~(1ull << row);
++    }
++  }
++}
++
++// The post transform of each regular texgen at draw time: nothing for the
++// usual identity (GXSetTexCoordGen's GX_PTIDENTITY), else its three rows.
++void snapshot_post_tex(DrawTransformSnapshot& out,
++                       const DolGxRecompState& state,
++                       const PostTexMatrices& post) {
++  out.post_tex_mask = 0u;
++  out.post_tex_normalize = 0u;
++  if (post.off)
++    return;
++  constexpr std::uint32_t kNumTexGens = 0x103Fu - DOL_GX_XF_REG_WINDOW_BASE;
++  std::uint32_t num = 8u;
++  if ((state.xf_reg_mask & (1ull << kNumTexGens)) != 0u &&
++      (state.xf_regs[kNumTexGens] & 0xFu) < num)
++    num = state.xf_regs[kNumTexGens] & 0xFu;
++  for (std::uint32_t i = 0; i < num; ++i) {
++    const std::uint32_t info = 0x1040u - DOL_GX_XF_REG_WINDOW_BASE + i;
++    if ((state.xf_reg_mask & (1ull << info)) != 0u &&
++        ((state.xf_regs[info] >> 4u) & 7u) != 0u)
++      continue; // only regular (matrix) texgens are post-transformed
++    const std::uint32_t reg = 0x1050u - DOL_GX_XF_REG_WINDOW_BASE + i;
++    const std::uint32_t post_info =
++        (state.xf_reg_mask & (1ull << reg)) != 0u ? state.xf_regs[reg] : kPtIdentityRow;
++    const std::uint32_t rows[3] = {post_info & 0x3Fu, (post_info + 1u) & 0x3Fu,
++                                   (post_info + 2u) & 0x3Fu};
++    const bool normalize = ((post_info >> 8u) & 1u) != 0u;
++    if (!normalize && ((post.identity[0] >> rows[0]) & 1u) != 0u &&
++        ((post.identity[1] >> rows[1]) & 1u) != 0u &&
++        ((post.identity[2] >> rows[2]) & 1u) != 0u)
++      continue;
++    out.post_tex_mask |= static_cast<std::uint8_t>(1u << i);
++    if (normalize)
++      out.post_tex_normalize |= static_cast<std::uint8_t>(1u << i);
++    for (std::uint32_t k = 0; k < 3u; ++k) {
++      float* dst = &out.post_tex_rows[i][4u * k];
++      if ((post.written & (1ull << rows[k])) != 0u) {
++        std::memcpy(dst, post.rows[rows[k]], 4u * sizeof(float));
++      } else {
++        dst[0] = dst[1] = dst[2] = dst[3] = 0.f;
++        dst[k] = 1.f;
++      }
++    }
++  }
++}
++
+ // Fills a queue slot in place. Every field is written (the arrays by a copy or,
+ // for an invalid position matrix, a zero of that slot), so a reused slot reads
+ // exactly as a value-initialized one would, without zeroing 2.3 KB first and
+@@ -255,6 +340,7 @@ std::uint32_t payload_pn_matrix_mask(const DolGxRecompState& state,
+ // memmoves on the GX worker, about 18,000 draws a frame in heavy scenes).
+ void snapshot_transform_into(DrawTransformSnapshot& out,
+                              const DolGxRecompState& state,
++                             const PostTexMatrices& post,
+                              const DolGxRecompVertexLayout& layout,
+                              std::span<const std::uint8_t> vertex_data,
+                              std::uint16_t vertex_count) {
+@@ -301,6 +387,7 @@ void snapshot_transform_into(DrawTransformSnapshot& out,
+               sizeof(out.tex_matrix_word_mask));
+   std::memcpy(out.xf_regs, state.xf_regs, sizeof(out.xf_regs));
+   out.xf_reg_mask = state.xf_reg_mask;
++  snapshot_post_tex(out, state, post);
+ }
+ 
+ } // namespace
+@@ -313,6 +400,7 @@ RetailGxFrontend::RetailGxFrontend(const DolGuestAddressResolver& resolver) {
+ 
+ void RetailGxFrontend::reset(const DolGuestAddressResolver* resolver) {
+   dol_gx_recomp_init(&state_, resolver);
++  post_tex_ = PostTexMatrices{};
+   fifo_buffer_.clear();
+   draw_payload_queue_.clear();
+   draw_transform_queue_.clear();
+@@ -659,6 +747,7 @@ bool RetailGxFrontend::parse_stream(std::span<const std::uint8_t> bytes,
+       // viewport/projection registers if this load covers them (transform-diff).
+       dol_gx_recomp_capture_xf_transform(&state_, base, count,
+                                          bytes.data() + pos + 5u);
++      capture_post_tex(post_tex_, base, count, bytes.data() + pos + 5u);
+       pos += command_size;
+       continue;
+     }
+@@ -689,6 +778,9 @@ bool RetailGxFrontend::parse_stream(std::span<const std::uint8_t> bytes,
+           &state_, base, count,
+           static_cast<const std::uint8_t*>(array.range.data) +
+               index * state_.arrays[attr].stride);
++      capture_post_tex(post_tex_, base, count,
++                       static_cast<const std::uint8_t*>(array.range.data) +
++                           index * state_.arrays[attr].stride);
+       if (!dol_gx_recomp_note_xf_load(&state_, base, count))
+         return false;
+       // `dol_gx_recomp_note_xf_load` records the generic XF event; retain the
+@@ -1055,7 +1147,7 @@ bool RetailGxFrontend::handle_draw(std::uint8_t command,
+     draw_payload_queue_[draw_queue_count_].assign(vertex_data.begin(),
+                                                   vertex_data.end());
+     snapshot_transform_into(draw_transform_queue_[draw_queue_count_], state_,
+-                            *layout, vertex_data, vertex_count);
++                            post_tex_, *layout, vertex_data, vertex_count);
+     ++draw_queue_count_;
+   }
+ 
+@@ -1177,6 +1269,12 @@ bool RetailGxFrontend::emit_new_packets(AuroraRenderSink& sink,
+       std::memcpy(packet.draw.xf_regs, transform.xf_regs,
+                   sizeof(packet.draw.xf_regs));
+       packet.draw.xf_reg_mask = transform.xf_reg_mask;
++      packet.draw.post_tex_mask = transform.post_tex_mask;
++      packet.draw.post_tex_normalize = transform.post_tex_normalize;
++      for (std::uint32_t i = 0; i < 8u; ++i)
++        if ((transform.post_tex_mask & (1u << i)) != 0u)
++          std::memcpy(packet.draw.post_tex_rows[i], transform.post_tex_rows[i],
++                      sizeof(packet.draw.post_tex_rows[i]));
+     }
+     if (!sink.submit_packet(packet))
+       return false;
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+index 0484518d9ce0a39d5d35581420b9dbb583a5ac27..a6731cd0344de68461d8d1769830bf71b415d127 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+@@ -475,6 +475,12 @@ struct DrawPlan {
+   // payload differs every frame, so such a draw is matched by its shape.
+   bool match_direct_position = false;
+   std::uint32_t match_vertex_stride = 0; // payload bytes per vertex
++  // Indexed CPU meshes keep their topology while direct UVs can change as
++  // the mesh follows the player. FIFO span of the position index; the array
++  // address may change when the game allocates a fresh frame buffer.
++  std::uint32_t match_position_offset = 0;
++  std::uint32_t match_position_size = 0;
++  std::uint8_t match_direct_texcoord_mask = 0; // VCD direct UV attributes
+   // The host's tag for the object this draw is, written just before it to
+   // BP registers the retail GX never uses (kDrawTagRegister and
+   // kDrawTagAgeRegister): the game's particle drawn here and its age in game
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore.cpp b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+index c6eadd3ff9c2b8deed1ca4bf8024d434aa333cf8..5b8aa5871fecff558554b4ce634386e024e7623b 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+@@ -660,6 +660,15 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+   }
+ 
+   plan.match_direct_position = bits(vcd_lo_, 2, 9) == 1u; // VCD position: direct
++  for (std::uint32_t uv = 0; uv < kMaxTexGens; ++uv)
++    if (bits(vcd_hi_, 2, uv * 2) == 1u)
++      plan.match_direct_texcoord_mask |= 1u << uv;
++  if (!plan.match_direct_position) {
++    if (const auto* positions = find_array(draw, 0)) {
++      plan.match_position_offset = positions->vertex_offset;
++      plan.match_position_size = positions->index_size;
++    }
++  }
+ 
+   // BP-derived pipeline state.
+   const std::uint32_t gen_mode = bp_valid_[0x00] ? bp_regs_[0x00] : 0u;
+@@ -1560,6 +1569,27 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+       identity_rows(rows);
+       ++counters.unresolved_tex_matrix;
+     }
++    // Dual-texture post transform (XF 0x1012, on since GXInit): the texture
++    // matrix's result goes through a second matrix from post-transform memory
++    // (Dolphin VertexShaderGen WriteTexCoordTransforms). Without normalization
++    // the two are one 3x4 matrix, folded here so the shader is unchanged:
++    // coord.w is 1, so each post row's w joins the fourth column, and a
++    // two-row (ST) texgen's third coordinate is the constant 1. The lava's
++    // pattern and colour ramp are projected this way (d_magma.cpp).
++    if ((draw.post_tex_mask & (1u << i)) != 0u &&
++        (draw.post_tex_normalize & (1u << i)) == 0u) {
++      const float* p = draw.post_tex_rows[i];
++      const bool stq = key.tex_gens[i].projection != 0u;
++      float folded[3][4];
++      for (std::uint32_t r = 0; r < 3u; ++r) {
++        const float* pr = p + 4u * r;
++        for (std::uint32_t col = 0; col < 4u; ++col)
++          folded[r][col] = pr[0] * rows[0][col] + pr[1] * rows[1][col] +
++                           (stq ? pr[2] * rows[2][col] : 0.f);
++        folded[r][3] += pr[3] + (stq ? 0.f : pr[2]);
++      }
++      std::memcpy(rows, folded, sizeof rows);
++    }
+     for (std::uint32_t k = 0; k < 3u; ++k)
+       std::memcpy(c.texmatrices[3u * i + k], rows[k], sizeof rows[k]);
+     if (i < kMaxTexGens)
+diff --git a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+index 408ae31d97b0ae485ad115c026e1b2ea3a603be7..4dbadc976d0c617c86063864df5f76dae816d8fd 100644
+--- a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
++++ b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+@@ -780,6 +780,82 @@ void test_fifth_texgen_plan_decode() {
+   CHECK((texidx_hi & 0xFFu) == 33u);
+ }
+ 
++// The dual-texture post transform is folded into a regular texgen's matrix
++// rows: post * (texmtx * coord) for a three-row (STQ) texgen, and post *
++// (s, t, 1) for a two-row (ST) one. The lava (d_magma.cpp) uses it.
++void test_post_tex_matrix_fold() {
++  for (const bool stq : {true, false}) {
++    gxc::GxCoreState state;
++    state.reset();
++    state.apply(bp(0x00u, 1u));
++    state.apply({.kind = ar::RenderStateKind::CpVcd,
++                 .index = 0u,
++                 .value = 1u << 9u}); // position direct
++    state.apply({.kind = ar::RenderStateKind::CpVcd, .index = 1u, .value = 0u});
++    state.apply({.kind = ar::RenderStateKind::CpVat,
++                 .index = 0u,
++                 .value = 1u | (4u << 1u),
++                 .aux0 = 0u});
++    state.apply({.kind = ar::RenderStateKind::CpVat, .index = 0u, .value = 0u, .aux0 = 1u});
++    state.apply({.kind = ar::RenderStateKind::CpVat, .index = 0u, .value = 0u, .aux0 = 2u});
++
++    ar::ConsumedDraw draw{};
++    draw.primitive = 0x80u;
++    draw.vertex_count = 4u;
++    draw.vertex_size = 12u;
++    constexpr float vertices[4][3] = {
++        {-1.f, -1.f, 0.f}, {1.f, -1.f, 0.f}, {1.f, 1.f, 0.f}, {-1.f, 1.f, 0.f}};
++    for (const auto& vertex : vertices)
++      for (float value : vertex)
++        append_be_f32(draw.vertex_payload, value);
++    draw.transform_flags = ar::kDrawTransformProjectionValid;
++    draw.projection[0] = 1.f;
++    draw.projection[2] = 1.f;
++    draw.projection[4] = -1.f;
++    draw.projection_type = 1u;
++    draw.position_matrix_valid_mask = 1u;
++    draw.position_matrices[0][0] = 1.f;
++    draw.position_matrices[0][5] = 1.f;
++    draw.position_matrices[0][10] = 1.f;
++
++    draw.xf_regs[0] = 30u << 6u; // texgen 0 from GX_TEXMTX0 (row 30)
++    draw.xf_regs[0x27] = 1u;
++    // Regular, position source (row 0), ABC1; MTX3x4 sets the projection bit.
++    draw.xf_regs[0x28] = (stq ? 1u << 1u : 0u) | (1u << 2u);
++    draw.xf_reg_mask = (1ull << 0u) | (1ull << 0x27u) | (1ull << 0x28u);
++    const float tex[12] = {2.f, 0.f, 0.f, 0.5f, 0.f, 3.f, 0.f, 0.25f,
++                           0.f, 0.f, 4.f, 1.f};
++    std::memcpy(draw.tex_matrices[0], tex, sizeof tex);
++    draw.tex_matrix_word_mask[0] = 0xFFFu;
++    const float post[12] = {0.5f, 0.f, 2.f, 0.125f, 0.f, 0.25f, 0.f, 0.5f,
++                            0.f, 0.f, 1.f, 0.f};
++    draw.post_tex_mask = 1u;
++    std::memcpy(draw.post_tex_rows[0], post, sizeof post);
++
++    gxc::GapCounters gaps;
++    const gxc::DrawPlan plan = state.build_draw_plan(draw, gaps);
++    CHECK(plan.ok);
++    CHECK(plan.pipeline.shader.tex_gens[0].projection == (stq ? 1u : 0u));
++    const float(*m)[4] = plan.constants.texmatrices;
++    // Row 0: 0.5 * tex row 0, plus 2 * tex row 2 (STQ) or 2 * the constant 1
++    // (ST), plus the post row's w.
++    CHECK(m[0][0] == 1.f);
++    CHECK(m[0][2] == (stq ? 8.f : 0.f));
++    CHECK(m[0][3] == (stq ? 0.25f + 2.f + 0.125f : 0.25f + 2.f + 0.125f));
++    CHECK(m[1][1] == 0.75f);
++    CHECK(m[1][3] == 0.0625f + 0.5f);
++    CHECK(m[2][2] == (stq ? 4.f : 0.f));
++    CHECK(m[2][3] == (stq ? 1.f : 1.f));
++
++    // Without the mask bit (the identity post matrix) the rows are the
++    // texture matrix's.
++    draw.post_tex_mask = 0u;
++    const gxc::DrawPlan plain = state.build_draw_plan(draw, gaps);
++    CHECK(plain.constants.texmatrices[0][0] == 2.f);
++    CHECK(plain.constants.texmatrices[0][3] == 0.5f);
++  }
++}
++
+ // Item 5: Emboss texgen (Dolphin VertexShaderGen) adds the view-space light dir
+ // projected onto tangent/binormal to the emboss-source texgen's coords. Needs
+ // the lights uniform + NBT vertex inputs even on an unlit draw.
+@@ -1926,6 +2002,7 @@ int main() {
+   test_texgen_normal_source();
+   test_five_texgens();
+   test_fifth_texgen_plan_decode();
++  test_post_tex_matrix_fold();
+   test_texgen_emboss();
+   test_texgen_per_vertex_mtx();
+   test_tev_indirect_matrix();

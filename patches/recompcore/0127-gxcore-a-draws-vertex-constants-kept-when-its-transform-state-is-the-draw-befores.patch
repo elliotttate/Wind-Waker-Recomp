@@ -1,0 +1,767 @@
+From 6d0ed15c06a8906c8908910447e63adc948129f1 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Fri, 2 Oct 2026 18:53:08 -0400
+Subject: [PATCH 127/128] gxcore: a draw's vertex constants kept when its
+ transform state is the draw before's
+
+Every draw rebuilt its 2.8 KB vertex constant block from the transform state
+the front end snapshotted for it (the whole plan, constants included, was
+cleared first), and the submission layer then compared all 2.8 KB with the
+block it pushed last - though most draws repeat the draw before's (96
+percent in the Forsaken Fortress). On four of the i9's E-cores a profile of
+the GX worker put its copying (clearing, building, comparing, keeping
+copies) at about 30 percent of its working time, the compare alone the
+largest part.
+
+The transform state now has a version (dol_gx_recomp_xf_version): one
+counter, changed by every XF load that reaches what a draw snapshots, by
+matrix index A, an init, post-transform memory and a loaded state. It is
+kept outside DolGxRecompState, so saved states keep their size and load as
+before. The snapshot, the draw packet and the consumed draw carry it. A plan
+keeps its constants through the next draw's reset (DrawPlanFields is
+everything else); the builder makes them anew only when the version or the
+shader key bits they depend on (lighting, the lit channels, the texgens and
+their projection, the incoming cached normal) differ from what they were made
+from, and gives each block it makes a new constants_id. The submission layer
+takes a plan whose id is the block it pushed last as repeating it, without
+comparing, and compares the others as before (they may still be the same
+bytes). The per-texgen matrix rows and the unresolved-matrix count are kept
+with the constants. DOL_GXCORE_CONSTANTS_VERIFY=1 makes kept constants again
+and compares them; DOL_GXCORE_CONSTANTS_KEEP=0 always makes them.
+
+Checked on the i9 + RTX 5090 (BlueWake):
+- Kept constants against remade ones, bit for bit, everywhere reachable:
+  the Outset route (12.7 million draws), three save states (Gohma's room,
+  Dragon Roost Cavern's lava room and bridge) and five warps (the Flight
+  Control Platform, sea rooms 25 and 11, Dragon Roost Cavern, Forest
+  Haven): no difference.
+- Smooth Motion dumps, game frames 880-910, identical to the build before
+  (62 of 62); gxcore_tests and frame_interp_test pass.
+- Four E-cores, unpaced, Smooth Motion off (a fixed amount of work), kept
+  against always made, four runs each, interleaved: the GX worker's CPU per
+  game frame 16.4-17.0 ms against 18.8-19.2 (12 percent less), and the game,
+  which waits on the GX worker at its draw-done barriers, at 34.0-34.7 game
+  frames a second against 32.9-33.5; the game thread's own CPU per frame the
+  same (23.5-24.5 ms). Paced at Smooth Motion 60 both held full speed.
+---
+ .../graphics/aurora/lib/gfx/gxcore_draw.cpp   |  14 +-
+ .../gxruntime/aurora_recomp/render_sink.hpp   |   5 +
+ .../aurora_recomp/retail_gx_frontend.hpp      |   2 +
+ .../graphics/frontend/src/render_sink.cpp     |   1 +
+ .../frontend/src/retail_gx_frontend.cpp       |   8 +-
+ .../include/gxruntime/gxcore/shader.hpp       |  44 +-
+ GXRuntime/graphics/gxcore/src/gxcore.cpp      | 407 ++++++++++--------
+ GXRuntime/include/gxruntime/gx_recomp.h       |   8 +
+ GXRuntime/src/gx_recomp.c                     |  13 +
+ 9 files changed, 318 insertions(+), 184 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index 9784f6d6..a7f6beb6 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -991,6 +991,8 @@ struct UniformCache {
+ #endif
+ };
+ static UniformCache g_vertexUniformCache;
++// The constants_id of the plan whose constants g_vertexUniformCache holds the bytes of (0: none).
++static uint64_t g_pushedConstantsId = 0;
+ static UniformCache g_interpUniformCache;
+ static UniformCache g_pixelUniformCache;
+ 
+@@ -1718,8 +1720,15 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   // in-between frame's pool and its block): most draws repeat the constants of
+   // the draw before them, 96 percent of the Forsaken Fortress's 17,500 a frame,
+   // and each comparison of equal blocks reads all 2.8 KB of both.
+-  const bool repeatsLast = repeats_cached(g_vertexUniformCache, reinterpret_cast<const uint8_t*>(&plan.constants),
+-                                          sizeof(plan.constants));
++  // A plan whose constants were kept from the draw before (constants_id, set
++  // by GxCoreState::build_draw_plan_into) is known to repeat the block last
++  // pushed in this frame packet without comparing them; constants made anew
++  // are compared (they may still be the same bytes).
++  const uint64_t frameId = current_frame_id();
++  const bool repeatsLast =
++      (plan.constants_id != 0 && frameId != 0 && plan.constants_id == g_pushedConstantsId &&
++       g_vertexUniformCache.frameId == frameId && g_vertexUniformCache.range.size == sizeof(plan.constants)) ||
++      repeats_cached(g_vertexUniformCache, reinterpret_cast<const uint8_t*>(&plan.constants), sizeof(plan.constants));
+   // In-between frames: matched on the helper thread (queued below), or here
+   // while a traced frame reports each draw's outcome. Here it is matched
+   // before a staging segment can split the frame; a split frame is not
+@@ -1777,6 +1786,7 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   const auto uniformRange = push_uniform_dedup(
+       g_vertexUniformCache, reinterpret_cast<const uint8_t*>(&plan.constants),
+       sizeof(plan.constants), repeatsLast ? 1 : 0);
++  g_pushedConstantsId = plan.constants_id;
+   Range pixelUniformRange{};
+   bool pixelRepeats = false;
+   if (tev) {
+diff --git a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+index fb024086..35d1daa4 100644
+--- a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
++++ b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/render_sink.hpp
+@@ -112,6 +112,10 @@ struct RenderDrawPacket {
+   // null in pure-state replays that don't carry the draw bytes.
+   const std::uint8_t* vertex_payload = nullptr;
+   std::uint32_t vertex_payload_size = 0;
++  // dol_gx_recomp_xf_version() when the transform state below was snapshotted
++  // (0: unknown, as in a replay): two draws with the same nonzero number had
++  // the same transform state.
++  std::uint64_t xf_version = 0;
+   // Transform state snapshotted at draw time. Projection/viewport validity is
+   // in transform_flags; position_matrix_valid_mask has one bit per PN matrix.
+   // current_pn_matrix is the Aurora uniform fallback when PNMTXIDX is absent;
+@@ -260,6 +264,7 @@ struct ConsumedDraw {
+   // per-vertex indices), retained from the Draw packet so an issuing sink can
+   // assemble vertices after submit. Empty when the packet carried no payload.
+   std::vector<std::uint8_t> vertex_payload;
++  std::uint64_t xf_version = 0; // as in RenderDrawPacket
+   std::uint32_t transform_flags = 0;
+   std::uint32_t current_pn_matrix = 0;
+   std::uint32_t payload_pn_matrix_mask = 0;
+diff --git a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
+index 5750d1e3..c755a542 100644
+--- a/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
++++ b/GXRuntime/graphics/frontend/include/gxruntime/aurora_recomp/retail_gx_frontend.hpp
+@@ -16,6 +16,8 @@ extern "C" {
+ namespace gxruntime::aurora_recomp {
+ 
+ struct DrawTransformSnapshot {
++  // dol_gx_recomp_xf_version() at the draw: the same number, the same state.
++  std::uint64_t xf_version = 0;
+   std::uint32_t transform_flags = 0;
+   std::uint32_t current_pn_matrix = 0;
+   std::uint32_t payload_pn_matrix_mask = 0;
+diff --git a/GXRuntime/graphics/frontend/src/render_sink.cpp b/GXRuntime/graphics/frontend/src/render_sink.cpp
+index 1752b41c..7a2fce92 100644
+--- a/GXRuntime/graphics/frontend/src/render_sink.cpp
++++ b/GXRuntime/graphics/frontend/src/render_sink.cpp
+@@ -231,6 +231,7 @@ bool ConsumingAuroraRenderSink::submit_packet(const RenderPacket& packet) {
+     draw.texture = bound_texture_;
+     for (std::uint32_t t = 0; t < ConsumedDraw::kMaxTexmaps; ++t)
+       draw.textures[t] = bound_textures_[t];
++    draw.xf_version = packet.draw.xf_version;
+     draw.transform_flags = packet.draw.transform_flags;
+     draw.current_pn_matrix = packet.draw.current_pn_matrix;
+     draw.payload_pn_matrix_mask = packet.draw.payload_pn_matrix_mask;
+diff --git a/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp b/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
+index 4bdc62ef..f4c45181 100644
+--- a/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
++++ b/GXRuntime/graphics/frontend/src/retail_gx_frontend.cpp
+@@ -261,10 +261,13 @@ void capture_post_tex(PostTexMatrices& post, std::uint32_t base,
+                       std::uint32_t count, const std::uint8_t* data_be) {
+   const std::span<const std::uint8_t> data(data_be, count * 4u);
+   const std::uint32_t last = base + count - 1u;
+-  if (base <= kXfDualTex && last >= kXfDualTex)
++  if (base <= kXfDualTex && last >= kXfDualTex) {
+     post.off = (read_be32(data, (kXfDualTex - base) * 4u) & 1u) == 0u;
++    dol_gx_recomp_bump_xf_version();
++  }
+   if (last < kXfPostMatrixBase || base >= kXfPostMatrixEnd)
+     return;
++  dol_gx_recomp_bump_xf_version();
+   const std::uint32_t first = base > kXfPostMatrixBase ? base : kXfPostMatrixBase;
+   const std::uint32_t end = last < kXfPostMatrixEnd - 1u ? last : kXfPostMatrixEnd - 1u;
+   for (std::uint32_t address = first; address <= end; ++address) {
+@@ -344,6 +347,7 @@ void snapshot_transform_into(DrawTransformSnapshot& out,
+                              const DolGxRecompVertexLayout& layout,
+                              std::span<const std::uint8_t> vertex_data,
+                              std::uint16_t vertex_count) {
++  out.xf_version = dol_gx_recomp_xf_version();
+   out.transform_flags = 0u;
+   out.position_matrix_valid_mask = 0u;
+   std::memset(out.viewport, 0, sizeof(out.viewport));
+@@ -483,6 +487,7 @@ bool RetailGxFrontend::load_state(const std::uint8_t* data, std::size_t size) {
+   const std::uint8_t* at = data + sizeof header;
+   std::memcpy(&state_, at, sizeof(DolGxRecompState));
+   at += sizeof(DolGxRecompState);
++  dol_gx_recomp_bump_xf_version(); // all of it may have changed
+   state_.resolver = resolver;
+   state_.fifo.size = 0u;
+   state_.trace_count = 0u;
+@@ -1236,6 +1241,7 @@ bool RetailGxFrontend::emit_new_packets(AuroraRenderSink& sink,
+         draw_transform_head_ < draw_queue_count_) {
+       const DrawTransformSnapshot& transform =
+           draw_transform_queue_[draw_transform_head_++];
++      packet.draw.xf_version = transform.xf_version;
+       packet.draw.transform_flags = transform.transform_flags;
+       packet.draw.current_pn_matrix = transform.current_pn_matrix;
+       packet.draw.payload_pn_matrix_mask =
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+index 60f7ca22..61507461 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+@@ -453,16 +453,34 @@ struct PlanTexture {
+   std::uint32_t tlut_available = 0;
+ };
+ 
++// What a draw's vertex constants are made from besides the transform state's
++// own words (DrawPlan::constants_inputs): two draws with the same inputs have
++// the same constants. Every byte is a field, so it compares as a block (bit
++// for bit: equal inputs make equal constants).
++struct ConstantsInputs {
++  std::uint64_t xf_version = 0; // ar::ConsumedDraw::xf_version; 0 never matches
++  float cached[9]{};            // the incoming cached normal, tangent, binormal
++  std::uint8_t has_cached = 0;
++  std::uint8_t lit_valid = 0;
++  std::uint8_t chan_lit = 0;    // a colour channel takes the lit path
++  std::uint8_t num_tex_gens = 0;
++  std::uint8_t texgen_stq = 0;  // bit per texgen with three rows (projection)
++  std::uint8_t pad[7]{};
++};
++// No padding the compiler adds (the floats keep the type from proving it).
++static_assert(sizeof(ConstantsInputs) == 8 + 9 * 4 + 5 + 7);
++
+ // packed uniforms, the pipeline key, and the bound texture's guest identity +
+ // host bytes (converted by the substrate's GX codecs at upload).
+-struct DrawPlan {
++// DrawPlanFields is everything set afresh for each draw; DrawPlan adds the
++// vertex constants, which a plan reused for the next draw keeps when they are
++// made from the same inputs (most draws repeat the draw before's), and the
++// vertex and index arrays.
++struct DrawPlanFields {
+   bool ok = false;
+   const char* skip_reason = nullptr; // set when ok==false
+   PipelineKey pipeline{};
+-  VertexShaderConstants constants{};
+   PixelShaderConstants pixel_constants{}; // S14 TEV color/konst/alpha uniforms
+-  std::vector<float> vertices; // kVertexFloats per vertex
+-  std::vector<std::uint16_t> indices;
+   std::uint32_t vertex_count = 0;
+   // The draw's raw FIFO vertex payload (per-vertex indices and direct
+   // attributes) and its command, for matching one model's draw across frames.
+@@ -521,11 +539,25 @@ struct DrawPlan {
+   std::uint32_t texmap_mask = 0;
+   PlanSampler samplers[8]{};
+   PlanTexture textures[8]{};
+-  // Diagnostics: each texgen's XF matrix row, and MatrixIndexA as captured.
+-  std::uint8_t texgen_row[kMaxTexGens]{};
++  // Diagnostics: MatrixIndexA as captured.
+   std::uint32_t matrix_index_a = 0;
+ };
+ 
++struct DrawPlan : DrawPlanFields {
++  VertexShaderConstants constants{};
++  // Made with the constants: each texgen's XF matrix row (diagnostics) and
++  // how many texgens found no matrix (GapCounters::unresolved_tex_matrix).
++  std::uint8_t texgen_row[kMaxTexGens]{};
++  std::uint32_t constants_unresolved = 0;
++  // What they were made from, and a number for them, new each time they are
++  // made (0: not made), so a consumer knows two draws' are the same without
++  // comparing them.
++  ConstantsInputs constants_inputs{};
++  std::uint64_t constants_id = 0;
++  std::vector<float> vertices; // kVertexFloats per vertex
++  std::vector<std::uint16_t> indices;
++};
++
+ // --- EFB copy-to-texture (S16) ------------------------------------------------
+ 
+ // One EFB copy-to-texture request, reconstructed from a BP 0x52 trigger + its
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore.cpp b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+index 418226a3..89e3c45c 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+@@ -627,17 +627,13 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+                                        CachedVertexAttrs* cached,
+                                        DrawPlan& plan) const {
+   {
+-    std::vector<float> vertices = std::move(plan.vertices);
+-    std::vector<std::uint16_t> indices = std::move(plan.indices);
+-    // Re-constructed in place: assigning a DrawPlan{} built the zeroed
+-    // temporary and then copied all of it (the shader constants are several
+-    // KB) over the plan, at every draw.
+-    std::destroy_at(&plan);
+-    std::construct_at(&plan);
+-    vertices.clear();
+-    indices.clear();
+-    plan.vertices = std::move(vertices);
+-    plan.indices = std::move(indices);
++    // Every field to its default, from one copy made once; the vertex and
++    // index arrays keep their capacity, and the vertex constants stay as they
++    // are until the draw's inputs are known (see "Uniforms" below).
++    static const DrawPlanFields kDefaults{};
++    static_cast<DrawPlanFields&>(plan) = kDefaults;
++    plan.vertices.clear();
++    plan.indices.clear();
+   }
+   plan.match_payload = draw.vertex_payload.data();
+   plan.match_payload_size = static_cast<std::uint32_t>(draw.vertex_payload.size());
+@@ -1455,172 +1451,237 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+                 &texmtxidx_packed_hi, sizeof texmtxidx_packed_hi);
+   }
+ 
+-  // Uniforms.
+-  VertexShaderConstants& c = plan.constants;
+-  // Rows 0-29 are position_matrices laid end to end (3 rows of 4 per matrix)
+-  // and rows 30-62 are tex_matrices the same way, so the 63 per-row copies
+-  // load_matrix_row made (their validity result was discarded) are two block
+-  // copies. This ran for every draw, about 18,000 a frame in heavy scenes.
+-  static_assert(sizeof(draw.position_matrices) == 30u * 4u * sizeof(float));
+-  static_assert(sizeof(draw.tex_matrices) == 33u * 4u * sizeof(float));
+-  std::memcpy(&c.transformmatrices[0][0], draw.position_matrices,
+-              sizeof(draw.position_matrices));
+-  std::memcpy(&c.transformmatrices[30][0], draw.tex_matrices,
+-              sizeof(draw.tex_matrices));
+-  const std::uint32_t pn_row = draw.current_pn_matrix * 3u;
+-  for (std::uint32_t k = 0; k < 3u; ++k)
+-    (void)load_matrix_row(draw, pn_row + k, c.posnormalmatrix[k]);
+-  // Normal matrix (XF 0x400): matrix M = current_pn_matrix, 3 rows of
+-  // 3 (Dolphin VertexShaderManager normalMatrices[3*(PosNormalMtxIdx&31)] == our
+-  // per-matrix [M] slot). Fall back to the position rows when it was never
+-  // captured (keeps the A1 behavior for uncaptured draws).
+-  {
+-    const std::uint32_t m = draw.current_pn_matrix;
+-    const bool nm_valid =
+-        m < DOL_GX_RECOMP_NORMAL_MATRIX_COUNT &&
+-        draw.normal_matrix_word_mask[m] ==
+-            ((1u << DOL_GX_RECOMP_NORMAL_MATRIX_WORDS) - 1u);
++  // Uniforms. Most draws are made with the transform state of the draw
++  // before them (96 percent in the Forsaken Fortress, 17,500 draws a frame):
++  // when the inputs below are the ones the plan's constants were made from,
++  // they are kept, and the constants_id tells the submission layer that the
++  // block is the same without comparing its 2.8 KB.
++  // DOL_GXCORE_CONSTANTS_VERIFY=1 makes them again anyway and compares, and
++  // DOL_GXCORE_CONSTANTS_KEEP=0 always makes them (debug).
++  ConstantsInputs inputs{};
++  inputs.xf_version = draw.xf_version;
++  if (cached != nullptr) {
++    inputs.has_cached = 1u;
+     for (std::uint32_t k = 0; k < 3u; ++k) {
+-      if (nm_valid) {
+-        c.posnormalmatrix[3u + k][0] = draw.normal_matrices[m][3u * k + 0u];
+-        c.posnormalmatrix[3u + k][1] = draw.normal_matrices[m][3u * k + 1u];
+-        c.posnormalmatrix[3u + k][2] = draw.normal_matrices[m][3u * k + 2u];
+-        c.posnormalmatrix[3u + k][3] = 0.f;
+-      } else {
+-        (void)load_matrix_row(draw, pn_row + k, c.posnormalmatrix[3u + k]);
+-      }
++      inputs.cached[k] = cached->normal[k];
++      inputs.cached[3u + k] = cached->tangent[k];
++      inputs.cached[6u + k] = cached->binormal[k];
+     }
+   }
+-  // Dolphin uploads the complete packed normal-matrix row bank for vertex
+-  // formats carrying PNMTXIDX. XF stores 96 floats as 32 rows of three; the
+-  // C/WGSL uniform pads each row to vec4 alignment.
+-  for (std::uint32_t row = 0; row < 32u; ++row) {
+-    const std::uint32_t matrix = row / 3u;
+-    const std::uint32_t matrix_row = row % 3u;
+-    if (matrix >= DOL_GX_RECOMP_NORMAL_MATRIX_COUNT)
+-      continue;
+-    const std::uint16_t row_mask =
+-        static_cast<std::uint16_t>(0x7u << (3u * matrix_row));
+-    if ((draw.normal_matrix_word_mask[matrix] & row_mask) != row_mask)
+-      continue;
+-    for (std::uint32_t col = 0; col < 3u; ++col)
+-      c.normalmatrices[row][col] =
+-          draw.normal_matrices[matrix][3u * matrix_row + col];
+-  }
++  inputs.lit_valid = key.lit_valid;
++  inputs.chan_lit = channel_lit_path(key, 0u) || channel_lit_path(key, 1u) ? 1u : 0u;
++  inputs.num_tex_gens = key.num_tex_gens;
++  for (std::uint32_t i = 0; i < key.num_tex_gens && i < kMaxTexGens; ++i)
++    if (key.tex_gens[i].projection != 0u)
++      inputs.texgen_stq |= static_cast<std::uint8_t>(1u << i);
++  static const bool keep_constants = [] {
++    const char* env = std::getenv("DOL_GXCORE_CONSTANTS_KEEP");
++    return env == nullptr || env[0] != '0';
++  }();
++  const bool reuse = keep_constants && inputs.xf_version != 0u && plan.constants_id != 0u &&
++                     std::memcmp(&inputs, &plan.constants_inputs, sizeof inputs) == 0;
++  static const bool verify_constants = [] {
++    const char* env = std::getenv("DOL_GXCORE_CONSTANTS_VERIFY");
++    return env != nullptr && env[0] == '1';
++  }();
++  static VertexShaderConstants verify_scratch;
++  if (!reuse || verify_constants) {
++    VertexShaderConstants& c = reuse ? verify_scratch : plan.constants;
++    std::uint8_t texgen_row[kMaxTexGens];
++    std::memset(texgen_row, 0, sizeof texgen_row);
++    std::uint32_t unresolved = 0;
++    c = VertexShaderConstants{};
++    // Rows 0-29 are position_matrices laid end to end (3 rows of 4 per matrix)
++    // and rows 30-62 are tex_matrices the same way, so the 63 per-row copies
++    // load_matrix_row made (their validity result was discarded) are two block
++    // copies. This ran for every draw, about 18,000 a frame in heavy scenes.
++    static_assert(sizeof(draw.position_matrices) == 30u * 4u * sizeof(float));
++    static_assert(sizeof(draw.tex_matrices) == 33u * 4u * sizeof(float));
++    std::memcpy(&c.transformmatrices[0][0], draw.position_matrices,
++                sizeof(draw.position_matrices));
++    std::memcpy(&c.transformmatrices[30][0], draw.tex_matrices,
++                sizeof(draw.tex_matrices));
++    const std::uint32_t pn_row = draw.current_pn_matrix * 3u;
++    for (std::uint32_t k = 0; k < 3u; ++k)
++      (void)load_matrix_row(draw, pn_row + k, c.posnormalmatrix[k]);
++    // Normal matrix (XF 0x400): matrix M = current_pn_matrix, 3 rows of
++    // 3 (Dolphin VertexShaderManager normalMatrices[3*(PosNormalMtxIdx&31)] == our
++    // per-matrix [M] slot). Fall back to the position rows when it was never
++    // captured (keeps the A1 behavior for uncaptured draws).
++    {
++      const std::uint32_t m = draw.current_pn_matrix;
++      const bool nm_valid =
++          m < DOL_GX_RECOMP_NORMAL_MATRIX_COUNT &&
++          draw.normal_matrix_word_mask[m] ==
++              ((1u << DOL_GX_RECOMP_NORMAL_MATRIX_WORDS) - 1u);
++      for (std::uint32_t k = 0; k < 3u; ++k) {
++        if (nm_valid) {
++          c.posnormalmatrix[3u + k][0] = draw.normal_matrices[m][3u * k + 0u];
++          c.posnormalmatrix[3u + k][1] = draw.normal_matrices[m][3u * k + 1u];
++          c.posnormalmatrix[3u + k][2] = draw.normal_matrices[m][3u * k + 2u];
++          c.posnormalmatrix[3u + k][3] = 0.f;
++        } else {
++          (void)load_matrix_row(draw, pn_row + k, c.posnormalmatrix[3u + k]);
++        }
++      }
++    }
++    // Dolphin uploads the complete packed normal-matrix row bank for vertex
++    // formats carrying PNMTXIDX. XF stores 96 floats as 32 rows of three; the
++    // C/WGSL uniform pads each row to vec4 alignment.
++    for (std::uint32_t row = 0; row < 32u; ++row) {
++      const std::uint32_t matrix = row / 3u;
++      const std::uint32_t matrix_row = row % 3u;
++      if (matrix >= DOL_GX_RECOMP_NORMAL_MATRIX_COUNT)
++        continue;
++      const std::uint16_t row_mask =
++          static_cast<std::uint16_t>(0x7u << (3u * matrix_row));
++      if ((draw.normal_matrix_word_mask[matrix] & row_mask) != row_mask)
++        continue;
++      for (std::uint32_t col = 0; col < 3u; ++col)
++        c.normalmatrices[row][col] =
++            draw.normal_matrices[matrix][3u * matrix_row + col];
++    }
+ 
+-  // Lighting uniforms (S15): 8 XF lights + 4 material/ambient registers. Light
+-  // words (gx_recomp.h): [3]=RGBA8 color, [4..6]=cosatt, [7..9]=distatt,
+-  // [10..12]=pos, [13..15]=dir (f32 bit patterns). Lights are read only when a
+-  // light is enabled (lit_valid); the material registers are read by any channel
+-  // taking the full path (register material/ambient or lighting). Both are left
+-  // zero otherwise — the WGSL for such a draw never references them.
+-  auto unpack_rgba8 = [](std::uint32_t col, std::int32_t out[4]) {
+-    out[0] = static_cast<std::int32_t>((col >> 24) & 0xFFu);
+-    out[1] = static_cast<std::int32_t>((col >> 16) & 0xFFu);
+-    out[2] = static_cast<std::int32_t>((col >> 8) & 0xFFu);
+-    out[3] = static_cast<std::int32_t>(col & 0xFFu);
+-  };
+-  if (key.lit_valid) {
+-    auto f32_of = [](std::uint32_t raw) {
+-      float f;
+-      std::memcpy(&f, &raw, sizeof f);
+-      return f;
++    // Lighting uniforms (S15): 8 XF lights + 4 material/ambient registers. Light
++    // words (gx_recomp.h): [3]=RGBA8 color, [4..6]=cosatt, [7..9]=distatt,
++    // [10..12]=pos, [13..15]=dir (f32 bit patterns). Lights are read only when a
++    // light is enabled (lit_valid); the material registers are read by any channel
++    // taking the full path (register material/ambient or lighting). Both are left
++    // zero otherwise — the WGSL for such a draw never references them.
++    auto unpack_rgba8 = [](std::uint32_t col, std::int32_t out[4]) {
++      out[0] = static_cast<std::int32_t>((col >> 24) & 0xFFu);
++      out[1] = static_cast<std::int32_t>((col >> 16) & 0xFFu);
++      out[2] = static_cast<std::int32_t>((col >> 8) & 0xFFu);
++      out[3] = static_cast<std::int32_t>(col & 0xFFu);
+     };
+-    for (std::uint32_t i = 0; i < 8u; ++i) {
+-      const std::uint32_t* w = draw.light_words[i];
+-      unpack_rgba8(w[3], c.lights[i].color);
+-      for (std::uint32_t k = 0; k < 3u; ++k) {
+-        c.lights[i].cosatt[k] = f32_of(w[4 + k]);
+-        c.lights[i].distatt[k] = f32_of(w[7 + k]);
+-        c.lights[i].pos[k] = f32_of(w[10 + k]);
+-        c.lights[i].dir[k] = f32_of(w[13 + k]);
++    if (key.lit_valid) {
++      auto f32_of = [](std::uint32_t raw) {
++        float f;
++        std::memcpy(&f, &raw, sizeof f);
++        return f;
++      };
++      for (std::uint32_t i = 0; i < 8u; ++i) {
++        const std::uint32_t* w = draw.light_words[i];
++        unpack_rgba8(w[3], c.lights[i].color);
++        for (std::uint32_t k = 0; k < 3u; ++k) {
++          c.lights[i].cosatt[k] = f32_of(w[4 + k]);
++          c.lights[i].distatt[k] = f32_of(w[7 + k]);
++          c.lights[i].pos[k] = f32_of(w[10 + k]);
++          c.lights[i].dir[k] = f32_of(w[13 + k]);
++        }
+       }
+     }
+-  }
+-  if (channel_lit_path(key, 0u) || channel_lit_path(key, 1u)) {
+-    // I_MATERIALS: [0]=amb0(0x100A), [1]=amb1(0x100B), [2]=mat0(0x100C),
+-    // [3]=mat1(0x100D) — chan_regs slots 1..4.
+-    const std::uint32_t mat_slot[4] = {1u, 2u, 3u, 4u};
+-    for (std::uint32_t m = 0; m < 4u; ++m) {
+-      const std::uint32_t col = (draw.chan_reg_mask & (1u << mat_slot[m]))
+-                                    ? draw.chan_regs[mat_slot[m]]
+-                                    : 0u;
+-      unpack_rgba8(col, c.materials[m]);
++    if (channel_lit_path(key, 0u) || channel_lit_path(key, 1u)) {
++      // I_MATERIALS: [0]=amb0(0x100A), [1]=amb1(0x100B), [2]=mat0(0x100C),
++      // [3]=mat1(0x100D) — chan_regs slots 1..4.
++      const std::uint32_t mat_slot[4] = {1u, 2u, 3u, 4u};
++      for (std::uint32_t m = 0; m < 4u; ++m) {
++        const std::uint32_t col = (draw.chan_reg_mask & (1u << mat_slot[m]))
++                                      ? draw.chan_regs[mat_slot[m]]
++                                      : 0u;
++        unpack_rgba8(col, c.materials[m]);
++      }
+     }
+-  }
+-  // Projection (GC 6-param form; Dolphin VertexShaderManager layout).
+-  const float* pr = draw.projection;
+-  if (draw.projection_type == 1u) { // orthographic
+-    c.projection[0][0] = pr[0];
+-    c.projection[0][3] = pr[1];
+-    c.projection[1][1] = pr[2];
+-    c.projection[1][3] = pr[3];
+-    c.projection[2][2] = pr[4];
+-    c.projection[2][3] = pr[5];
+-    c.projection[3][3] = 1.f;
+-  } else { // perspective
+-    c.projection[0][0] = pr[0];
+-    c.projection[0][2] = pr[1];
+-    c.projection[1][1] = pr[2];
+-    c.projection[1][2] = pr[3];
+-    c.projection[2][2] = pr[4];
+-    c.projection[2][3] = pr[5];
+-    c.projection[3][2] = -1.f;
+-  }
+-  // Per-texgen matrix rows via XF MatrixIndexA/B (CPMemory.h TMatrixIndexA/B).
+-  const bool mat_idx_a_valid = (draw.xf_reg_mask & 0x1ull) != 0ull;
+-  const bool mat_idx_b_valid = (draw.xf_reg_mask & 0x2ull) != 0ull;
+-  const std::uint32_t mat_idx_a = draw.xf_regs[0];
+-  const std::uint32_t mat_idx_b = draw.xf_regs[1];
+-  for (std::uint32_t i = 0; i < key.num_tex_gens; ++i) {
+-    std::uint32_t row = 60u; // GX_IDENTITY row when never configured
+-    bool row_known = false;
+-    if (i < 4u && mat_idx_a_valid) {
+-      row = bits(mat_idx_a, 6, 6 + 6 * i);
+-      row_known = true;
+-    } else if (i >= 4u && mat_idx_b_valid) {
+-      // CPMemory.h TMatrixIndexB begins Tex4MtxIdx at bit 0; unlike A it has
+-      // no leading PosNormalMtxIdx field.
+-      row = bits(mat_idx_b, 6, 6 * (i - 4u));
+-      row_known = true;
++    // Projection (GC 6-param form; Dolphin VertexShaderManager layout).
++    const float* pr = draw.projection;
++    if (draw.projection_type == 1u) { // orthographic
++      c.projection[0][0] = pr[0];
++      c.projection[0][3] = pr[1];
++      c.projection[1][1] = pr[2];
++      c.projection[1][3] = pr[3];
++      c.projection[2][2] = pr[4];
++      c.projection[2][3] = pr[5];
++      c.projection[3][3] = 1.f;
++    } else { // perspective
++      c.projection[0][0] = pr[0];
++      c.projection[0][2] = pr[1];
++      c.projection[1][1] = pr[2];
++      c.projection[1][2] = pr[3];
++      c.projection[2][2] = pr[4];
++      c.projection[2][3] = pr[5];
++      c.projection[3][2] = -1.f;
+     }
+-    float rows[3][4];
+-    bool resolved = row_known;
+-    for (std::uint32_t k = 0; k < 3u; ++k)
+-      resolved = load_matrix_row(draw, row + k, rows[k]) && resolved;
+-    if (!resolved) {
+-      // Never-written matrix memory: pass raw ST through (identity) and
+-      // count it loudly instead of collapsing every UV to zero.
+-      identity_rows(rows);
+-      ++counters.unresolved_tex_matrix;
++    // Per-texgen matrix rows via XF MatrixIndexA/B (CPMemory.h TMatrixIndexA/B).
++    const bool mat_idx_a_valid = (draw.xf_reg_mask & 0x1ull) != 0ull;
++    const bool mat_idx_b_valid = (draw.xf_reg_mask & 0x2ull) != 0ull;
++    const std::uint32_t mat_idx_a = draw.xf_regs[0];
++    const std::uint32_t mat_idx_b = draw.xf_regs[1];
++    for (std::uint32_t i = 0; i < key.num_tex_gens; ++i) {
++      std::uint32_t row = 60u; // GX_IDENTITY row when never configured
++      bool row_known = false;
++      if (i < 4u && mat_idx_a_valid) {
++        row = bits(mat_idx_a, 6, 6 + 6 * i);
++        row_known = true;
++      } else if (i >= 4u && mat_idx_b_valid) {
++        // CPMemory.h TMatrixIndexB begins Tex4MtxIdx at bit 0; unlike A it has
++        // no leading PosNormalMtxIdx field.
++        row = bits(mat_idx_b, 6, 6 * (i - 4u));
++        row_known = true;
++      }
++      float rows[3][4];
++      bool resolved = row_known;
++      for (std::uint32_t k = 0; k < 3u; ++k)
++        resolved = load_matrix_row(draw, row + k, rows[k]) && resolved;
++      if (!resolved) {
++        // Never-written matrix memory: pass raw ST through (identity) and
++        // count it loudly instead of collapsing every UV to zero.
++        identity_rows(rows);
++        ++unresolved;
++      }
++      // Dual-texture post transform (XF 0x1012, on since GXInit): the texture
++      // matrix's result goes through a second matrix from post-transform memory
++      // (Dolphin VertexShaderGen WriteTexCoordTransforms). Without normalization
++      // the two are one 3x4 matrix, folded here so the shader is unchanged:
++      // coord.w is 1, so each post row's w joins the fourth column, and a
++      // two-row (ST) texgen's third coordinate is the constant 1. The lava's
++      // pattern and colour ramp are projected this way (d_magma.cpp).
++      if ((draw.post_tex_mask & (1u << i)) != 0u &&
++          (draw.post_tex_normalize & (1u << i)) == 0u) {
++        const float* p = draw.post_tex_rows[i];
++        const bool stq = key.tex_gens[i].projection != 0u;
++        float folded[3][4];
++        for (std::uint32_t r = 0; r < 3u; ++r) {
++          const float* pr = p + 4u * r;
++          for (std::uint32_t col = 0; col < 4u; ++col)
++            folded[r][col] = pr[0] * rows[0][col] + pr[1] * rows[1][col] +
++                             (stq ? pr[2] * rows[2][col] : 0.f);
++          folded[r][3] += pr[3] + (stq ? 0.f : pr[2]);
++        }
++        std::memcpy(rows, folded, sizeof rows);
++      }
++      for (std::uint32_t k = 0; k < 3u; ++k)
++        std::memcpy(c.texmatrices[3u * i + k], rows[k], sizeof rows[k]);
++      if (i < kMaxTexGens)
++        texgen_row[i] = static_cast<std::uint8_t>(resolved ? row : 0xFFu);
+     }
+-    // Dual-texture post transform (XF 0x1012, on since GXInit): the texture
+-    // matrix's result goes through a second matrix from post-transform memory
+-    // (Dolphin VertexShaderGen WriteTexCoordTransforms). Without normalization
+-    // the two are one 3x4 matrix, folded here so the shader is unchanged:
+-    // coord.w is 1, so each post row's w joins the fourth column, and a
+-    // two-row (ST) texgen's third coordinate is the constant 1. The lava's
+-    // pattern and colour ramp are projected this way (d_magma.cpp).
+-    if ((draw.post_tex_mask & (1u << i)) != 0u &&
+-        (draw.post_tex_normalize & (1u << i)) == 0u) {
+-      const float* p = draw.post_tex_rows[i];
+-      const bool stq = key.tex_gens[i].projection != 0u;
+-      float folded[3][4];
+-      for (std::uint32_t r = 0; r < 3u; ++r) {
+-        const float* pr = p + 4u * r;
+-        for (std::uint32_t col = 0; col < 4u; ++col)
+-          folded[r][col] = pr[0] * rows[0][col] + pr[1] * rows[1][col] +
+-                           (stq ? pr[2] * rows[2][col] : 0.f);
+-        folded[r][3] += pr[3] + (stq ? 0.f : pr[2]);
++    // Cached N/B/T fallback (Dolphin ConstantManager cached_normal): the
++    // incoming cross-draw cache, for a draw whose format omits the attribute
++    // (see the end of the plan, where this draw advances the cache).
++    if (cached != nullptr) {
++      for (std::uint32_t k = 0; k < 3u; ++k) {
++        c.cached_normal[k] = cached->normal[k];
++        c.cached_tangent[k] = cached->tangent[k];
++        c.cached_binormal[k] = cached->binormal[k];
+       }
+-      std::memcpy(rows, folded, sizeof rows);
+     }
+-    for (std::uint32_t k = 0; k < 3u; ++k)
+-      std::memcpy(c.texmatrices[3u * i + k], rows[k], sizeof rows[k]);
+-    if (i < kMaxTexGens)
+-      plan.texgen_row[i] = static_cast<std::uint8_t>(resolved ? row : 0xFFu);
++    if (!reuse) {
++      std::memcpy(plan.texgen_row, texgen_row, sizeof texgen_row);
++      plan.constants_unresolved = unresolved;
++      plan.constants_inputs = inputs;
++      static std::atomic<std::uint64_t> next_constants_id{0};
++      plan.constants_id = next_constants_id.fetch_add(1u, std::memory_order_relaxed) + 1u;
++    } else {
++      static std::uint64_t mismatches = 0;
++      if ((std::memcmp(&c, &plan.constants, sizeof c) != 0 ||
++           std::memcmp(texgen_row, plan.texgen_row, sizeof texgen_row) != 0 ||
++           unresolved != plan.constants_unresolved) &&
++          ++mismatches <= 8u)
++        std::fprintf(stderr, "[gx-constants] kept constants differ from remade ones (#%llu, xf version %llu)\n",
++                     static_cast<unsigned long long>(mismatches), static_cast<unsigned long long>(inputs.xf_version));
++    }
+   }
+-  plan.matrix_index_a = mat_idx_a_valid ? mat_idx_a : 0xFFFFFFFFu;
++  counters.unresolved_tex_matrix += plan.constants_unresolved;
++  plan.matrix_index_a = (draw.xf_reg_mask & 0x1ull) != 0ull ? draw.xf_regs[0] : 0xFFFFFFFFu;
+ 
+   // Viewport + texture.
+   if ((draw.transform_flags & ar::kDrawTransformViewportValid) != 0u) {
+@@ -1852,18 +1913,14 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+   }
+ 
+   // Cached N/B/T fallback (Dolphin VertexLoaderManager normal_cache /
+-  // ConstantManager cached_normal). Expose the incoming cross-draw cache in the
+-  // uniform so a draw whose format omits an attribute reads the last-decoded
+-  // vertex's value instead of a zero input (normalize(0) = NaN). Then, if THIS
+-  // draw carried the attribute, advance the cache to its LAST vertex's raw
+-  // object-space value (Dolphin writes the cache on the loader's m_remaining==0
+-  // vertex). N/B/T are appended in the fixed vertex layout at these float slots.
++  // ConstantManager cached_normal). The uniform has the incoming cross-draw
++  // cache (above, with the constants) so a draw whose format omits an
++  // attribute reads the last-decoded vertex's value instead of a zero input
++  // (normalize(0) = NaN). Then, if THIS draw carried the attribute, advance the
++  // cache to its LAST vertex's raw object-space value (Dolphin writes the cache
++  // on the loader's m_remaining==0 vertex). N/B/T are appended in the fixed
++  // vertex layout at these float slots.
+   if (cached != nullptr) {
+-    for (std::uint32_t k = 0; k < 3u; ++k) {
+-      c.cached_normal[k] = cached->normal[k];
+-      c.cached_tangent[k] = cached->tangent[k];
+-      c.cached_binormal[k] = cached->binormal[k];
+-    }
+     if (plan.vertex_count > 0u) {
+       const float* last =
+           plan.vertices.data() +
+diff --git a/GXRuntime/include/gxruntime/gx_recomp.h b/GXRuntime/include/gxruntime/gx_recomp.h
+index 76f08eb4..ed6cd648 100644
+--- a/GXRuntime/include/gxruntime/gx_recomp.h
++++ b/GXRuntime/include/gxruntime/gx_recomp.h
+@@ -349,6 +349,14 @@ bool dol_gx_recomp_note_xf_load(DolGxRecompState* gx, u16 base, u8 count);
+ // loads carry no inline words, so callers pass data_be=NULL there.
+ bool dol_gx_recomp_capture_xf_transform(DolGxRecompState* gx, u16 base, u8 count,
+                                         const u8* data_be);
++// A number that changes whenever transform state a draw snapshots may have
++// changed: an XF load reaching any of it, matrix index A, an init, or (from
++// the caller) post-transform memory and a loaded state. Two draws with the
++// same number had the same XF state, so a consumer can keep what it derived
++// from the first (gxcore's vertex constants). One counter for the process,
++// outside DolGxRecompState so a saved state keeps its size. Never 0.
++u64 dol_gx_recomp_xf_version(void);
++void dol_gx_recomp_bump_xf_version(void);
+ bool dol_gx_recomp_note_invalidate_vtx_cache(DolGxRecompState* gx);
+ bool dol_gx_recomp_set_vertex_layout(DolGxRecompState* gx, u8 vtx_fmt,
+                                      u32 vertex_size);
+diff --git a/GXRuntime/src/gx_recomp.c b/GXRuntime/src/gx_recomp.c
+index 6de3916c..aedde629 100644
+--- a/GXRuntime/src/gx_recomp.c
++++ b/GXRuntime/src/gx_recomp.c
+@@ -55,9 +55,20 @@ static u32 bp_get(u32 value, u32 size, u32 shift) {
+     return (value >> shift) & ((1u << size) - 1u);
+ }
+ 
++static u64 g_xf_version = 1u;
++
++u64 dol_gx_recomp_xf_version(void) {
++    return __atomic_load_n(&g_xf_version, __ATOMIC_RELAXED);
++}
++
++void dol_gx_recomp_bump_xf_version(void) {
++    __atomic_add_fetch(&g_xf_version, 1u, __ATOMIC_RELAXED);
++}
++
+ static void note_matrix_index_a(DolGxRecompState* gx, u32 value) {
+     if (gx == NULL)
+         return;
++    dol_gx_recomp_bump_xf_version();
+     gx->matrix_index_a = value;
+     gx->current_pn_matrix = bp_get(value, 6u, 0u) / 3u;
+     if (gx->current_pn_matrix >= DOL_GX_RECOMP_POSITION_MATRIX_COUNT)
+@@ -470,6 +481,7 @@ void dol_gx_recomp_init(DolGxRecompState* gx,
+     if (gx == NULL)
+         return;
+     memset(gx, 0, sizeof(*gx));
++    dol_gx_recomp_bump_xf_version();
+     gx->bp_regs[DOL_GX_BP_REG_MASK] = 0x00FFFFFFu;
+     gx->bp_valid[DOL_GX_BP_REG_MASK] = true;
+     if (resolver != NULL)
+@@ -955,6 +967,7 @@ bool dol_gx_recomp_capture_xf_transform(DolGxRecompState* gx, u16 base, u8 count
+     if (!touches_pn && !touches_tex && !touches_scalar && !touches_window &&
+         !touches_light && !touches_normal)
+         return false;
++    dol_gx_recomp_bump_xf_version();
+     bool captured = false;
+     for (u32 w = 0u; w < count; ++w) {
+         const u32 xf_addr = (u32)base + w;
+-- 
+2.45.2.windows.1
+

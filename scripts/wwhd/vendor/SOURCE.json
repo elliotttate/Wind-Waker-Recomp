@@ -1,0 +1,23 @@
+{
+  "project": "BFRES-Tool",
+  "url": "https://github.com/aboood40091/BFRES-Tool",
+  "revision": "e00e9bcf6ca0e0dd5885a8cc9927f15c3e3892d9",
+  "file": "addrlib/addrlib.py",
+  "license": "GPL-3.0-or-later",
+  "copyright": "AboodXD, 2018",
+  "changes": "None; Python implementation used without runtime Cython compilation.",
+  "format_references": {
+    "BFLIM-Tool": {
+      "url": "https://github.com/aboood40091/BFLIM-Tool",
+      "revision": "9fbc91d2b0d9fabfc4755c75e60a4564377cb9bb",
+      "license": "GPL-3.0-or-later",
+      "copyright": "AboodXD, 2016"
+    },
+    "JNUSLib": {
+      "url": "https://github.com/Maschell/JNUSLib",
+      "revision": "ac7637e7bfe06299e69a82ee241638ebdb5017ce",
+      "license": "GPL-3.0-or-later",
+      "copyright": "Maschell, 2016-2019"
+    }
+  }
+}

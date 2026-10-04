@@ -50,6 +50,13 @@ static float read_f32(CPUState* cpu, u32 address) {
 static unsigned long long g_place_retrace;
 static float g_place[3];
 
+// BLUEWAKE_TEST_STALL=retrace:ms[,retrace:ms...] (testing only): the game thread
+// held that long at those retraces, a hitch like a pipeline compiled or a file
+// read, to check how frame interpolation's pacing takes one.
+static unsigned long long g_stall_retrace[16];
+static unsigned g_stall_ms[16];
+static unsigned g_stall_count;
+
 void bluewake_fps_watch_attach(CPUState* cpu) {
     g_cpu = cpu;
     const char* on = getenv("BLUEWAKE_FPS_WATCH");
@@ -58,6 +65,18 @@ void bluewake_fps_watch_attach(CPUState* cpu) {
     if (place != NULL &&
         sscanf(place, "%llu:%f:%f:%f", &g_place_retrace, &g_place[0], &g_place[1], &g_place[2]) != 4)
         g_place_retrace = 0;
+    const char* stall = getenv("BLUEWAKE_TEST_STALL");
+    for (const char* at = stall; at != NULL && *at != '\0' && g_stall_count < 16u;) {
+        unsigned long long retrace = 0;
+        unsigned ms = 0;
+        if (sscanf(at, "%llu:%u", &retrace, &ms) != 2)
+            break;
+        g_stall_retrace[g_stall_count] = retrace;
+        g_stall_ms[g_stall_count++] = ms;
+        at = strchr(at, ',');
+        if (at != NULL)
+            ++at;
+    }
 }
 
 static void write_f32(CPUState* cpu, u32 address, float value) {
@@ -82,6 +101,14 @@ void bluewake_fps_watch_retrace(void) {
     ++g_retrace;
     if (g_place_retrace != 0 && g_cpu != NULL && g_retrace >= g_place_retrace && g_retrace < g_place_retrace + 8)
         place_player();
+    for (unsigned i = 0; i < g_stall_count; ++i) {
+        if (g_stall_retrace[i] != g_retrace)
+            continue;
+        const unsigned long long until = now_us(CLOCK_MONOTONIC) + 1000ull * g_stall_ms[i];
+        while (now_us(CLOCK_MONOTONIC) < until) {
+        }
+        fprintf(stderr, "[test-stall] retrace=%llu held %u ms\n", g_retrace, g_stall_ms[i]);
+    }
     if (!g_enabled || g_cpu == NULL)
         return;
     const unsigned long long wall = now_us(CLOCK_MONOTONIC);
