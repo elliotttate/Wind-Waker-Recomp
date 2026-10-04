@@ -287,6 +287,10 @@ static inline void bw_dcbz_l(CPUState* cpu, u32 ea, u32 cia) {
     ppc_dcbz_l(cpu, ea, cia);
 }
 
+/* The generated header's single-to-double conversion (lfs and friends) under
+ * another name: the chunks get inline_fp.h's, which falls back on this one. */
+#define dolrecomp_f32_from_bits bw_generated_f32_from_bits
+
 #define ppc_fallback_instruction bw_fallback_instruction
 #define ppc_psq_load bw_psq_load
 #define ppc_psq_store bw_psq_store

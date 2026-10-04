@@ -662,7 +662,9 @@ int main(void) {
         per-instruction machinery for when it has prepaid its cycles
         (scripts/windows/fast_blocks.py), take the pc and suffix stores of
         those copies' plain loads and stores into their out-of-line paths
-        (scripts/windows/lean_memory.py), run the certified recovered J3D
+        (scripts/windows/lean_memory.py), let a return into another chunk leave
+        the return dispatch before its switch (scripts/windows/return_ranges.py),
+        run the certified recovered J3D
         transform matrices natively (scripts/mods/prepare_native_j3d.py),
         then the opt-in 60 Hz
         gameplay's timing sites (docs/SIMULATION_60HZ.md; off unless asked
@@ -678,6 +680,7 @@ int main(void) {
         self.source_step("fast-blocks", "scripts/windows/fast_blocks.py", root)
         # The copies' plain loads and stores without their pc and suffix stores.
         self.source_step("lean-memory", "scripts/windows/lean_memory.py", root)
+        self.source_step("return-ranges", "scripts/windows/return_ranges.py", root)
         self.source_step("native-j3d", "scripts/mods/prepare_native_j3d.py", root)
         # Certified native entries, the second set (FIFO matrix loads, collision
         # checks, PSMTXMultVecSR, joint matrix calculations): after the prepaid
@@ -688,7 +691,8 @@ int main(void) {
         self.source_step("native-math", "scripts/mods/prepare_native_math.py", root)
         print((self.logs / "native-game-math.log").read_text(errors="replace").strip().splitlines()[-1])
         for name in ("guest-cpu", "gpr-inline", "chunk-headers", "direct-calls", "native-skin", "fast-blocks",
-                     "lean-memory", "native-j3d", "native-entries", "simulation-prepare", "native-math"):
+                     "lean-memory", "return-ranges", "native-j3d", "native-entries", "simulation-prepare",
+                     "native-math"):
             print((self.logs / f"{name}.log").read_text(errors="replace").strip().splitlines()[-1])
 
     def source_step(self, name, script, root):
@@ -886,7 +890,7 @@ int main(void) {
         # chunk is one function, so a step that changes that shape leaves the
         # old counts matching nothing.
         for name in ("global_guest_cpu.py", "inline_save_restore_gpr.py", "chunk_headers.py", "direct_calls.py",
-                     "native_skin.py", "fast_blocks.py", "lean_memory.py"):
+                     "native_skin.py", "fast_blocks.py", "lean_memory.py", "return_ranges.py"):
             path = ROOT / "scripts/windows" / name
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
