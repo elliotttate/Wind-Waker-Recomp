@@ -5,9 +5,9 @@
 #
 #   scripts/linux/build.sh /path/to/GZLE01.iso [--no-mods] [--jobs N] [--out DIR]
 #
-# The disc may be an uncompressed .iso/.gcm or a compact .ciso (converted
-# automatically). The game module (gGZLE01_recomp.so) is translated from YOUR
-# disc and stays private; the host, Aurora and DSP donor are the port's code.
+# The disc must be an uncompressed .iso or .gcm. The game module
+# (gGZLE01_recomp.so) is translated from YOUR disc and stays private; the
+# host, Aurora and DSP donor are the port's own code.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
@@ -71,17 +71,6 @@ sys.exit(0 if v >= (3, 25) else 1)
 EOF
 profile_check_tools
 echo "clang $(clang --version | head -1 | awk '{print $3}'), cmake $cmake_version, $jobs jobs"
-
-# A compact .ciso is not a raw disc image; decompress it first. The converter
-# reproduces the exact 0x57058000-byte GameCube image, sparse blocks zeroed.
-if [[ "$iso" == *.ciso ]]; then
-    step "decompress CISO"
-    raw_iso="$out/GZLE01.iso"
-    if [ ! -f "$raw_iso" ]; then
-        run ciso2iso python3 "$root/scripts/linux/ciso2iso.py" "$iso" "$raw_iso"
-    fi
-    iso="$raw_iso"
-fi
 
 step "dependencies"
 profile_dependencies

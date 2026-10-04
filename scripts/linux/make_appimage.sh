@@ -65,13 +65,44 @@ ldd "$appdir/usr/bin/bluewake_host" | awk '/=> \// {print $3} /^\t\// {print $1}
     fi
 done
 
-# Launcher (AppRun): resolve the bundled host and exec it, passing the module.
+# Launcher (AppRun): prepare the game files from the player's disc on first
+# run (same logic as scripts/linux/run.sh), then exec the bundled host.
 cat > "$appdir/AppRun" <<'APPRUN'
 #!/bin/sh
+set -eu
 HERE="$(dirname "$(readlink -f "$0")")"
-export BLUEWAKE_LIBEXEC="$HERE/usr/bin"
+LIBEXEC="$HERE/usr/bin"
 export LD_LIBRARY_PATH="$HERE/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-exec "$HERE/usr/bin/bluewake_host" "$HERE/usr/bin/gGZLE01_recomp.so" "$@"
+
+data_home="${XDG_DATA_HOME:-${HOME:?HOME is not set}/.local/share}/wind-waker-recomp"
+state_home="${XDG_STATE_HOME:-${HOME:?HOME is not set}/.local/state}/wind-waker-recomp"
+game="$data_home/game"
+disc="${BLUEWAKE_DISC:-$PWD/GZLE01.iso}"
+
+# Prepare main.dol + 415 RELs from the disc on first run (never bundled).
+if [ ! -f "$game/main.dol" ] || [ "$(find "$game/rels" -maxdepth 1 -name '*.rel' 2>/dev/null | wc -l)" -ne 415 ]; then
+    [ -f "$disc" ] || {
+        echo "wind-waker-recomp: set BLUEWAKE_DISC to your GZLE01 revision 0 disc image" >&2
+        exit 1
+    }
+    pending="$data_home/game.pending"
+    rm -rf "$pending"
+    mkdir -p "$data_home"
+    "$LIBEXEC/disc_extract" "$disc" "$pending"
+    rm -rf "$game"
+    mv "$pending" "$game"
+fi
+
+mkdir -p "$state_home/states"
+export BLUEWAKE_DOL="${BLUEWAKE_DOL:-$game/main.dol}"
+export BLUEWAKE_RELS_DIR="${BLUEWAKE_RELS_DIR:-$game/rels}"
+export BLUEWAKE_DISC="$disc"
+export BLUEWAKE_DSP_IROM="${BLUEWAKE_DSP_IROM:-$LIBEXEC/dsp_rom.bin}"
+export BLUEWAKE_DSP_COEF="${BLUEWAKE_DSP_COEF:-$LIBEXEC/dsp_coef.bin}"
+export BLUEWAKE_CARD_PATH="${BLUEWAKE_CARD_PATH:-$state_home/memory.card}"
+export BLUEWAKE_STATE_DIR="${BLUEWAKE_STATE_DIR:-$state_home/states}"
+
+exec "$LIBEXEC/bluewake_host" "$LIBEXEC/gGZLE01_recomp.so" "$@"
 APPRUN
 chmod +x "$appdir/AppRun"
 
