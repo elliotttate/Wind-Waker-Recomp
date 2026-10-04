@@ -269,9 +269,11 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
                 atexit(bluewake_native_anim_report);
                 atexit(bluewake_native_cc_report);
             }
-            /* The fifth set: the GX SDK's FIFO writers (the matrix, texture,
-             * TEV, vertex-format and pixel state loads, GXBegin and
-             * GXCallDisplayList), with the same switch. */
+            /* The fifth set: the GX SDK's FIFO writers (the matrix and
+             * texture loads, the TEV colours and order, the vertex arrays,
+             * texture coordinates, lighting channels and fog, GXBegin's
+             * dirty-state callees, GXBegin and GXCallDisplayList, J3D's GD
+             * and GF fog and TEV writers), with the same switch. */
             bluewake_native_gx_enabled = on;
             if (on)
                 atexit(bluewake_native_gx_report);
