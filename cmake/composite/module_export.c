@@ -20,6 +20,8 @@
 #include "native_kankyo.h"
 #include "native_anim.h"
 #include "native_cc.h"
+/* Certified native entries, the fifth set: the GX SDK's FIFO writers (native_gx.c). */
+#include "native_gx.h"
 #include <stdlib.h>
 #include <stdio.h>
 static int s_native_math;
@@ -267,6 +269,12 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
                 atexit(bluewake_native_anim_report);
                 atexit(bluewake_native_cc_report);
             }
+            /* The fifth set: the GX SDK's FIFO writers (the matrix, texture,
+             * TEV, vertex-format and pixel state loads, GXBegin and
+             * GXCallDisplayList), with the same switch. */
+            bluewake_native_gx_enabled = on;
+            if (on)
+                atexit(bluewake_native_gx_report);
         }
         if (s_native_math) {
             atexit(bluewake_native_skin_report);

@@ -81,6 +81,8 @@ add_library(${MODULE_NAME} SHARED
   native_kankyo.c
   native_anim.c
   native_cc.c
+  # Certified native entries, the fifth set: the GX SDK's FIFO writers.
+  native_gx.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c
