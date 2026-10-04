@@ -1,7 +1,7 @@
 ## 2026-10-04 After fusion: the game by warp again, the game thread's share, and what did not help
 
 **The survey with fusion** (the 47 places of 2026-10-03, four E-cores `0x000F0000`, uncapped, Smooth Motion
-off, scratchpad survey.ps1). Every place now runs at 38 game frames a second or more: the slowest are the
+off, scripts/windows/perf/survey.ps1). Every place now runs at 38 game frames a second or more: the slowest are the
 sea by the Forsaken Fortress (`sea:1`) 38.3, Dragon Roost Island 39.1, Forest Haven 40.2 and Outset 40.7
 (before the transform copies and fusion: Forest Haven 29.5, Dragon Roost 31.3, the sea by the Fortress
 32.6, Hyrule Castle's room 33.3). The worst GX worker is Forest Haven's 12.1 ms a game frame; the worst
