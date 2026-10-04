@@ -1,10 +1,15 @@
-/* The GX SDK's FIFO writers, native: the matrix loads (GXLoadPosMtxImm,
- * GXLoadNrmMtxImm, GXSetCurrentMtx, __GXSetMatrixIndex), the texture loads
- * (GXLoadTexObj, GXLoadTexObjPreLoaded, GXGetTexObjFmt), the TEV, channel,
- * pixel and vertex-format state (GXSetTevColor and the rest of native_gx_gen.inc's
- * list), GXBegin with the dirty state's callees (__GXSetSUTexRegs,
- * __GXUpdateBPMask, __GXSetGenMode, __GXSetVCD, __GXXfVtxSpecs, __GXSetVAT,
- * __GXCalculateVLim) and GXCallDisplayList.
+/* The GX SDK's FIFO writers, native (native_gx_list.h has the 35): the
+ * matrix loads (GXLoadPosMtxImm, GXLoadNrmMtxImm, GXSetCurrentMtx,
+ * __GXSetMatrixIndex, GXSetIndTexMtx), the texture loads (GXLoadTexObj,
+ * GXLoadTexObjPreLoaded, GXInitTexObjLOD), the TEV colours and order
+ * (GXSetTevColor, GXSetTevColorS10, GXSetTevKColor, GXSetTevOrder), the
+ * vertex arrays, texture coordinates and lighting channels (GXSetArray,
+ * GXSetTexCoordGen2, GXSetNumTexGens, GXSetChanAmbColor, GXSetChanMatColor,
+ * GXSetNumChans, GXSetChanCtrl), the fog (GXSetFog, GXSetFogRangeAdj),
+ * GXBegin with its dirty state's callees (__GXSetSUTexRegs, __GXUpdateBPMask,
+ * __GXSetGenMode, __GXSetVCD, __GXXfVtxSpecs, __GXSetVAT, __GXCalculateVLim),
+ * GXCallDisplayList, and J3D's J3DGDSetFog, J3DGDSetTevOrder, GFSetTevColor,
+ * GFSetTevColorS10 and GFSetFog.
  *
  * Every draw the game makes goes through these: a matrix, a texture, the TEV
  * and vertex state, then GXBegin or GXCallDisplayList. Each writes the
@@ -13,7 +18,11 @@
  * leaves the RAM fast path for gather_pipe.h's out-of-line store, and every
  * block pays its leader's machinery; together they were about 5 percent of
  * the game thread at Forest Haven, the largest part of it no earlier native
- * covered.
+ * covered. The set is the functions whose native was faster through the
+ * hooked chunks in every measurement (by 15 percent or more): the setters
+ * that store mostly to RAM ran no faster than their translation and are not
+ * here (native_gx_gen.py's DROPPED). Each native has its own entry point,
+ * bluewake_native_gx_<entry>, which its hook calls.
  *
  * Each native here is its function's translation itself, replayed on local
  * registers: scripts/windows/native_gx_gen.py took the instructions' C from
@@ -25,7 +34,8 @@
  * with it: GXLoadTexObj's region callback (__GXDefaultTexRegionCallback, with
  * GXGetTexObjFmt) and GXLoadTexObjPreLoaded with its TLUT callback
  * (__GXDefaultTlutRegionCallback); __GXSetSUTexRegs's __SetSURegs; __GXSetVCD's
- * __GXXfVtxSpecs; GXSetTexCoordGen2's and GXSetCurrentMtx's __GXSetMatrixIndex.
+ * __GXXfVtxSpecs; GXSetTexCoordGen2's and GXSetCurrentMtx's __GXSetMatrixIndex;
+ * the fog functions' __cvt_fp2unsigned.
  * GXBegin replays only its own blocks: where its dirty state needs a callee,
  * it declines, and the translation makes the calls - each callee native at
  * its own hook.
@@ -43,7 +53,9 @@
  * pending, no write journal, no alias over MEM1, both of the host's pipe
  * writers set (the natives run only where the module batches the pipe), FP
  * available and the paired singles unscaled where the function uses them,
- * every block prepaid and none stopped for the budget, every load plain RAM
+ * the rounding mode round-to-nearest where it does FP arithmetic (the fog,
+ * the LOD, the indirect matrix), every block prepaid and none stopped for the
+ * budget or a deadline inside it, every load plain RAM
  * and every store plain RAM or the pipe, a call through a pointer reaching
  * the function the native replays (the SDK's default callbacks), a jump
  * table's target a block of the function, and every boundary between chunks
@@ -99,23 +111,26 @@ void bluewake_native_gx_report(void) {
     fprintf(stderr, " (native/declined)\n");
 }
 
+#define GX_ENTRY(entry, fn, name, id)            \
+    int bluewake_native_gx_##id(CPUState* cpu) { \
+        const int done = fn(cpu, entry);         \
+        if (done)                                \
+            s_gx_runs[GXI_##id]++;               \
+        else                                     \
+            s_gx_declined[GXI_##id]++;           \
+        return done;                             \
+    }
+GX_NATIVES(GX_ENTRY)
+#undef GX_ENTRY
+
 int bluewake_native_gx(CPUState* cpu, u32 address) {
-    unsigned which;
-    int done;
     switch (address) {
 #define GX_CASE(entry, fn, name, id) \
     case entry:                      \
-        which = GXI_##id;            \
-        done = fn(cpu, entry);       \
-        break;
+        return bluewake_native_gx_##id(cpu);
         GX_NATIVES(GX_CASE)
 #undef GX_CASE
     default:
         return 0;
     }
-    if (done)
-        s_gx_runs[which]++;
-    else
-        s_gx_declined[which]++;
-    return done;
 }

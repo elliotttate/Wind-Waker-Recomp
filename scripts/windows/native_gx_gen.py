@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Write cmake/composite/native_gx_gen.inc: the fifth set's natives (the GX
 SDK's FIFO writers, native_gx.c), each a translated function's prepaid
-blocks replayed on local registers (cmake/composite/native_gx_run.h).
+blocks replayed on local registers (cmake/composite/native_gx_run.h); and
+their list, cmake/composite/native_gx_list.h (native_gx.h's entry points).
 
   native_gx_gen.py COMPOSITE_SRC [OUT]
 
@@ -598,6 +599,7 @@ class Gen:
 
 # --- The natives -----------------------------------------------------------
 # (function ranges from tww's config/GZLE01/symbols.txt)
+CVT_FP2UNSIGNED = (0x80328E10, 0x80328E6C)  # __cvt_fp2unsigned (chunk 0201)
 TEX_PRELOADED = [(0x80324D50, 0x80324EE8), (0x8031FAC4, 0x8031FAE8)]  # with __GXDefaultTlutRegionCallback
 NATIVES = [
     Native("GXLoadPosMtxImm", 0x80326F38, [(0x80326F38, 0x80326F88)]),
@@ -623,17 +625,39 @@ NATIVES = [
     Native("__GXSetVCD", 0x80321958, [(0x80321958, 0x803219AC), (0x803214B0, 0x80321608)]),  # with __GXXfVtxSpecs
     Native("__GXXfVtxSpecs", 0x803214B0, [(0x803214B0, 0x80321608)]),
     Native("__GXCalculateVLim", 0x803219AC, [(0x803219AC, 0x80321AD0)]),
-    # The vertex format and the TEV, channel and pixel state.
-    Native("GXSetVtxDesc", 0x80321608, [(0x80321608, 0x80321958)]),  # across chunks 0199 and 0200
-    Native("GXClearVtxDesc", 0x80321AD0, [(0x80321AD0, 0x80321B08)]),
-    Native("GXSetVtxAttrFmt", 0x80321B08, [(0x80321B08, 0x80321E60)]),
+    # Texture coordinates, lighting channels, the current matrix.
     Native("GXSetTexCoordGen2", 0x80322604, [(0x80322604, 0x803228D4), (0x80327364, 0x803273E8)]),  # with __GXSetMatrixIndex
     Native("GXSetNumTexGens", 0x803228D4, [(0x803228D4, 0x80322914)]),
-    Native("GXSetCullMode", 0x80323328, [(0x80323328, 0x80323374)]),
     Native("GXSetChanAmbColor", 0x80324390, [(0x80324390, 0x80324484)]),
     Native("GXSetChanMatColor", 0x80324484, [(0x80324484, 0x80324578)]),
     Native("GXSetNumChans", 0x80324578, [(0x80324578, 0x803245BC)]),
     Native("GXSetChanCtrl", 0x803245BC, [(0x803245BC, 0x80324688)]),
+    Native("GXSetCurrentMtx", 0x80326FD8, [(0x80326FD8, 0x80327010), (0x80327364, 0x803273E8)]),  # with __GXSetMatrixIndex
+    # With floating point: fog, texture LOD, indirect matrices.
+    Native("GXSetFog", 0x803265A8, [(0x803265A8, 0x80326758), CVT_FP2UNSIGNED]),
+    Native("GXSetFogRangeAdj", 0x80326758, [(0x80326758, 0x80326858)]),
+    Native("GXInitTexObjLOD", 0x80324B68, [(0x80324B68, 0x80324CFC)]),
+    Native("GXSetIndTexMtx", 0x80325810, [(0x80325810, 0x80325970)]),
+    # J3D's display-list writers (GD: the current list's write pointer) and the
+    # direct FIFO forms (GF).
+    Native("J3DGDSetFog", 0x802D85F8, [(0x802D85F8, 0x802D895C), CVT_FP2UNSIGNED]),
+    Native("J3DGDSetTevOrder", 0x802D80D0, [(0x802D80D0, 0x802D825C)]),
+    Native("GFSetTevColor", 0x802AFDDC, [(0x802AFDDC, 0x802AFE38)]),
+    Native("GFSetTevColorS10", 0x802AFE38, [(0x802AFE38, 0x802AFEA0)]),
+    Native("GFSetFog", 0x802AFBD4, [(0x802AFBD4, 0x802AFD3C), CVT_FP2UNSIGNED]),
+]
+
+# Made, tested exact (60,000 cases each, no mismatch) and dropped: through the
+# hooked chunks none was faster than its translation by 15 percent or more in
+# every run (NATIVES5_REPORT.md). Each is a setter of a few instructions that
+# stores to RAM (__GXData, a GD list) more than to the pipe: there the
+# translation's inline RAM stores are as fast as a native's, whose undo log
+# and entry cost what the pipe stores it saves would have. Not generated.
+DROPPED = [
+    Native("GXSetVtxDesc", 0x80321608, [(0x80321608, 0x80321958)]),  # across chunks 0199 and 0200
+    Native("GXClearVtxDesc", 0x80321AD0, [(0x80321AD0, 0x80321B08)]),
+    Native("GXSetVtxAttrFmt", 0x80321B08, [(0x80321B08, 0x80321E60)]),
+    Native("GXSetCullMode", 0x80323328, [(0x80323328, 0x80323374)]),
     Native("GXGetTexObjFmt", 0x80324D28, [(0x80324D28, 0x80324D30)]),
     Native("GXSetTevIndirect", 0x80325774, [(0x80325774, 0x80325810)]),
     Native("GXSetNumIndStages", 0x80325C00, [(0x80325C00, 0x80325C28)]),
@@ -653,7 +677,15 @@ NATIVES = [
     Native("GXSetZMode", 0x80326904, [(0x80326904, 0x80326938)]),
     Native("GXSetZCompLoc", 0x80326938, [(0x80326938, 0x80326970)]),
     Native("GXSetDstAlpha", 0x80326A8C, [(0x80326A8C, 0x80326AC8)]),
-    Native("GXSetCurrentMtx", 0x80326FD8, [(0x80326FD8, 0x80327010), (0x80327364, 0x803273E8)]),  # with __GXSetMatrixIndex
+    Native("J3DGDSetTevKColor", 0x802D825C, [(0x802D825C, 0x802D83C4)]),
+    Native("J3DGDSetTevColorS10", 0x802D83C4, [(0x802D83C4, 0x802D85F8)]),
+    Native("J3DGDSetLightColor", 0x802D6624, [(0x802D6624, 0x802D6734)]),
+    Native("J3DGDSetLightPos", 0x802D6734, [(0x802D6734, 0x802D6900)]),
+    Native("J3DGDSetLightDir", 0x802D6900, [(0x802D6900, 0x802D6ACC)]),
+    Native("J3DGDSetLightAttn", 0x802D632C, [(0x802D632C, 0x802D6624)]),
+    Native("J3DGDSetTexLookupMode", 0x802D7400, [(0x802D7400, 0x802D759C)]),
+    Native("J3DGDSetTexImgPtr", 0x802D7644, [(0x802D7644, 0x802D76D4)]),
+    Native("J3DGDLoadTexMtxImm", 0x802E9984, [(0x802E9984, 0x802E9F04)]),
 ]
 
 
@@ -673,17 +705,24 @@ def main():
         table.append(native)
         print(f"{native.entry:08X} {native.name}: {native.blocks} blocks, boundaries "
               + (", ".join(f"{b:08X}" for b in sorted(native.boundaries)) or "none"))
-    pieces.append("/* The natives by entry. */")
-    pieces.append("#define GX_NATIVES(X) \\")
-    rows = []
-    for n in table:
-        rows.append(f"    X(0x{n.entry:08X}u, gxn_{n.entry:08X}, \"{n.name}\", {n.entry:08X})")
-        rows += [f"    X(0x{r:08X}u, gxn_{n.entry:08X}, \"{n.name}@{r:08X}\", {r:08X})" for r in n.resumes]
-    pieces.append(" \\\n".join(rows))
     pieces.append("")
     with open(out_path, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(pieces))
     print(f"wrote {out_path}")
+    # The natives by entry (native_gx.h: each native's own entry point, the
+    # function its hook calls).
+    rows = []
+    for n in table:
+        rows.append(f"    X(0x{n.entry:08X}u, gxn_{n.entry:08X}, \"{n.name}\", {n.entry:08X})")
+        rows += [f"    X(0x{r:08X}u, gxn_{n.entry:08X}, \"{n.name}@{r:08X}\", {r:08X})" for r in n.resumes]
+    listing = ["/* Generated by scripts/windows/native_gx_gen.py: the fifth set's natives by entry",
+               " * (X(entry, native, name, the entry's digits)). Do not edit; regenerate. */",
+               "#ifndef BLUEWAKE_NATIVE_GX_LIST_H", "#define BLUEWAKE_NATIVE_GX_LIST_H", "",
+               "#define GX_NATIVES(X) \\", " \\\n".join(rows), "", "#endif", ""]
+    list_path = out_path.with_name("native_gx_list.h")
+    with open(list_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(listing))
+    print(f"wrote {list_path}")
     # For the test: the block leaders a jump through CTR may reach in each
     # native that makes one (its jump tables are filled with them).
     leaders = ["/* Generated by scripts/windows/native_gx_gen.py: the block leaders a native's",

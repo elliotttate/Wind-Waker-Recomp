@@ -20,6 +20,8 @@
 #define BLUEWAKE_GX_SET_VAT 0x803221D8u           /* __GXSetVAT */
 #define BLUEWAKE_GX_SET_MATRIX_INDEX 0x80327364u  /* __GXSetMatrixIndex */
 
+#include "native_gx_list.h"
+
 extern int bluewake_native_gx_enabled;
 
 /* The function at `address`, entered with the return address in LR, through
@@ -29,5 +31,12 @@ extern int bluewake_native_gx_enabled;
  * these. No identifier here may be `ctx`. */
 int bluewake_native_gx(CPUState* cpu, u32 address);
 void bluewake_native_gx_report(void);
+
+/* The same, each native on its own (bluewake_native_gx_80326F38 for
+ * GXLoadPosMtxImm, ...): what its hook calls, with no dispatch on the
+ * address. */
+#define BLUEWAKE_GX_DECLARE(entry, native, name, digits) int bluewake_native_gx_##digits(CPUState* cpu);
+GX_NATIVES(BLUEWAKE_GX_DECLARE)
+#undef BLUEWAKE_GX_DECLARE
 
 #endif

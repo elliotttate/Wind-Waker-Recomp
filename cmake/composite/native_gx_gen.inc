@@ -8842,2867 +8842,6 @@ GX_DONE:
     return 1;
 }
 
-/* GXSetVtxDesc (80321608): 80321608..80321958 */
-static int gxn_80321608(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 cr = cpu->cr;
-    u32 xer = cpu->xer;
-    u32 ctr = cpu->ctr;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80321608;
-B_80321608: /* 2 cycles */
-    if (!gx_block(&s, 2u))
-        return gx_decline(&s);
-    // 80321608: cmplwi  r3, 0x0019
-    {
-        u32 val_a = (u32)(g3);
-        u32 val_b = (u32)(0x0019u);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 8032160C: bc    12, 1, 0x803218FC
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            if (!gx_silent(&s, 0x803218FCu))
-                return gx_decline(&s);
-            goto B_803218FC;
-        }
-    }
-    goto B_80321610;
-B_80321610: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 80321610: lis     r5, -32710
-    g5 = ((u32)(s32)(-32710) << 16);
-
-    // 80321614: addi    r5, r5, 6416
-    g5 = g5 + (u32)(s32)(6416);
-
-    // 80321618: rlwinm r0, r3, 2, 0, 29
-    {
-        g0 = gx_rotl32(g3, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 8032161C: lwzx    r0, r5, r0
-    {
-        u32 ea = g5 + g0;
-        g0 = gx_ld32(&s, ea);
-    }
-
-    s.suffix = 1u;
-    // 80321620: mtctr    r0
-    ctr = g0;
-
-    // 80321624: bctr
-    {
-        u32 target = ctr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            if (!gx_live(&s))
-                return gx_decline(&s);
-            switch (target) {
-            case 0x80321608u:
-                if (!gx_silent(&s, 0x80321608u))
-                    return gx_decline(&s);
-                goto B_80321608;
-            case 0x80321610u:
-                if (!gx_silent(&s, 0x80321610u))
-                    return gx_decline(&s);
-                goto B_80321610;
-            case 0x80321628u:
-                if (!gx_silent(&s, 0x80321628u))
-                    return gx_decline(&s);
-                goto B_80321628;
-            case 0x80321640u:
-                if (!gx_silent(&s, 0x80321640u))
-                    return gx_decline(&s);
-                goto B_80321640;
-            case 0x80321660u:
-                if (!gx_silent(&s, 0x80321660u))
-                    return gx_decline(&s);
-                goto B_80321660;
-            case 0x80321680u:
-                if (!gx_silent(&s, 0x80321680u))
-                    return gx_decline(&s);
-                goto B_80321680;
-            case 0x803216A0u:
-                if (!gx_silent(&s, 0x803216A0u))
-                    return gx_decline(&s);
-                goto B_803216A0;
-            case 0x803216C0u:
-                if (!gx_silent(&s, 0x803216C0u))
-                    return gx_decline(&s);
-                goto B_803216C0;
-            case 0x803216E0u:
-                if (!gx_silent(&s, 0x803216E0u))
-                    return gx_decline(&s);
-                goto B_803216E0;
-            case 0x80321700u:
-                if (!gx_silent(&s, 0x80321700u))
-                    return gx_decline(&s);
-                goto B_80321700;
-            case 0x80321720u:
-                if (!gx_silent(&s, 0x80321720u))
-                    return gx_decline(&s);
-                goto B_80321720;
-            case 0x80321740u:
-                if (!gx_silent(&s, 0x80321740u))
-                    return gx_decline(&s);
-                goto B_80321740;
-            case 0x80321760u:
-                if (!gx_silent(&s, 0x80321760u))
-                    return gx_decline(&s);
-                goto B_80321760;
-            case 0x80321768u:
-                if (!gx_silent(&s, 0x80321768u))
-                    return gx_decline(&s);
-                goto B_80321768;
-            case 0x80321784u:
-                if (!gx_silent(&s, 0x80321784u))
-                    return gx_decline(&s);
-                goto B_80321784;
-            case 0x80321794u:
-                if (!gx_silent(&s, 0x80321794u))
-                    return gx_decline(&s);
-                goto B_80321794;
-            case 0x8032179Cu:
-                if (!gx_silent(&s, 0x8032179Cu))
-                    return gx_decline(&s);
-                goto B_8032179C;
-            case 0x803217B8u:
-                if (!gx_silent(&s, 0x803217B8u))
-                    return gx_decline(&s);
-                goto B_803217B8;
-            case 0x803217C8u:
-                if (!gx_silent(&s, 0x803217C8u))
-                    return gx_decline(&s);
-                goto B_803217C8;
-            case 0x803217E8u:
-                if (!gx_silent(&s, 0x803217E8u))
-                    return gx_decline(&s);
-                goto B_803217E8;
-            case 0x80321808u:
-                if (!gx_silent(&s, 0x80321808u))
-                    return gx_decline(&s);
-                goto B_80321808;
-            case 0x80321820u:
-                if (!gx_silent(&s, 0x80321820u))
-                    return gx_decline(&s);
-                goto B_80321820;
-            case 0x80321840u:
-                if (!gx_silent(&s, 0x80321840u))
-                    return gx_decline(&s);
-                goto B_80321840;
-            case 0x80321860u:
-                if (!gx_silent(&s, 0x80321860u))
-                    return gx_decline(&s);
-                goto B_80321860;
-            case 0x80321880u:
-                if (!gx_silent(&s, 0x80321880u))
-                    return gx_decline(&s);
-                goto B_80321880;
-            case 0x803218A0u:
-                if (!gx_silent(&s, 0x803218A0u))
-                    return gx_decline(&s);
-                goto B_803218A0;
-            case 0x803218C0u:
-                if (!gx_silent(&s, 0x803218C0u))
-                    return gx_decline(&s);
-                goto B_803218C0;
-            case 0x803218E0u:
-                if (!gx_silent(&s, 0x803218E0u))
-                    return gx_decline(&s);
-                goto B_803218E0;
-            case 0x803218FCu:
-                if (!gx_silent(&s, 0x803218FCu))
-                    return gx_decline(&s);
-                goto B_803218FC;
-            case 0x8032190Cu:
-                if (!gx_silent(&s, 0x8032190Cu))
-                    return gx_decline(&s);
-                goto B_8032190C;
-            case 0x80321918u:
-                if (!gx_silent(&s, 0x80321918u))
-                    return gx_decline(&s);
-                goto B_80321918;
-            case 0x80321938u:
-                if (!gx_silent(&s, 0x80321938u))
-                    return gx_decline(&s);
-                goto B_80321938;
-            case 0x80321944u:
-                if (!gx_silent(&s, 0x80321944u))
-                    return gx_decline(&s);
-                goto B_80321944;
-            default:
-                break;
-            }
-            return gx_decline(&s);
-        }
-    }
-B_80321628: /* 6 cycles */
-    if (!gx_block(&s, 6u))
-        return gx_decline(&s);
-    // 80321628: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 8032162C: lwzu     r0, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g0 = gx_ld32(&s, ea);
-        g3 = ea;
-    }
-
-    // 80321630: rlwinm r0, r0, 0, 0, 30
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFFFFEu;
-    }
-
-    // 80321634: or   r0, r0, r4
-    {
-        g0 = g0 | g4;
-    }
-
-    // 80321638: stw     r0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321638u, 1u, ea, (u32)g0);
-    }
-
-    // 8032163C: b       0x803218FC
-    {
-            if (!gx_silent(&s, 0x803218FCu))
-                return gx_decline(&s);
-            goto B_803218FC;
-    }
-B_80321640: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321640: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321644: rlwinm r0, r4, 1, 0, 30
-    {
-        g0 = gx_rotl32(g4, 1u) & 0xFFFFFFFEu;
-    }
-
-    // 80321648: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 8032164C: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321650: rlwinm r3, r3, 0, 31, 29
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFFDu;
-    }
-
-    // 80321654: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321658: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321658u, 1u, ea, (u32)g0);
-    }
-
-    // 8032165C: b       0x803218FC
-    {
-            if (!gx_silent(&s, 0x803218FCu))
-                return gx_decline(&s);
-            goto B_803218FC;
-    }
-B_80321660: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321660: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321664: rlwinm r0, r4, 2, 0, 29
-    {
-        g0 = gx_rotl32(g4, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80321668: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 8032166C: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321670: rlwinm r3, r3, 0, 30, 28
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFFBu;
-    }
-
-    // 80321674: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321678: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321678u, 1u, ea, (u32)g0);
-    }
-
-    // 8032167C: b       0x803218FC
-    {
-            if (!gx_silent(&s, 0x803218FCu))
-                return gx_decline(&s);
-            goto B_803218FC;
-    }
-B_80321680: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321680: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321684: rlwinm r0, r4, 3, 0, 28
-    {
-        g0 = gx_rotl32(g4, 3u) & 0xFFFFFFF8u;
-    }
-
-    // 80321688: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 8032168C: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321690: rlwinm r3, r3, 0, 29, 27
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFF7u;
-    }
-
-    // 80321694: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321698: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321698u, 1u, ea, (u32)g0);
-    }
-
-    // 8032169C: b       0x803218FC
-    {
-            if (!gx_silent(&s, 0x803218FCu))
-                return gx_decline(&s);
-            goto B_803218FC;
-    }
-B_803216A0: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 803216A0: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803216A4: rlwinm r0, r4, 4, 0, 27
-    {
-        g0 = gx_rotl32(g4, 4u) & 0xFFFFFFF0u;
-    }
-
-    // 803216A8: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 803216AC: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803216B0: rlwinm r3, r3, 0, 28, 26
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFEFu;
-    }
-
-    // 803216B4: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803216B8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x803216B8u, 1u, ea, (u32)g0);
-    }
-
-    // 803216BC: b       0x803218FC
-    {
-            if (!gx_silent(&s, 0x803218FCu))
-                return gx_decline(&s);
-            goto B_803218FC;
-    }
-B_803216C0: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 803216C0: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803216C4: rlwinm r0, r4, 5, 0, 26
-    {
-        g0 = gx_rotl32(g4, 5u) & 0xFFFFFFE0u;
-    }
-
-    // 803216C8: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 803216CC: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803216D0: rlwinm r3, r3, 0, 27, 25
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFDFu;
-    }
-
-    // 803216D4: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803216D8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x803216D8u, 1u, ea, (u32)g0);
-    }
-
-    // 803216DC: b       0x803218FC
-    {
-            if (!gx_silent(&s, 0x803218FCu))
-                return gx_decline(&s);
-            goto B_803218FC;
-    }
-B_803216E0: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 803216E0: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803216E4: rlwinm r0, r4, 6, 0, 25
-    {
-        g0 = gx_rotl32(g4, 6u) & 0xFFFFFFC0u;
-    }
-
-    // 803216E8: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 803216EC: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803216F0: rlwinm r3, r3, 0, 26, 24
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFBFu;
-    }
-
-    // 803216F4: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803216F8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x803216F8u, 1u, ea, (u32)g0);
-    }
-
-    // 803216FC: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321700: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321700: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321704: rlwinm r0, r4, 7, 0, 24
-    {
-        g0 = gx_rotl32(g4, 7u) & 0xFFFFFF80u;
-    }
-
-    // 80321708: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 8032170C: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321710: rlwinm r3, r3, 0, 25, 23
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFF7Fu;
-    }
-
-    // 80321714: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321718: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321718u, 1u, ea, (u32)g0);
-    }
-
-    // 8032171C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321720: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321720: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321724: rlwinm r0, r4, 8, 0, 23
-    {
-        g0 = gx_rotl32(g4, 8u) & 0xFFFFFF00u;
-    }
-
-    // 80321728: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 8032172C: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321730: rlwinm r3, r3, 0, 24, 22
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFEFFu;
-    }
-
-    // 80321734: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321738: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321738u, 1u, ea, (u32)g0);
-    }
-
-    // 8032173C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321740: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321740: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321744: rlwinm r0, r4, 9, 0, 22
-    {
-        g0 = gx_rotl32(g4, 9u) & 0xFFFFFE00u;
-    }
-
-    // 80321748: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 8032174C: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321750: rlwinm r3, r3, 0, 23, 20
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFF9FFu;
-    }
-
-    // 80321754: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321758: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321758u, 1u, ea, (u32)g0);
-    }
-
-    // 8032175C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321760: /* 2 cycles */
-    if (!gx_block(&s, 2u))
-        return gx_decline(&s);
-    // 80321760: cmpwi   r4, 0
-    {
-        s32 val_a = (s32)(g4);
-        s32 val_b = (s32)(0);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80321764: bc    12, 2, 0x80321784
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80321784;
-        }
-    }
-    goto B_80321768;
-B_80321768: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 80321768: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 8032176C: li      r5, 1
-    g5 = (u32)(s32)(1);
-
-    // 80321770: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80321774: stb     r5, 1052(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1052);
-        gx_st8(&s, 0x80321774u, 3u, ea, (u8)g5);
-    }
-
-    // 80321778: stb     r0, 1053(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1053);
-        gx_st8(&s, 0x80321778u, 2u, ea, (u8)g0);
-    }
-
-    // 8032177C: stw     r4, 1048(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1048);
-        gx_st32(&s, 0x8032177Cu, 1u, ea, (u32)g4);
-    }
-
-    // 80321780: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321784: /* 4 cycles */
-    if (!gx_block(&s, 4u))
-        return gx_decline(&s);
-    // 80321784: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321788: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 8032178C: stb     r0, 1052(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1052);
-        gx_st8(&s, 0x8032178Cu, 1u, ea, (u8)g0);
-    }
-
-    // 80321790: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321794: /* 2 cycles */
-    if (!gx_block(&s, 2u))
-        return gx_decline(&s);
-    // 80321794: cmpwi   r4, 0
-    {
-        s32 val_a = (s32)(g4);
-        s32 val_b = (s32)(0);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80321798: bc    12, 2, 0x803217B8
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_803217B8;
-        }
-    }
-    goto B_8032179C;
-B_8032179C: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 8032179C: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803217A0: li      r5, 1
-    g5 = (u32)(s32)(1);
-
-    // 803217A4: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 803217A8: stb     r5, 1053(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1053);
-        gx_st8(&s, 0x803217A8u, 3u, ea, (u8)g5);
-    }
-
-    // 803217AC: stb     r0, 1052(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1052);
-        gx_st8(&s, 0x803217ACu, 2u, ea, (u8)g0);
-    }
-
-    // 803217B0: stw     r4, 1048(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1048);
-        gx_st32(&s, 0x803217B0u, 1u, ea, (u32)g4);
-    }
-
-    // 803217B4: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_803217B8: /* 4 cycles */
-    if (!gx_block(&s, 4u))
-        return gx_decline(&s);
-    // 803217B8: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803217BC: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 803217C0: stb     r0, 1053(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1053);
-        gx_st8(&s, 0x803217C0u, 1u, ea, (u8)g0);
-    }
-
-    // 803217C4: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_803217C8: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 803217C8: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803217CC: rlwinm r0, r4, 13, 0, 18
-    {
-        g0 = gx_rotl32(g4, 13u) & 0xFFFFE000u;
-    }
-
-    // 803217D0: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 803217D4: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803217D8: rlwinm r3, r3, 0, 19, 16
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFF9FFFu;
-    }
-
-    // 803217DC: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803217E0: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x803217E0u, 1u, ea, (u32)g0);
-    }
-
-    // 803217E4: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_803217E8: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 803217E8: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803217EC: rlwinm r0, r4, 15, 0, 16
-    {
-        g0 = gx_rotl32(g4, 15u) & 0xFFFF8000u;
-    }
-
-    // 803217F0: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 803217F4: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803217F8: rlwinm r3, r3, 0, 17, 14
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFE7FFFu;
-    }
-
-    // 803217FC: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321800: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321800u, 1u, ea, (u32)g0);
-    }
-
-    // 80321804: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321808: /* 6 cycles */
-    if (!gx_block(&s, 6u))
-        return gx_decline(&s);
-    // 80321808: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 8032180C: lwzu     r0, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g0 = gx_ld32(&s, ea);
-        g3 = ea;
-    }
-
-    // 80321810: rlwinm r0, r0, 0, 0, 29
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFFFFCu;
-    }
-
-    // 80321814: or   r0, r0, r4
-    {
-        g0 = g0 | g4;
-    }
-
-    // 80321818: stw     r0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321818u, 1u, ea, (u32)g0);
-    }
-
-    // 8032181C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321820: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321820: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321824: rlwinm r0, r4, 2, 0, 29
-    {
-        g0 = gx_rotl32(g4, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80321828: addi    r4, r3, 24
-    g4 = g3 + (u32)(s32)(24);
-
-    // 8032182C: lwz     r3, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321830: rlwinm r3, r3, 0, 30, 27
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFF3u;
-    }
-
-    // 80321834: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321838: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321838u, 1u, ea, (u32)g0);
-    }
-
-    // 8032183C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321840: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321840: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321844: rlwinm r0, r4, 4, 0, 27
-    {
-        g0 = gx_rotl32(g4, 4u) & 0xFFFFFFF0u;
-    }
-
-    // 80321848: addi    r4, r3, 24
-    g4 = g3 + (u32)(s32)(24);
-
-    // 8032184C: lwz     r3, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321850: rlwinm r3, r3, 0, 28, 25
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFFCFu;
-    }
-
-    // 80321854: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321858: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321858u, 1u, ea, (u32)g0);
-    }
-
-    // 8032185C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321860: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321860: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321864: rlwinm r0, r4, 6, 0, 25
-    {
-        g0 = gx_rotl32(g4, 6u) & 0xFFFFFFC0u;
-    }
-
-    // 80321868: addi    r4, r3, 24
-    g4 = g3 + (u32)(s32)(24);
-
-    // 8032186C: lwz     r3, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321870: rlwinm r3, r3, 0, 26, 23
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFF3Fu;
-    }
-
-    // 80321874: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321878: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321878u, 1u, ea, (u32)g0);
-    }
-
-    // 8032187C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_80321880: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321880: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321884: rlwinm r0, r4, 8, 0, 23
-    {
-        g0 = gx_rotl32(g4, 8u) & 0xFFFFFF00u;
-    }
-
-    // 80321888: addi    r4, r3, 24
-    g4 = g3 + (u32)(s32)(24);
-
-    // 8032188C: lwz     r3, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321890: rlwinm r3, r3, 0, 24, 21
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFCFFu;
-    }
-
-    // 80321894: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321898: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321898u, 1u, ea, (u32)g0);
-    }
-
-    // 8032189C: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_803218A0: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 803218A0: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803218A4: rlwinm r0, r4, 10, 0, 21
-    {
-        g0 = gx_rotl32(g4, 10u) & 0xFFFFFC00u;
-    }
-
-    // 803218A8: addi    r4, r3, 24
-    g4 = g3 + (u32)(s32)(24);
-
-    // 803218AC: lwz     r3, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803218B0: rlwinm r3, r3, 0, 22, 19
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFF3FFu;
-    }
-
-    // 803218B4: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803218B8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x803218B8u, 1u, ea, (u32)g0);
-    }
-
-    // 803218BC: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_803218C0: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 803218C0: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803218C4: rlwinm r0, r4, 12, 0, 19
-    {
-        g0 = gx_rotl32(g4, 12u) & 0xFFFFF000u;
-    }
-
-    // 803218C8: addi    r4, r3, 24
-    g4 = g3 + (u32)(s32)(24);
-
-    // 803218CC: lwz     r3, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803218D0: rlwinm r3, r3, 0, 20, 17
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFCFFFu;
-    }
-
-    // 803218D4: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803218D8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x803218D8u, 1u, ea, (u32)g0);
-    }
-
-    // 803218DC: b       0x803218FC
-    {
-            goto B_803218FC;
-    }
-B_803218E0: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 803218E0: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803218E4: rlwinm r0, r4, 14, 0, 17
-    {
-        g0 = gx_rotl32(g4, 14u) & 0xFFFFC000u;
-    }
-
-    // 803218E8: addi    r4, r3, 24
-    g4 = g3 + (u32)(s32)(24);
-
-    // 803218EC: lwz     r3, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803218F0: rlwinm r3, r3, 0, 18, 15
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFF3FFFu;
-    }
-
-    // 803218F4: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    s.suffix = 0u;
-    // 803218F8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_stp32(&s, 0x803218F8u, ea, (u32)g0);
-    }
-
-    goto B_803218FC;
-B_803218FC: /* 4 cycles */
-    if (!gx_block(&s, 4u))
-        return gx_decline(&s);
-    // 803218FC: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321900: lbz     r0, 1052(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1052);
-        g0 = gx_ld8(&s, ea);
-    }
-
-    // 80321904: cmplwi  r0, 0x0000
-    {
-        u32 val_a = (u32)(g0);
-        u32 val_b = (u32)(0x0000u);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80321908: bc    4, 2, 0x80321918
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80321918;
-        }
-    }
-    goto B_8032190C;
-B_8032190C: /* 3 cycles */
-    if (!gx_block(&s, 3u))
-        return gx_decline(&s);
-    // 8032190C: lbz     r0, 1053(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1053);
-        g0 = gx_ld8(&s, ea);
-    }
-
-    // 80321910: cmplwi  r0, 0x0000
-    {
-        u32 val_a = (u32)(g0);
-        u32 val_b = (u32)(0x0000u);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80321914: bc    12, 2, 0x80321938
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80321938;
-        }
-    }
-    goto B_80321918;
-B_80321918: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80321918: addi    r4, r3, 20
-    g4 = g3 + (u32)(s32)(20);
-
-    // 8032191C: lwz     r0, 1048(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1048);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321920: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321924: rlwinm r0, r0, 11, 0, 20
-    {
-        g0 = gx_rotl32(g0, 11u) & 0xFFFFF800u;
-    }
-
-    // 80321928: rlwinm r3, r3, 0, 21, 18
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFE7FFu;
-    }
-
-    // 8032192C: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321930: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321930u, 1u, ea, (u32)g0);
-    }
-
-    // 80321934: b       0x80321944
-    {
-            goto B_80321944;
-    }
-B_80321938: /* 3 cycles */
-    if (!gx_block(&s, 3u))
-        return gx_decline(&s);
-    // 80321938: lwzu     r0, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g0 = gx_ld32(&s, ea);
-        g3 = ea;
-    }
-
-    // 8032193C: rlwinm r0, r0, 0, 21, 18
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFE7FFu;
-    }
-
-    s.suffix = 0u;
-    // 80321940: stw     r0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        gx_stp32(&s, 0x80321940u, ea, (u32)g0);
-    }
-
-    goto B_80321944;
-B_80321944: /* 5 cycles */
-    if (!gx_block(&s, 5u))
-        return gx_decline(&s);
-    // 80321944: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321948: lwz     r0, 1268(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1268);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 8032194C: ori     r0, r0, 0x0008
-    g0 = g0 | 0x0008u;
-
-    // 80321950: stw     r0, 1268(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1268);
-        gx_st32(&s, 0x80321950u, 1u, ea, (u32)g0);
-    }
-
-    // 80321954: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            if (s.depth == 0u && (gx_t - 0x8031D6E0u < 0x4000u || gx_t - 0x803216E0u < 0x4000u))
-                return gx_decline(&s);
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->cr = cr;
-    cpu->ctr = ctr;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXClearVtxDesc (80321AD0): 80321AD0..80321B08 */
-static int gxn_80321AD0(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80321AD0;
-B_80321AD0: /* 14 cycles */
-    if (!gx_block(&s, 14u))
-        return gx_decline(&s);
-    // 80321AD0: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80321AD4: li      r4, 0
-    g4 = (u32)(s32)(0);
-
-    // 80321AD8: stw     r4, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        gx_st32(&s, 0x80321AD8u, 11u, ea, (u32)g4);
-    }
-
-    // 80321ADC: lwz     r0, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321AE0: rlwinm r0, r0, 0, 23, 20
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFF9FFu;
-    }
-
-    // 80321AE4: ori     r0, r0, 0x0200
-    g0 = g0 | 0x0200u;
-
-    // 80321AE8: stw     r0, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        gx_st32(&s, 0x80321AE8u, 7u, ea, (u32)g0);
-    }
-
-    // 80321AEC: stw     r4, 24(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(24);
-        gx_st32(&s, 0x80321AECu, 6u, ea, (u32)g4);
-    }
-
-    // 80321AF0: stb     r4, 1052(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1052);
-        gx_st8(&s, 0x80321AF0u, 5u, ea, (u8)g4);
-    }
-
-    // 80321AF4: stb     r4, 1053(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1053);
-        gx_st8(&s, 0x80321AF4u, 4u, ea, (u8)g4);
-    }
-
-    // 80321AF8: lwz     r0, 1268(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1268);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321AFC: ori     r0, r0, 0x0008
-    g0 = g0 | 0x0008u;
-
-    // 80321B00: stw     r0, 1268(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(1268);
-        gx_st32(&s, 0x80321B00u, 1u, ea, (u32)g0);
-    }
-
-    // 80321B04: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetVtxAttrFmt (80321B08): 80321B08..80321E60 */
-static int gxn_80321B08(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 g10 = cpu->gpr[10];
-    u32 cr = cpu->cr;
-    u32 xer = cpu->xer;
-    u32 ctr = cpu->ctr;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80321B08;
-B_80321B08: /* 9 cycles */
-    if (!gx_block(&s, 9u))
-        return gx_decline(&s);
-    // 80321B08: addi    r0, r4, -9
-    g0 = g4 + (u32)(s32)(-9);
-
-    // 80321B0C: lwz     r8, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g8 = gx_ld32(&s, ea);
-    }
-
-    // 80321B10: rlwinm r4, r3, 2, 0, 29
-    {
-        g4 = gx_rotl32(g3, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80321B14: add   r9, r8, r4
-    {
-        u32 a = g8;
-        u32 b = g4;
-        u32 res = a + b;
-        g9 = res;
-    }
-
-    // 80321B18: cmplwi  r0, 0x0010
-    {
-        u32 val_a = (u32)(g0);
-        u32 val_b = (u32)(0x0010u);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80321B1C: addi    r4, r9, 28
-    g4 = g9 + (u32)(s32)(28);
-
-    // 80321B20: addi    r8, r9, 60
-    g8 = g9 + (u32)(s32)(60);
-
-    // 80321B24: addi    r9, r9, 92
-    g9 = g9 + (u32)(s32)(92);
-
-    // 80321B28: bc    12, 1, 0x80321E30
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80321E30;
-        }
-    }
-    goto B_80321B2C;
-B_80321B2C: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 80321B2C: lis     r10, -32710
-    g10 = ((u32)(s32)(-32710) << 16);
-
-    // 80321B30: addi    r10, r10, 6520
-    g10 = g10 + (u32)(s32)(6520);
-
-    // 80321B34: rlwinm r0, r0, 2, 0, 29
-    {
-        g0 = gx_rotl32(g0, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80321B38: lwzx    r0, r10, r0
-    {
-        u32 ea = g10 + g0;
-        g0 = gx_ld32(&s, ea);
-    }
-
-    s.suffix = 1u;
-    // 80321B3C: mtctr    r0
-    ctr = g0;
-
-    // 80321B40: bctr
-    {
-        u32 target = ctr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            if (!gx_live(&s))
-                return gx_decline(&s);
-            switch (target) {
-            case 0x80321B08u:
-                if (!gx_silent(&s, 0x80321B08u))
-                    return gx_decline(&s);
-                goto B_80321B08;
-            case 0x80321B2Cu:
-                if (!gx_silent(&s, 0x80321B2Cu))
-                    return gx_decline(&s);
-                goto B_80321B2C;
-            case 0x80321B44u:
-                if (!gx_silent(&s, 0x80321B44u))
-                    return gx_decline(&s);
-                goto B_80321B44;
-            case 0x80321B80u:
-                if (!gx_silent(&s, 0x80321B80u))
-                    return gx_decline(&s);
-                goto B_80321B80;
-            case 0x80321B9Cu:
-                if (!gx_silent(&s, 0x80321B9Cu))
-                    return gx_decline(&s);
-                goto B_80321B9C;
-            case 0x80321BC0u:
-                if (!gx_silent(&s, 0x80321BC0u))
-                    return gx_decline(&s);
-                goto B_80321BC0;
-            case 0x80321BE4u:
-                if (!gx_silent(&s, 0x80321BE4u))
-                    return gx_decline(&s);
-                goto B_80321BE4;
-            case 0x80321C10u:
-                if (!gx_silent(&s, 0x80321C10u))
-                    return gx_decline(&s);
-                goto B_80321C10;
-            case 0x80321C3Cu:
-                if (!gx_silent(&s, 0x80321C3Cu))
-                    return gx_decline(&s);
-                goto B_80321C3C;
-            case 0x80321C7Cu:
-                if (!gx_silent(&s, 0x80321C7Cu))
-                    return gx_decline(&s);
-                goto B_80321C7C;
-            case 0x80321CB8u:
-                if (!gx_silent(&s, 0x80321CB8u))
-                    return gx_decline(&s);
-                goto B_80321CB8;
-            case 0x80321CF8u:
-                if (!gx_silent(&s, 0x80321CF8u))
-                    return gx_decline(&s);
-                goto B_80321CF8;
-            case 0x80321D38u:
-                if (!gx_silent(&s, 0x80321D38u))
-                    return gx_decline(&s);
-                goto B_80321D38;
-            case 0x80321D78u:
-                if (!gx_silent(&s, 0x80321D78u))
-                    return gx_decline(&s);
-                goto B_80321D78;
-            case 0x80321DB8u:
-                if (!gx_silent(&s, 0x80321DB8u))
-                    return gx_decline(&s);
-                goto B_80321DB8;
-            case 0x80321DF8u:
-                if (!gx_silent(&s, 0x80321DF8u))
-                    return gx_decline(&s);
-                goto B_80321DF8;
-            case 0x80321E30u:
-                if (!gx_silent(&s, 0x80321E30u))
-                    return gx_decline(&s);
-                goto B_80321E30;
-            default:
-                break;
-            }
-            return gx_decline(&s);
-        }
-    }
-B_80321B44: /* 15 cycles */
-    if (!gx_block(&s, 15u))
-        return gx_decline(&s);
-    // 80321B44: lwz     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321B48: rlwinm r6, r6, 1, 0, 30
-    {
-        g6 = gx_rotl32(g6, 1u) & 0xFFFFFFFEu;
-    }
-
-    // 80321B4C: rlwinm r0, r0, 0, 0, 30
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFFFFEu;
-    }
-
-    // 80321B50: or   r0, r0, r5
-    {
-        g0 = g0 | g5;
-    }
-
-    // 80321B54: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321B54u, 10u, ea, (u32)g0);
-    }
-
-    // 80321B58: rlwinm r0, r7, 4, 20, 27
-    {
-        g0 = gx_rotl32(g7, 4u) & 0x00000FF0u;
-    }
-
-    // 80321B5C: lwz     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321B60: rlwinm r5, r5, 0, 31, 27
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFFFFF1u;
-    }
-
-    // 80321B64: or   r5, r5, r6
-    {
-        g5 = g5 | g6;
-    }
-
-    // 80321B68: stw     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321B68u, 5u, ea, (u32)g5);
-    }
-
-    // 80321B6C: lwz     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321B70: rlwinm r5, r5, 0, 28, 22
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFFFE0Fu;
-    }
-
-    // 80321B74: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80321B78: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321B78u, 1u, ea, (u32)g0);
-    }
-
-    // 80321B7C: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321B80: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 80321B80: lwz     r7, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g7 = gx_ld32(&s, ea);
-    }
-
-    // 80321B84: rlwinm r0, r6, 10, 0, 21
-    {
-        g0 = gx_rotl32(g6, 10u) & 0xFFFFFC00u;
-    }
-
-    // 80321B88: cmpwi   r5, 2
-    {
-        s32 val_a = (s32)(g5);
-        s32 val_b = (s32)(2);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80321B8C: rlwinm r6, r7, 0, 22, 18
-    {
-        g6 = gx_rotl32(g7, 0u) & 0xFFFFE3FFu;
-    }
-
-    // 80321B90: or   r0, r6, r0
-    {
-        g0 = g6 | g0;
-    }
-
-    // 80321B94: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321B94u, 1u, ea, (u32)g0);
-    }
-
-    // 80321B98: bc    4, 2, 0x80321BC0
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80321BC0;
-        }
-    }
-    goto B_80321B9C;
-B_80321B9C: /* 9 cycles */
-    if (!gx_block(&s, 9u))
-        return gx_decline(&s);
-    // 80321B9C: lwz     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321BA0: rlwinm r0, r0, 0, 23, 21
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFFDFFu;
-    }
-
-    // 80321BA4: ori     r0, r0, 0x0200
-    g0 = g0 | 0x0200u;
-
-    // 80321BA8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321BA8u, 5u, ea, (u32)g0);
-    }
-
-    // 80321BAC: lwz     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321BB0: rlwinm r0, r0, 0, 1, 31
-    {
-        g0 = gx_rotl32(g0, 0u) & 0x7FFFFFFFu;
-    }
-
-    // 80321BB4: oris    r0, r0, 0x8000
-    g0 = g0 | (0x8000u << 16);
-
-    // 80321BB8: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321BB8u, 1u, ea, (u32)g0);
-    }
-
-    // 80321BBC: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321BC0: /* 9 cycles */
-    if (!gx_block(&s, 9u))
-        return gx_decline(&s);
-    // 80321BC0: lwz     r6, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 80321BC4: rlwinm r0, r5, 9, 0, 22
-    {
-        g0 = gx_rotl32(g5, 9u) & 0xFFFFFE00u;
-    }
-
-    // 80321BC8: rlwinm r5, r6, 0, 23, 21
-    {
-        g5 = gx_rotl32(g6, 0u) & 0xFFFFFDFFu;
-    }
-
-    // 80321BCC: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80321BD0: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321BD0u, 4u, ea, (u32)g0);
-    }
-
-    // 80321BD4: lwz     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321BD8: rlwinm r0, r0, 0, 1, 31
-    {
-        g0 = gx_rotl32(g0, 0u) & 0x7FFFFFFFu;
-    }
-
-    // 80321BDC: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321BDCu, 1u, ea, (u32)g0);
-    }
-
-    // 80321BE0: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321BE4: /* 11 cycles */
-    if (!gx_block(&s, 11u))
-        return gx_decline(&s);
-    // 80321BE4: lwz     r7, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g7 = gx_ld32(&s, ea);
-    }
-
-    // 80321BE8: rlwinm r5, r5, 13, 0, 18
-    {
-        g5 = gx_rotl32(g5, 13u) & 0xFFFFE000u;
-    }
-
-    // 80321BEC: rlwinm r0, r6, 14, 0, 17
-    {
-        g0 = gx_rotl32(g6, 14u) & 0xFFFFC000u;
-    }
-
-    // 80321BF0: rlwinm r6, r7, 0, 19, 17
-    {
-        g6 = gx_rotl32(g7, 0u) & 0xFFFFDFFFu;
-    }
-
-    // 80321BF4: or   r5, r6, r5
-    {
-        g5 = g6 | g5;
-    }
-
-    // 80321BF8: stw     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321BF8u, 5u, ea, (u32)g5);
-    }
-
-    // 80321BFC: lwz     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321C00: rlwinm r5, r5, 0, 18, 14
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFE3FFFu;
-    }
-
-    // 80321C04: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80321C08: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321C08u, 1u, ea, (u32)g0);
-    }
-
-    // 80321C0C: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321C10: /* 11 cycles */
-    if (!gx_block(&s, 11u))
-        return gx_decline(&s);
-    // 80321C10: lwz     r7, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g7 = gx_ld32(&s, ea);
-    }
-
-    // 80321C14: rlwinm r5, r5, 17, 0, 14
-    {
-        g5 = gx_rotl32(g5, 17u) & 0xFFFE0000u;
-    }
-
-    // 80321C18: rlwinm r0, r6, 18, 0, 13
-    {
-        g0 = gx_rotl32(g6, 18u) & 0xFFFC0000u;
-    }
-
-    // 80321C1C: rlwinm r6, r7, 0, 15, 13
-    {
-        g6 = gx_rotl32(g7, 0u) & 0xFFFDFFFFu;
-    }
-
-    // 80321C20: or   r5, r6, r5
-    {
-        g5 = g6 | g5;
-    }
-
-    // 80321C24: stw     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321C24u, 5u, ea, (u32)g5);
-    }
-
-    // 80321C28: lwz     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321C2C: rlwinm r5, r5, 0, 14, 10
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFE3FFFFu;
-    }
-
-    // 80321C30: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80321C34: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321C34u, 1u, ea, (u32)g0);
-    }
-
-    // 80321C38: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321C3C: /* 16 cycles */
-    if (!gx_block(&s, 16u))
-        return gx_decline(&s);
-    // 80321C3C: lwz     r8, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g8 = gx_ld32(&s, ea);
-    }
-
-    // 80321C40: rlwinm r0, r5, 21, 0, 10
-    {
-        g0 = gx_rotl32(g5, 21u) & 0xFFE00000u;
-    }
-
-    // 80321C44: rlwinm r5, r8, 0, 11, 9
-    {
-        g5 = gx_rotl32(g8, 0u) & 0xFFDFFFFFu;
-    }
-
-    // 80321C48: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80321C4C: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321C4Cu, 11u, ea, (u32)g0);
-    }
-
-    // 80321C50: rlwinm r5, r6, 22, 0, 9
-    {
-        g5 = gx_rotl32(g6, 22u) & 0xFFC00000u;
-    }
-
-    // 80321C54: rlwinm r0, r7, 25, 0, 6
-    {
-        g0 = gx_rotl32(g7, 25u) & 0xFE000000u;
-    }
-
-    // 80321C58: lwz     r6, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 80321C5C: rlwinm r6, r6, 0, 10, 6
-    {
-        g6 = gx_rotl32(g6, 0u) & 0xFE3FFFFFu;
-    }
-
-    // 80321C60: or   r5, r6, r5
-    {
-        g5 = g6 | g5;
-    }
-
-    // 80321C64: stw     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321C64u, 5u, ea, (u32)g5);
-    }
-
-    // 80321C68: lwz     r5, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321C6C: rlwinm r5, r5, 0, 7, 1
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xC1FFFFFFu;
-    }
-
-    // 80321C70: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80321C74: stw     r0, 0(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321C74u, 1u, ea, (u32)g0);
-    }
-
-    // 80321C78: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321C7C: /* 15 cycles */
-    if (!gx_block(&s, 15u))
-        return gx_decline(&s);
-    // 80321C7C: lwz     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321C80: rlwinm r4, r6, 1, 0, 30
-    {
-        g4 = gx_rotl32(g6, 1u) & 0xFFFFFFFEu;
-    }
-
-    // 80321C84: rlwinm r0, r0, 0, 0, 30
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFFFFEu;
-    }
-
-    // 80321C88: or   r0, r0, r5
-    {
-        g0 = g0 | g5;
-    }
-
-    // 80321C8C: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321C8Cu, 10u, ea, (u32)g0);
-    }
-
-    // 80321C90: rlwinm r0, r7, 4, 20, 27
-    {
-        g0 = gx_rotl32(g7, 4u) & 0x00000FF0u;
-    }
-
-    // 80321C94: lwz     r5, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321C98: rlwinm r5, r5, 0, 31, 27
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFFFFF1u;
-    }
-
-    // 80321C9C: or   r4, r5, r4
-    {
-        g4 = g5 | g4;
-    }
-
-    // 80321CA0: stw     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321CA0u, 5u, ea, (u32)g4);
-    }
-
-    // 80321CA4: lwz     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321CA8: rlwinm r4, r4, 0, 28, 22
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFFE0Fu;
-    }
-
-    // 80321CAC: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321CB0: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321CB0u, 1u, ea, (u32)g0);
-    }
-
-    // 80321CB4: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321CB8: /* 16 cycles */
-    if (!gx_block(&s, 16u))
-        return gx_decline(&s);
-    // 80321CB8: lwz     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321CBC: rlwinm r0, r5, 9, 0, 22
-    {
-        g0 = gx_rotl32(g5, 9u) & 0xFFFFFE00u;
-    }
-
-    // 80321CC0: rlwinm r4, r4, 0, 23, 21
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFFDFFu;
-    }
-
-    // 80321CC4: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321CC8: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321CC8u, 11u, ea, (u32)g0);
-    }
-
-    // 80321CCC: rlwinm r4, r6, 10, 0, 21
-    {
-        g4 = gx_rotl32(g6, 10u) & 0xFFFFFC00u;
-    }
-
-    // 80321CD0: rlwinm r0, r7, 13, 11, 18
-    {
-        g0 = gx_rotl32(g7, 13u) & 0x001FE000u;
-    }
-
-    // 80321CD4: lwz     r5, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321CD8: rlwinm r5, r5, 0, 22, 18
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFFE3FFu;
-    }
-
-    // 80321CDC: or   r4, r5, r4
-    {
-        g4 = g5 | g4;
-    }
-
-    // 80321CE0: stw     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321CE0u, 5u, ea, (u32)g4);
-    }
-
-    // 80321CE4: lwz     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321CE8: rlwinm r4, r4, 0, 19, 13
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFC1FFFu;
-    }
-
-    // 80321CEC: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321CF0: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321CF0u, 1u, ea, (u32)g0);
-    }
-
-    // 80321CF4: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321CF8: /* 16 cycles */
-    if (!gx_block(&s, 16u))
-        return gx_decline(&s);
-    // 80321CF8: lwz     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321CFC: rlwinm r0, r5, 18, 0, 13
-    {
-        g0 = gx_rotl32(g5, 18u) & 0xFFFC0000u;
-    }
-
-    // 80321D00: rlwinm r4, r4, 0, 14, 12
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFBFFFFu;
-    }
-
-    // 80321D04: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321D08: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321D08u, 11u, ea, (u32)g0);
-    }
-
-    // 80321D0C: rlwinm r4, r6, 19, 0, 12
-    {
-        g4 = gx_rotl32(g6, 19u) & 0xFFF80000u;
-    }
-
-    // 80321D10: rlwinm r0, r7, 22, 2, 9
-    {
-        g0 = gx_rotl32(g7, 22u) & 0x3FC00000u;
-    }
-
-    // 80321D14: lwz     r5, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321D18: rlwinm r5, r5, 0, 13, 9
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFC7FFFFu;
-    }
-
-    // 80321D1C: or   r4, r5, r4
-    {
-        g4 = g5 | g4;
-    }
-
-    // 80321D20: stw     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321D20u, 5u, ea, (u32)g4);
-    }
-
-    // 80321D24: lwz     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321D28: rlwinm r4, r4, 0, 10, 4
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xF83FFFFFu;
-    }
-
-    // 80321D2C: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321D30: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321D30u, 1u, ea, (u32)g0);
-    }
-
-    // 80321D34: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321D38: /* 16 cycles */
-    if (!gx_block(&s, 16u))
-        return gx_decline(&s);
-    // 80321D38: lwz     r10, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g10 = gx_ld32(&s, ea);
-    }
-
-    // 80321D3C: rlwinm r0, r5, 27, 0, 4
-    {
-        g0 = gx_rotl32(g5, 27u) & 0xF8000000u;
-    }
-
-    // 80321D40: rlwinm r4, r6, 28, 0, 3
-    {
-        g4 = gx_rotl32(g6, 28u) & 0xF0000000u;
-    }
-
-    // 80321D44: rlwinm r5, r10, 0, 5, 3
-    {
-        g5 = gx_rotl32(g10, 0u) & 0xF7FFFFFFu;
-    }
-
-    // 80321D48: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80321D4C: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321D4Cu, 10u, ea, (u32)g0);
-    }
-
-    // 80321D50: rlwinm r0, r7, 0, 24, 31
-    {
-        g0 = gx_rotl32(g7, 0u) & 0x000000FFu;
-    }
-
-    // 80321D54: lwz     r5, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321D58: rlwinm r5, r5, 0, 4, 0
-    {
-        g5 = gx_rotl32(g5, 0u) & 0x8FFFFFFFu;
-    }
-
-    // 80321D5C: or   r4, r5, r4
-    {
-        g4 = g5 | g4;
-    }
-
-    // 80321D60: stw     r4, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321D60u, 5u, ea, (u32)g4);
-    }
-
-    // 80321D64: lwz     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321D68: rlwinm r4, r4, 0, 0, 26
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFFFE0u;
-    }
-
-    // 80321D6C: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321D70: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321D70u, 1u, ea, (u32)g0);
-    }
-
-    // 80321D74: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321D78: /* 16 cycles */
-    if (!gx_block(&s, 16u))
-        return gx_decline(&s);
-    // 80321D78: lwz     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321D7C: rlwinm r0, r5, 5, 0, 26
-    {
-        g0 = gx_rotl32(g5, 5u) & 0xFFFFFFE0u;
-    }
-
-    // 80321D80: rlwinm r4, r4, 0, 27, 25
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFFFDFu;
-    }
-
-    // 80321D84: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321D88: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321D88u, 11u, ea, (u32)g0);
-    }
-
-    // 80321D8C: rlwinm r4, r6, 6, 0, 25
-    {
-        g4 = gx_rotl32(g6, 6u) & 0xFFFFFFC0u;
-    }
-
-    // 80321D90: rlwinm r0, r7, 9, 15, 22
-    {
-        g0 = gx_rotl32(g7, 9u) & 0x0001FE00u;
-    }
-
-    // 80321D94: lwz     r5, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321D98: rlwinm r5, r5, 0, 26, 22
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFFFE3Fu;
-    }
-
-    // 80321D9C: or   r4, r5, r4
-    {
-        g4 = g5 | g4;
-    }
-
-    // 80321DA0: stw     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321DA0u, 5u, ea, (u32)g4);
-    }
-
-    // 80321DA4: lwz     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321DA8: rlwinm r4, r4, 0, 23, 17
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFC1FFu;
-    }
-
-    // 80321DAC: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321DB0: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321DB0u, 1u, ea, (u32)g0);
-    }
-
-    // 80321DB4: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321DB8: /* 16 cycles */
-    if (!gx_block(&s, 16u))
-        return gx_decline(&s);
-    // 80321DB8: lwz     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321DBC: rlwinm r0, r5, 14, 0, 17
-    {
-        g0 = gx_rotl32(g5, 14u) & 0xFFFFC000u;
-    }
-
-    // 80321DC0: rlwinm r4, r4, 0, 18, 16
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFBFFFu;
-    }
-
-    // 80321DC4: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321DC8: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321DC8u, 11u, ea, (u32)g0);
-    }
-
-    // 80321DCC: rlwinm r4, r6, 15, 0, 16
-    {
-        g4 = gx_rotl32(g6, 15u) & 0xFFFF8000u;
-    }
-
-    // 80321DD0: rlwinm r0, r7, 18, 6, 13
-    {
-        g0 = gx_rotl32(g7, 18u) & 0x03FC0000u;
-    }
-
-    // 80321DD4: lwz     r5, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321DD8: rlwinm r5, r5, 0, 17, 13
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFC7FFFu;
-    }
-
-    // 80321DDC: or   r4, r5, r4
-    {
-        g4 = g5 | g4;
-    }
-
-    // 80321DE0: stw     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321DE0u, 5u, ea, (u32)g4);
-    }
-
-    // 80321DE4: lwz     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321DE8: rlwinm r4, r4, 0, 14, 8
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFF83FFFFu;
-    }
-
-    // 80321DEC: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321DF0: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321DF0u, 1u, ea, (u32)g0);
-    }
-
-    // 80321DF4: b       0x80321E30
-    {
-            goto B_80321E30;
-    }
-B_80321DF8: /* 14 cycles */
-    if (!gx_block(&s, 14u))
-        return gx_decline(&s);
-    // 80321DF8: lwz     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321DFC: rlwinm r0, r5, 23, 0, 8
-    {
-        g0 = gx_rotl32(g5, 23u) & 0xFF800000u;
-    }
-
-    // 80321E00: rlwinm r4, r4, 0, 9, 7
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFF7FFFFFu;
-    }
-
-    // 80321E04: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321E08: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321E08u, 9u, ea, (u32)g0);
-    }
-
-    // 80321E0C: rlwinm r0, r6, 24, 0, 7
-    {
-        g0 = gx_rotl32(g6, 24u) & 0xFF000000u;
-    }
-
-    // 80321E10: lwz     r4, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321E14: rlwinm r4, r4, 0, 8, 4
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xF8FFFFFFu;
-    }
-
-    // 80321E18: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80321E1C: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_st32(&s, 0x80321E1Cu, 4u, ea, (u32)g0);
-    }
-
-    // 80321E20: lwz     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80321E24: rlwinm r0, r0, 0, 5, 31
-    {
-        g0 = gx_rotl32(g0, 0u) & 0x07FFFFFFu;
-    }
-
-    // 80321E28: rlwimi r0, r7, 27, 0, 4
-    {
-        u32 rot = gx_rotl32(g7, 27u);
-        g0 = (g0 & ~0xF8000000u) | (rot & 0xF8000000u);
-    }
-
-    s.suffix = 0u;
-    // 80321E2C: stw     r0, 0(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(0);
-        gx_stp32(&s, 0x80321E2Cu, ea, (u32)g0);
-    }
-
-    goto B_80321E30;
-B_80321E30: /* 12 cycles */
-    if (!gx_block(&s, 12u))
-        return gx_decline(&s);
-    // 80321E30: lwz     r5, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80321E34: rlwinm r0, r3, 0, 24, 31
-    {
-        g0 = gx_rotl32(g3, 0u) & 0x000000FFu;
-    }
-
-    // 80321E38: li      r3, 1
-    g3 = (u32)(s32)(1);
-
-    // 80321E3C: lwz     r4, 1268(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(1268);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80321E40: slw   r0, r3, r0
-    {
-        u32 sh = g0 & 0x3Fu;
-        g0 = sh > 31 ? 0u : (g3 << sh);
-    }
-
-    // 80321E44: rlwinm r0, r0, 0, 24, 31
-    {
-        g0 = gx_rotl32(g0, 0u) & 0x000000FFu;
-    }
-
-    // 80321E48: ori     r3, r4, 0x0010
-    g3 = g4 | 0x0010u;
-
-    // 80321E4C: stw     r3, 1268(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(1268);
-        gx_st32(&s, 0x80321E4Cu, 4u, ea, (u32)g3);
-    }
-
-    // 80321E50: lbz     r3, 1266(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(1266);
-        g3 = gx_ld8(&s, ea);
-    }
-
-    // 80321E54: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80321E58: stb     r0, 1266(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(1266);
-        gx_st8(&s, 0x80321E58u, 1u, ea, (u8)g0);
-    }
-
-    // 80321E5C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->gpr[8] = g8;
-    cpu->gpr[9] = g9;
-    cpu->gpr[10] = g10;
-    cpu->cr = cr;
-    cpu->ctr = ctr;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
 /* GXSetTexCoordGen2 (80322604): 80322604..803228D4, 80327364..803273E8 */
 static int gxn_80322604(CPUState* cpu, u32 at) {
     GxRun s;
@@ -13491,184 +10630,6 @@ GX_DONE:
     return 1;
 }
 
-/* GXSetCullMode (80323328): 80323328..80323374 */
-static int gxn_80323328(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 cr = cpu->cr;
-    u32 xer = cpu->xer;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80323328;
-B_80323328: /* 2 cycles */
-    if (!gx_block(&s, 2u))
-        return gx_decline(&s);
-    // 80323328: cmpwi   r3, 2
-    {
-        s32 val_a = (s32)(g3);
-        s32 val_b = (s32)(2);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 8032332C: bc    12, 2, 0x80323348
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80323348;
-        }
-    }
-    goto B_80323330;
-B_80323330: /* 1 cycles */
-    if (!gx_block(&s, 1u))
-        return gx_decline(&s);
-    // 80323330: bc    4, 0, 0x8032334C
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_8032334C;
-        }
-    }
-    goto B_80323334;
-B_80323334: /* 2 cycles */
-    if (!gx_block(&s, 2u))
-        return gx_decline(&s);
-    // 80323334: cmpwi   r3, 1
-    {
-        s32 val_a = (s32)(g3);
-        s32 val_b = (s32)(1);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80323338: bc    4, 0, 0x80323340
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80323340;
-        }
-    }
-    goto B_8032333C;
-B_8032333C: /* 1 cycles */
-    if (!gx_block(&s, 1u))
-        return gx_decline(&s);
-    // 8032333C: b       0x8032334C
-    {
-            goto B_8032334C;
-    }
-    goto B_80323340;
-B_80323340: /* 2 cycles */
-    if (!gx_block(&s, 2u))
-        return gx_decline(&s);
-    // 80323340: li      r3, 2
-    g3 = (u32)(s32)(2);
-
-    // 80323344: b       0x8032334C
-    {
-            goto B_8032334C;
-    }
-B_80323348: /* 1 cycles */
-    if (!gx_block(&s, 1u))
-        return gx_decline(&s);
-    // 80323348: li      r3, 1
-    g3 = (u32)(s32)(1);
-    goto B_8032334C;
-B_8032334C: /* 10 cycles */
-    if (!gx_block(&s, 10u))
-        return gx_decline(&s);
-    // 8032334C: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80323350: rlwinm r0, r3, 14, 0, 17
-    {
-        g0 = gx_rotl32(g3, 14u) & 0xFFFFC000u;
-    }
-
-    // 80323354: lwz     r3, 516(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(516);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80323358: rlwinm r3, r3, 0, 18, 15
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFF3FFFu;
-    }
-
-    // 8032335C: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80323360: stw     r0, 516(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(516);
-        gx_st32(&s, 0x80323360u, 4u, ea, (u32)g0);
-    }
-
-    // 80323364: lwz     r0, 1268(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(1268);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80323368: ori     r0, r0, 0x0004
-    g0 = g0 | 0x0004u;
-
-    // 8032336C: stw     r0, 1268(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(1268);
-        gx_st32(&s, 0x8032336Cu, 1u, ea, (u32)g0);
-    }
-
-    // 80323370: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->cr = cr;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
 /* GXSetChanAmbColor (80324390): 80324390..80324484 */
 static int gxn_80324390(CPUState* cpu, u32 at) {
     GxRun s;
@@ -15093,2969 +12054,6 @@ GX_DONE:
     return 1;
 }
 
-/* GXGetTexObjFmt (80324D28): 80324D28..80324D30 */
-static int gxn_80324D28(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g3 = cpu->gpr[3];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80324D28;
-B_80324D28: /* 2 cycles */
-    if (!gx_block(&s, 2u))
-        return gx_decline(&s);
-    // 80324D28: lwz     r3, 20(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(20);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80324D2C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[3] = g3;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevIndirect (80325774): 80325774..80325810 */
-static int gxn_80325774(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g1 = cpu->gpr[1];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 g10 = cpu->gpr[10];
-    u32 g11 = cpu->gpr[11];
-    u32 g12 = cpu->gpr[12];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80325774;
-B_80325774: /* 39 cycles */
-    if (!gx_block(&s, 39u))
-        return gx_decline(&s);
-    // 80325774: stwu     r1, -40(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(-40);
-        gx_st32(&s, 0x80325774u, 38u, ea, (u32)g1);
-        g1 = ea;
-    }
-
-    // 80325778: rlwinm r4, r4, 0, 30, 27
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFFFF3u;
-    }
-
-    // 8032577C: rlwinm r0, r5, 2, 0, 29
-    {
-        g0 = gx_rotl32(g5, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80325780: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80325784: lwz     r11, 52(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(52);
-        g11 = gx_ld32(&s, ea);
-    }
-
-    // 80325788: rlwinm r5, r0, 0, 28, 24
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFFFF8Fu;
-    }
-
-    // 8032578C: lbz     r12, 51(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(51);
-        g12 = gx_ld8(&s, ea);
-    }
-
-    // 80325790: rlwinm r0, r6, 4, 0, 27
-    {
-        g0 = gx_rotl32(g6, 4u) & 0xFFFFFFF0u;
-    }
-
-    // 80325794: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80325798: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 8032579C: rlwinm r5, r0, 0, 25, 22
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFFFE7Fu;
-    }
-
-    // 803257A0: rlwinm r0, r11, 7, 0, 24
-    {
-        g0 = gx_rotl32(g11, 7u) & 0xFFFFFF80u;
-    }
-
-    // 803257A4: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 803257A8: rlwinm r5, r0, 0, 23, 18
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFFE1FFu;
-    }
-
-    // 803257AC: rlwinm r0, r7, 9, 0, 22
-    {
-        g0 = gx_rotl32(g7, 9u) & 0xFFFFFE00u;
-    }
-
-    // 803257B0: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 803257B4: rlwinm r5, r0, 0, 19, 15
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFF1FFFu;
-    }
-
-    // 803257B8: rlwinm r0, r8, 13, 0, 18
-    {
-        g0 = gx_rotl32(g8, 13u) & 0xFFFFE000u;
-    }
-
-    // 803257BC: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 803257C0: addi    r5, r3, 16
-    g5 = g3 + (u32)(s32)(16);
-
-    // 803257C4: rlwinm r3, r0, 0, 16, 12
-    {
-        g3 = gx_rotl32(g0, 0u) & 0xFFF8FFFFu;
-    }
-
-    // 803257C8: rlwinm r0, r9, 16, 0, 15
-    {
-        g0 = gx_rotl32(g9, 16u) & 0xFFFF0000u;
-    }
-
-    // 803257CC: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803257D0: rlwinm r3, r0, 0, 13, 11
-    {
-        g3 = gx_rotl32(g0, 0u) & 0xFFF7FFFFu;
-    }
-
-    // 803257D4: rlwinm r0, r12, 19, 0, 12
-    {
-        g0 = gx_rotl32(g12, 19u) & 0xFFF80000u;
-    }
-
-    // 803257D8: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803257DC: rlwinm r3, r0, 0, 12, 10
-    {
-        g3 = gx_rotl32(g0, 0u) & 0xFFEFFFFFu;
-    }
-
-    // 803257E0: rlwinm r0, r10, 20, 4, 11
-    {
-        g0 = gx_rotl32(g10, 20u) & 0x0FF00000u;
-    }
-
-    // 803257E4: or   r6, r3, r0
-    {
-        g6 = g3 | g0;
-    }
-
-    // 803257E8: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 803257EC: lis     r3, -13311
-    g3 = ((u32)(s32)(-13311) << 16);
-
-    // 803257F0: stb     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x803257F0u, 7u, ea, (u8)g0);
-    }
-
-    // 803257F4: rlwinm r0, r5, 24, 0, 7
-    {
-        g0 = gx_rotl32(g5, 24u) & 0xFF000000u;
-    }
-
-    // 803257F8: rlwimi r0, r6, 0, 8, 31
-    {
-        u32 rot = gx_rotl32(g6, 0u);
-        g0 = (g0 & ~0x00FFFFFFu) | (rot & 0x00FFFFFFu);
-    }
-
-    // 803257FC: stw     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x803257FCu, 4u, ea, (u32)g0);
-    }
-
-    // 80325800: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80325804: sth     r0, 2(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(2);
-        gx_st16(&s, 0x80325804u, 2u, ea, (u16)g0);
-    }
-
-    // 80325808: addi    r1, r1, 40
-    g1 = g1 + (u32)(s32)(40);
-
-    // 8032580C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[1] = g1;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->gpr[11] = g11;
-    cpu->gpr[12] = g12;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetNumIndStages (80325C00): 80325C00..80325C28 */
-static int gxn_80325C00(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80325C00;
-B_80325C00: /* 10 cycles */
-    if (!gx_block(&s, 10u))
-        return gx_decline(&s);
-    // 80325C00: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80325C04: rlwinm r0, r3, 16, 8, 15
-    {
-        g0 = gx_rotl32(g3, 16u) & 0x00FF0000u;
-    }
-
-    // 80325C08: lwz     r3, 516(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(516);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80325C0C: rlwinm r3, r3, 0, 16, 12
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFF8FFFFu;
-    }
-
-    // 80325C10: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80325C14: stw     r0, 516(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(516);
-        gx_st32(&s, 0x80325C14u, 4u, ea, (u32)g0);
-    }
-
-    // 80325C18: lwz     r0, 1268(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(1268);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80325C1C: ori     r0, r0, 0x0006
-    g0 = g0 | 0x0006u;
-
-    // 80325C20: stw     r0, 1268(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(1268);
-        gx_st32(&s, 0x80325C20u, 1u, ea, (u32)g0);
-    }
-
-    // 80325C24: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevDirect (80325C28): 80325C28..80325C70, 80325774..80325810 */
-static int gxn_80325C28(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g1 = cpu->gpr[1];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 g10 = cpu->gpr[10];
-    u32 g11 = cpu->gpr[11];
-    u32 g12 = cpu->gpr[12];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80325C28;
-B_80325774: /* 39 cycles */
-    if (!gx_block(&s, 39u))
-        return gx_decline(&s);
-    // 80325774: stwu     r1, -40(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(-40);
-        gx_st32(&s, 0x80325774u, 38u, ea, (u32)g1);
-        g1 = ea;
-    }
-
-    // 80325778: rlwinm r4, r4, 0, 30, 27
-    {
-        g4 = gx_rotl32(g4, 0u) & 0xFFFFFFF3u;
-    }
-
-    // 8032577C: rlwinm r0, r5, 2, 0, 29
-    {
-        g0 = gx_rotl32(g5, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80325780: or   r0, r4, r0
-    {
-        g0 = g4 | g0;
-    }
-
-    // 80325784: lwz     r11, 52(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(52);
-        g11 = gx_ld32(&s, ea);
-    }
-
-    // 80325788: rlwinm r5, r0, 0, 28, 24
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFFFF8Fu;
-    }
-
-    // 8032578C: lbz     r12, 51(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(51);
-        g12 = gx_ld8(&s, ea);
-    }
-
-    // 80325790: rlwinm r0, r6, 4, 0, 27
-    {
-        g0 = gx_rotl32(g6, 4u) & 0xFFFFFFF0u;
-    }
-
-    // 80325794: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80325798: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 8032579C: rlwinm r5, r0, 0, 25, 22
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFFFE7Fu;
-    }
-
-    // 803257A0: rlwinm r0, r11, 7, 0, 24
-    {
-        g0 = gx_rotl32(g11, 7u) & 0xFFFFFF80u;
-    }
-
-    // 803257A4: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 803257A8: rlwinm r5, r0, 0, 23, 18
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFFE1FFu;
-    }
-
-    // 803257AC: rlwinm r0, r7, 9, 0, 22
-    {
-        g0 = gx_rotl32(g7, 9u) & 0xFFFFFE00u;
-    }
-
-    // 803257B0: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 803257B4: rlwinm r5, r0, 0, 19, 15
-    {
-        g5 = gx_rotl32(g0, 0u) & 0xFFFF1FFFu;
-    }
-
-    // 803257B8: rlwinm r0, r8, 13, 0, 18
-    {
-        g0 = gx_rotl32(g8, 13u) & 0xFFFFE000u;
-    }
-
-    // 803257BC: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 803257C0: addi    r5, r3, 16
-    g5 = g3 + (u32)(s32)(16);
-
-    // 803257C4: rlwinm r3, r0, 0, 16, 12
-    {
-        g3 = gx_rotl32(g0, 0u) & 0xFFF8FFFFu;
-    }
-
-    // 803257C8: rlwinm r0, r9, 16, 0, 15
-    {
-        g0 = gx_rotl32(g9, 16u) & 0xFFFF0000u;
-    }
-
-    // 803257CC: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803257D0: rlwinm r3, r0, 0, 13, 11
-    {
-        g3 = gx_rotl32(g0, 0u) & 0xFFF7FFFFu;
-    }
-
-    // 803257D4: rlwinm r0, r12, 19, 0, 12
-    {
-        g0 = gx_rotl32(g12, 19u) & 0xFFF80000u;
-    }
-
-    // 803257D8: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 803257DC: rlwinm r3, r0, 0, 12, 10
-    {
-        g3 = gx_rotl32(g0, 0u) & 0xFFEFFFFFu;
-    }
-
-    // 803257E0: rlwinm r0, r10, 20, 4, 11
-    {
-        g0 = gx_rotl32(g10, 20u) & 0x0FF00000u;
-    }
-
-    // 803257E4: or   r6, r3, r0
-    {
-        g6 = g3 | g0;
-    }
-
-    // 803257E8: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 803257EC: lis     r3, -13311
-    g3 = ((u32)(s32)(-13311) << 16);
-
-    // 803257F0: stb     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x803257F0u, 7u, ea, (u8)g0);
-    }
-
-    // 803257F4: rlwinm r0, r5, 24, 0, 7
-    {
-        g0 = gx_rotl32(g5, 24u) & 0xFF000000u;
-    }
-
-    // 803257F8: rlwimi r0, r6, 0, 8, 31
-    {
-        u32 rot = gx_rotl32(g6, 0u);
-        g0 = (g0 & ~0x00FFFFFFu) | (rot & 0x00FFFFFFu);
-    }
-
-    // 803257FC: stw     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x803257FCu, 4u, ea, (u32)g0);
-    }
-
-    // 80325800: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80325804: sth     r0, 2(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(2);
-        gx_st16(&s, 0x80325804u, 2u, ea, (u16)g0);
-    }
-
-    // 80325808: addi    r1, r1, 40
-    g1 = g1 + (u32)(s32)(40);
-
-    // 8032580C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-B_80325C28: /* 14 cycles */
-    if (!gx_block(&s, 14u))
-        return gx_decline(&s);
-    s.suffix = 13u;
-    // 80325C28: mflr    r0
-    g0 = lr;
-
-    // 80325C2C: li      r4, 0
-    g4 = (u32)(s32)(0);
-
-    // 80325C30: stw     r0, 4(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(4);
-        gx_st32(&s, 0x80325C30u, 11u, ea, (u32)g0);
-    }
-
-    // 80325C34: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80325C38: li      r5, 0
-    g5 = (u32)(s32)(0);
-
-    // 80325C3C: stwu     r1, -24(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(-24);
-        gx_st32(&s, 0x80325C3Cu, 8u, ea, (u32)g1);
-        g1 = ea;
-    }
-
-    // 80325C40: li      r6, 0
-    g6 = (u32)(s32)(0);
-
-    // 80325C44: li      r7, 0
-    g7 = (u32)(s32)(0);
-
-    // 80325C48: stw     r0, 8(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(8);
-        gx_st32(&s, 0x80325C48u, 5u, ea, (u32)g0);
-    }
-
-    // 80325C4C: li      r8, 0
-    g8 = (u32)(s32)(0);
-
-    // 80325C50: li      r9, 0
-    g9 = (u32)(s32)(0);
-
-    // 80325C54: stw     r0, 12(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(12);
-        gx_st32(&s, 0x80325C54u, 2u, ea, (u32)g0);
-    }
-
-    // 80325C58: li      r10, 0
-    g10 = (u32)(s32)(0);
-
-    // 80325C5C: bl      0x80325774
-    {
-            lr = 0x80325C60u;
-            s.depth++;
-            if (!gx_live(&s))
-                return gx_decline(&s);
-            goto B_80325774;
-    }
-    goto B_80325C60;
-B_80325C60: /* 5 cycles */
-    if (!gx_block(&s, 5u))
-        return gx_decline(&s);
-    // 80325C60: lwz     r0, 28(r1)
-    {
-        u32 ea = g1 + (u32)(s32)(28);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80325C64: addi    r1, r1, 24
-    g1 = g1 + (u32)(s32)(24);
-
-    s.suffix = 1u;
-    // 80325C68: mtlr    r0
-    lr = g0;
-
-    // 80325C6C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    s.depth--;
-    if (!gx_live(&s))
-        return gx_decline(&s);
-    switch (gx_t) {
-    case 0x80325C60u: goto B_80325C60;
-    default: return gx_decline(&s);
-    }
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[1] = g1;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->gpr[8] = g8;
-    cpu->gpr[9] = g9;
-    cpu->gpr[10] = g10;
-    cpu->gpr[11] = g11;
-    cpu->gpr[12] = g12;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevColorIn (80325E50): 80325E50..80325E94 */
-static int gxn_80325E50(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 g10 = cpu->gpr[10];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80325E50;
-B_80325E50: /* 17 cycles */
-    if (!gx_block(&s, 17u))
-        return gx_decline(&s);
-    // 80325E50: lwz     r9, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g9 = gx_ld32(&s, ea);
-    }
-
-    // 80325E54: rlwinm r3, r3, 2, 0, 29
-    {
-        g3 = gx_rotl32(g3, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80325E58: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 80325E5C: add   r8, r9, r3
-    {
-        u32 a = g9;
-        u32 b = g3;
-        u32 res = a + b;
-        g8 = res;
-    }
-
-    // 80325E60: lwz     r10, 304(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(304);
-        g10 = gx_ld32(&s, ea);
-    }
-
-    // 80325E64: lis     r3, -13311
-    g3 = ((u32)(s32)(-13311) << 16);
-
-    // 80325E68: rlwimi r10, r4, 12, 16, 19
-    {
-        u32 rot = gx_rotl32(g4, 12u);
-        g10 = (g10 & ~0x0000F000u) | (rot & 0x0000F000u);
-    }
-
-    // 80325E6C: stb     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80325E6Cu, 9u, ea, (u8)g0);
-    }
-
-    // 80325E70: addi    r4, r10, 0
-    g4 = g10 + (u32)(s32)(0);
-
-    // 80325E74: rlwimi r4, r5, 8, 20, 23
-    {
-        u32 rot = gx_rotl32(g5, 8u);
-        g4 = (g4 & ~0x00000F00u) | (rot & 0x00000F00u);
-    }
-
-    // 80325E78: rlwimi r4, r6, 4, 24, 27
-    {
-        u32 rot = gx_rotl32(g6, 4u);
-        g4 = (g4 & ~0x000000F0u) | (rot & 0x000000F0u);
-    }
-
-    // 80325E7C: rlwimi r4, r7, 0, 28, 31
-    {
-        u32 rot = gx_rotl32(g7, 0u);
-        g4 = (g4 & ~0x0000000Fu) | (rot & 0x0000000Fu);
-    }
-
-    // 80325E80: stw     r4, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80325E80u, 4u, ea, (u32)g4);
-    }
-
-    // 80325E84: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80325E88: stw     r4, 304(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(304);
-        gx_st32(&s, 0x80325E88u, 2u, ea, (u32)g4);
-    }
-
-    // 80325E8C: sth     r0, 2(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(2);
-        gx_st16(&s, 0x80325E8Cu, 1u, ea, (u16)g0);
-    }
-
-    // 80325E90: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[8] = g8;
-    cpu->gpr[9] = g9;
-    cpu->gpr[10] = g10;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevAlphaIn (80325E94): 80325E94..80325ED8 */
-static int gxn_80325E94(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 g10 = cpu->gpr[10];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80325E94;
-B_80325E94: /* 17 cycles */
-    if (!gx_block(&s, 17u))
-        return gx_decline(&s);
-    // 80325E94: lwz     r9, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g9 = gx_ld32(&s, ea);
-    }
-
-    // 80325E98: rlwinm r3, r3, 2, 0, 29
-    {
-        g3 = gx_rotl32(g3, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80325E9C: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 80325EA0: add   r8, r9, r3
-    {
-        u32 a = g9;
-        u32 b = g3;
-        u32 res = a + b;
-        g8 = res;
-    }
-
-    // 80325EA4: lwz     r10, 368(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(368);
-        g10 = gx_ld32(&s, ea);
-    }
-
-    // 80325EA8: lis     r3, -13311
-    g3 = ((u32)(s32)(-13311) << 16);
-
-    // 80325EAC: rlwimi r10, r4, 13, 16, 18
-    {
-        u32 rot = gx_rotl32(g4, 13u);
-        g10 = (g10 & ~0x0000E000u) | (rot & 0x0000E000u);
-    }
-
-    // 80325EB0: stb     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80325EB0u, 9u, ea, (u8)g0);
-    }
-
-    // 80325EB4: addi    r4, r10, 0
-    g4 = g10 + (u32)(s32)(0);
-
-    // 80325EB8: rlwimi r4, r5, 10, 19, 21
-    {
-        u32 rot = gx_rotl32(g5, 10u);
-        g4 = (g4 & ~0x00001C00u) | (rot & 0x00001C00u);
-    }
-
-    // 80325EBC: rlwimi r4, r6, 7, 22, 24
-    {
-        u32 rot = gx_rotl32(g6, 7u);
-        g4 = (g4 & ~0x00000380u) | (rot & 0x00000380u);
-    }
-
-    // 80325EC0: rlwimi r4, r7, 4, 25, 27
-    {
-        u32 rot = gx_rotl32(g7, 4u);
-        g4 = (g4 & ~0x00000070u) | (rot & 0x00000070u);
-    }
-
-    // 80325EC4: stw     r4, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80325EC4u, 4u, ea, (u32)g4);
-    }
-
-    // 80325EC8: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80325ECC: stw     r4, 368(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(368);
-        gx_st32(&s, 0x80325ECCu, 2u, ea, (u32)g4);
-    }
-
-    // 80325ED0: sth     r0, 2(r9)
-    {
-        u32 ea = g9 + (u32)(s32)(2);
-        gx_st16(&s, 0x80325ED0u, 1u, ea, (u16)g0);
-    }
-
-    // 80325ED4: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[8] = g8;
-    cpu->gpr[9] = g9;
-    cpu->gpr[10] = g10;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevColorOp (80325ED8): 80325ED8..80325F40 */
-static int gxn_80325ED8(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 g10 = cpu->gpr[10];
-    u32 cr = cpu->cr;
-    u32 xer = cpu->xer;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80325ED8;
-B_80325ED8: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80325ED8: lwz     r0, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80325EDC: rlwinm r9, r3, 2, 0, 29
-    {
-        g9 = gx_rotl32(g3, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80325EE0: cmpwi   r4, 1
-    {
-        s32 val_a = (s32)(g4);
-        s32 val_b = (s32)(1);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80325EE4: add   r3, r0, r9
-    {
-        u32 a = g0;
-        u32 b = g9;
-        u32 res = a + b;
-        g3 = res;
-    }
-
-    // 80325EE8: lwz     r3, 304(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(304);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80325EEC: rlwimi r3, r4, 18, 13, 13
-    {
-        u32 rot = gx_rotl32(g4, 18u);
-        g3 = (g3 & ~0x00040000u) | (rot & 0x00040000u);
-    }
-
-    // 80325EF0: addi    r10, r3, 0
-    g10 = g3 + (u32)(s32)(0);
-
-    // 80325EF4: bc    12, 1, 0x80325F04
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80325F04;
-        }
-    }
-    goto B_80325EF8;
-B_80325EF8: /* 3 cycles */
-    if (!gx_block(&s, 3u))
-        return gx_decline(&s);
-    // 80325EF8: rlwimi r10, r6, 20, 10, 11
-    {
-        u32 rot = gx_rotl32(g6, 20u);
-        g10 = (g10 & ~0x00300000u) | (rot & 0x00300000u);
-    }
-
-    // 80325EFC: rlwimi r10, r5, 16, 14, 15
-    {
-        u32 rot = gx_rotl32(g5, 16u);
-        g10 = (g10 & ~0x00030000u) | (rot & 0x00030000u);
-    }
-
-    // 80325F00: b       0x80325F10
-    {
-            goto B_80325F10;
-    }
-B_80325F04: /* 3 cycles */
-    if (!gx_block(&s, 3u))
-        return gx_decline(&s);
-    // 80325F04: li      r0, 3
-    g0 = (u32)(s32)(3);
-
-    // 80325F08: rlwimi r10, r4, 19, 10, 11
-    {
-        u32 rot = gx_rotl32(g4, 19u);
-        g10 = (g10 & ~0x00300000u) | (rot & 0x00300000u);
-    }
-
-    // 80325F0C: rlwimi r10, r0, 16, 14, 15
-    {
-        u32 rot = gx_rotl32(g0, 16u);
-        g10 = (g10 & ~0x00030000u) | (rot & 0x00030000u);
-    }
-    goto B_80325F10;
-B_80325F10: /* 12 cycles */
-    if (!gx_block(&s, 12u))
-        return gx_decline(&s);
-    // 80325F10: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 80325F14: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80325F18: lis     r5, -13311
-    g5 = ((u32)(s32)(-13311) << 16);
-
-    // 80325F1C: stb     r0, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80325F1Cu, 8u, ea, (u8)g0);
-    }
-
-    // 80325F20: rlwimi r10, r7, 19, 12, 12
-    {
-        u32 rot = gx_rotl32(g7, 19u);
-        g10 = (g10 & ~0x00080000u) | (rot & 0x00080000u);
-    }
-
-    // 80325F24: rlwimi r10, r8, 22, 8, 9
-    {
-        u32 rot = gx_rotl32(g8, 22u);
-        g10 = (g10 & ~0x00C00000u) | (rot & 0x00C00000u);
-    }
-
-    // 80325F28: stw     r10, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80325F28u, 5u, ea, (u32)g10);
-    }
-
-    // 80325F2C: add   r3, r4, r9
-    {
-        u32 a = g4;
-        u32 b = g9;
-        u32 res = a + b;
-        g3 = res;
-    }
-
-    // 80325F30: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80325F34: stw     r10, 304(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(304);
-        gx_st32(&s, 0x80325F34u, 2u, ea, (u32)g10);
-    }
-
-    // 80325F38: sth     r0, 2(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(2);
-        gx_st16(&s, 0x80325F38u, 1u, ea, (u16)g0);
-    }
-
-    // 80325F3C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[9] = g9;
-    cpu->gpr[10] = g10;
-    cpu->cr = cr;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevAlphaOp (80325F40): 80325F40..80325FA8 */
-static int gxn_80325F40(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 g10 = cpu->gpr[10];
-    u32 cr = cpu->cr;
-    u32 xer = cpu->xer;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80325F40;
-B_80325F40: /* 8 cycles */
-    if (!gx_block(&s, 8u))
-        return gx_decline(&s);
-    // 80325F40: lwz     r0, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 80325F44: rlwinm r9, r3, 2, 0, 29
-    {
-        g9 = gx_rotl32(g3, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80325F48: cmpwi   r4, 1
-    {
-        s32 val_a = (s32)(g4);
-        s32 val_b = (s32)(1);
-        u32 cr_bits = 0;
-        if (val_a < val_b)  cr_bits |= 0x8u;
-        if (val_a > val_b)  cr_bits |= 0x4u;
-        if (val_a == val_b) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
-    }
-
-    // 80325F4C: add   r3, r0, r9
-    {
-        u32 a = g0;
-        u32 b = g9;
-        u32 res = a + b;
-        g3 = res;
-    }
-
-    // 80325F50: lwz     r3, 368(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(368);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80325F54: rlwimi r3, r4, 18, 13, 13
-    {
-        u32 rot = gx_rotl32(g4, 18u);
-        g3 = (g3 & ~0x00040000u) | (rot & 0x00040000u);
-    }
-
-    // 80325F58: addi    r10, r3, 0
-    g10 = g3 + (u32)(s32)(0);
-
-    // 80325F5C: bc    12, 1, 0x80325F6C
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80325F6C;
-        }
-    }
-    goto B_80325F60;
-B_80325F60: /* 3 cycles */
-    if (!gx_block(&s, 3u))
-        return gx_decline(&s);
-    // 80325F60: rlwimi r10, r6, 20, 10, 11
-    {
-        u32 rot = gx_rotl32(g6, 20u);
-        g10 = (g10 & ~0x00300000u) | (rot & 0x00300000u);
-    }
-
-    // 80325F64: rlwimi r10, r5, 16, 14, 15
-    {
-        u32 rot = gx_rotl32(g5, 16u);
-        g10 = (g10 & ~0x00030000u) | (rot & 0x00030000u);
-    }
-
-    // 80325F68: b       0x80325F78
-    {
-            goto B_80325F78;
-    }
-B_80325F6C: /* 3 cycles */
-    if (!gx_block(&s, 3u))
-        return gx_decline(&s);
-    // 80325F6C: li      r0, 3
-    g0 = (u32)(s32)(3);
-
-    // 80325F70: rlwimi r10, r4, 19, 10, 11
-    {
-        u32 rot = gx_rotl32(g4, 19u);
-        g10 = (g10 & ~0x00300000u) | (rot & 0x00300000u);
-    }
-
-    // 80325F74: rlwimi r10, r0, 16, 14, 15
-    {
-        u32 rot = gx_rotl32(g0, 16u);
-        g10 = (g10 & ~0x00030000u) | (rot & 0x00030000u);
-    }
-    goto B_80325F78;
-B_80325F78: /* 12 cycles */
-    if (!gx_block(&s, 12u))
-        return gx_decline(&s);
-    // 80325F78: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 80325F7C: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80325F80: lis     r5, -13311
-    g5 = ((u32)(s32)(-13311) << 16);
-
-    // 80325F84: stb     r0, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80325F84u, 8u, ea, (u8)g0);
-    }
-
-    // 80325F88: rlwimi r10, r7, 19, 12, 12
-    {
-        u32 rot = gx_rotl32(g7, 19u);
-        g10 = (g10 & ~0x00080000u) | (rot & 0x00080000u);
-    }
-
-    // 80325F8C: rlwimi r10, r8, 22, 8, 9
-    {
-        u32 rot = gx_rotl32(g8, 22u);
-        g10 = (g10 & ~0x00C00000u) | (rot & 0x00C00000u);
-    }
-
-    // 80325F90: stw     r10, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80325F90u, 5u, ea, (u32)g10);
-    }
-
-    // 80325F94: add   r3, r4, r9
-    {
-        u32 a = g4;
-        u32 b = g9;
-        u32 res = a + b;
-        g3 = res;
-    }
-
-    // 80325F98: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80325F9C: stw     r10, 368(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(368);
-        gx_st32(&s, 0x80325F9Cu, 2u, ea, (u32)g10);
-    }
-
-    // 80325FA0: sth     r0, 2(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(2);
-        gx_st16(&s, 0x80325FA0u, 1u, ea, (u16)g0);
-    }
-
-    // 80325FA4: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[9] = g9;
-    cpu->gpr[10] = g10;
-    cpu->cr = cr;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevKColorSel (80326104): 80326104..80326170 */
-static int gxn_80326104(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 cr = cpu->cr;
-    u32 xer = cpu->xer;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80326104;
-B_80326104: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 80326104: srawi r5, r3, 1
-    {
-        u32 sh = 1u;
-        u32 value = g3;
-        bool ca = false;
-        if (sh == 0) {
-            g5 = value;
-        } else if (sh > 31) {
-            g5 = (value & 0x80000000u) ? 0xFFFFFFFFu : 0u;
-            ca = (value & 0x80000000u) != 0;
-        } else {
-            g5 = (u32)((s32)value >> sh);
-            ca = (value & 0x80000000u) && ((value << (32u - sh)) != 0);
-        }
-        xer = (xer & ~0x20000000u) | (ca ? 0x20000000u : 0u);
-    }
-
-    // 80326108: lwz     r6, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 8032610C: rlwinm. r0, r3, 0, 31, 31
-    {
-        g0 = gx_rotl32(g3, 0u) & 0x00000001u;
-        u32 cr_bits = 0;
-        s32 cr_value = (s32)g0;
-        if (cr_value < 0)  cr_bits |= 0x8u;
-        if (cr_value > 0)  cr_bits |= 0x4u;
-        if (cr_value == 0) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
-    }
-
-    // 80326110: rlwinm r3, r5, 2, 0, 29
-    {
-        g3 = gx_rotl32(g5, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80326114: addi    r7, r3, 432
-    g7 = g3 + (u32)(s32)(432);
-
-    // 80326118: add   r7, r6, r7
-    {
-        u32 a = g6;
-        u32 b = g7;
-        u32 res = a + b;
-        g7 = res;
-    }
-
-    // 8032611C: bc    12, 2, 0x80326138
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80326138;
-        }
-    }
-    goto B_80326120;
-B_80326120: /* 6 cycles */
-    if (!gx_block(&s, 6u))
-        return gx_decline(&s);
-    // 80326120: lwz     r3, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80326124: rlwinm r0, r4, 14, 0, 17
-    {
-        g0 = gx_rotl32(g4, 14u) & 0xFFFFC000u;
-    }
-
-    // 80326128: rlwinm r3, r3, 0, 18, 12
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFF83FFFu;
-    }
-
-    // 8032612C: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80326130: stw     r0, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        gx_st32(&s, 0x80326130u, 1u, ea, (u32)g0);
-    }
-
-    // 80326134: b       0x8032614C
-    {
-            goto B_8032614C;
-    }
-B_80326138: /* 5 cycles */
-    if (!gx_block(&s, 5u))
-        return gx_decline(&s);
-    // 80326138: lwz     r3, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 8032613C: rlwinm r0, r4, 4, 0, 27
-    {
-        g0 = gx_rotl32(g4, 4u) & 0xFFFFFFF0u;
-    }
-
-    // 80326140: rlwinm r3, r3, 0, 28, 22
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFFE0Fu;
-    }
-
-    // 80326144: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    s.suffix = 0u;
-    // 80326148: stw     r0, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        gx_stp32(&s, 0x80326148u, ea, (u32)g0);
-    }
-
-    goto B_8032614C;
-B_8032614C: /* 9 cycles */
-    if (!gx_block(&s, 9u))
-        return gx_decline(&s);
-    // 8032614C: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 80326150: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80326154: lis     r5, -13311
-    g5 = ((u32)(s32)(-13311) << 16);
-
-    // 80326158: stb     r0, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80326158u, 5u, ea, (u8)g0);
-    }
-
-    // 8032615C: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80326160: lwz     r4, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 80326164: stw     r4, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80326164u, 2u, ea, (u32)g4);
-    }
-
-    // 80326168: sth     r0, 2(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(2);
-        gx_st16(&s, 0x80326168u, 1u, ea, (u16)g0);
-    }
-
-    // 8032616C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->cr = cr;
-    cpu->xer = xer;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevKAlphaSel (80326170): 80326170..803261DC */
-static int gxn_80326170(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 cr = cpu->cr;
-    u32 xer = cpu->xer;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80326170;
-B_80326170: /* 7 cycles */
-    if (!gx_block(&s, 7u))
-        return gx_decline(&s);
-    // 80326170: srawi r5, r3, 1
-    {
-        u32 sh = 1u;
-        u32 value = g3;
-        bool ca = false;
-        if (sh == 0) {
-            g5 = value;
-        } else if (sh > 31) {
-            g5 = (value & 0x80000000u) ? 0xFFFFFFFFu : 0u;
-            ca = (value & 0x80000000u) != 0;
-        } else {
-            g5 = (u32)((s32)value >> sh);
-            ca = (value & 0x80000000u) && ((value << (32u - sh)) != 0);
-        }
-        xer = (xer & ~0x20000000u) | (ca ? 0x20000000u : 0u);
-    }
-
-    // 80326174: lwz     r6, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 80326178: rlwinm. r0, r3, 0, 31, 31
-    {
-        g0 = gx_rotl32(g3, 0u) & 0x00000001u;
-        u32 cr_bits = 0;
-        s32 cr_value = (s32)g0;
-        if (cr_value < 0)  cr_bits |= 0x8u;
-        if (cr_value > 0)  cr_bits |= 0x4u;
-        if (cr_value == 0) cr_bits |= 0x2u;
-        cr_bits |= (xer >> 31) & 1u;
-        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
-    }
-
-    // 8032617C: rlwinm r3, r5, 2, 0, 29
-    {
-        g3 = gx_rotl32(g5, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 80326180: addi    r7, r3, 432
-    g7 = g3 + (u32)(s32)(432);
-
-    // 80326184: add   r7, r6, r7
-    {
-        u32 a = g6;
-        u32 b = g7;
-        u32 res = a + b;
-        g7 = res;
-    }
-
-    // 80326188: bc    12, 2, 0x803261A4
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_803261A4;
-        }
-    }
-    goto B_8032618C;
-B_8032618C: /* 6 cycles */
-    if (!gx_block(&s, 6u))
-        return gx_decline(&s);
-    // 8032618C: lwz     r3, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80326190: rlwinm r0, r4, 19, 0, 12
-    {
-        g0 = gx_rotl32(g4, 19u) & 0xFFF80000u;
-    }
-
-    // 80326194: rlwinm r3, r3, 0, 13, 7
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFF07FFFFu;
-    }
-
-    // 80326198: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 8032619C: stw     r0, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        gx_st32(&s, 0x8032619Cu, 1u, ea, (u32)g0);
-    }
-
-    // 803261A0: b       0x803261B8
-    {
-            goto B_803261B8;
-    }
-B_803261A4: /* 5 cycles */
-    if (!gx_block(&s, 5u))
-        return gx_decline(&s);
-    // 803261A4: lwz     r3, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803261A8: rlwinm r0, r4, 9, 0, 22
-    {
-        g0 = gx_rotl32(g4, 9u) & 0xFFFFFE00u;
-    }
-
-    // 803261AC: rlwinm r3, r3, 0, 23, 17
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFC1FFu;
-    }
-
-    // 803261B0: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    s.suffix = 0u;
-    // 803261B4: stw     r0, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        gx_stp32(&s, 0x803261B4u, ea, (u32)g0);
-    }
-
-    goto B_803261B8;
-B_803261B8: /* 9 cycles */
-    if (!gx_block(&s, 9u))
-        return gx_decline(&s);
-    // 803261B8: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 803261BC: lwz     r3, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 803261C0: lis     r5, -13311
-    g5 = ((u32)(s32)(-13311) << 16);
-
-    // 803261C4: stb     r0, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x803261C4u, 5u, ea, (u8)g0);
-    }
-
-    // 803261C8: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 803261CC: lwz     r4, 0(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(0);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 803261D0: stw     r4, -32768(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x803261D0u, 2u, ea, (u32)g4);
-    }
-
-    // 803261D4: sth     r0, 2(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(2);
-        gx_st16(&s, 0x803261D4u, 1u, ea, (u16)g0);
-    }
-
-    // 803261D8: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->cr = cr;
-    cpu->xer = xer;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetTevSwapMode (803261DC): 803261DC..80326230 */
-static int gxn_803261DC(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_803261DC;
-B_803261DC: /* 21 cycles */
-    if (!gx_block(&s, 21u))
-        return gx_decline(&s);
-    // 803261DC: rlwinm r3, r3, 2, 0, 29
-    {
-        g3 = gx_rotl32(g3, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 803261E0: lwz     r7, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g7 = gx_ld32(&s, ea);
-    }
-
-    // 803261E4: addi    r8, r3, 368
-    g8 = g3 + (u32)(s32)(368);
-
-    // 803261E8: add   r8, r7, r8
-    {
-        u32 a = g7;
-        u32 b = g8;
-        u32 res = a + b;
-        g8 = res;
-    }
-
-    // 803261EC: lwz     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 803261F0: rlwinm r5, r5, 2, 0, 29
-    {
-        g5 = gx_rotl32(g5, 2u) & 0xFFFFFFFCu;
-    }
-
-    // 803261F4: li      r3, 97
-    g3 = (u32)(s32)(97);
-
-    // 803261F8: rlwinm r0, r0, 0, 0, 29
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFFFFFCu;
-    }
-
-    // 803261FC: or   r0, r0, r4
-    {
-        g0 = g0 | g4;
-    }
-
-    // 80326200: stw     r0, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80326200u, 11u, ea, (u32)g0);
-    }
-
-    // 80326204: lis     r4, -13311
-    g4 = ((u32)(s32)(-13311) << 16);
-
-    // 80326208: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 8032620C: lwz     r6, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 80326210: rlwinm r6, r6, 0, 30, 27
-    {
-        g6 = gx_rotl32(g6, 0u) & 0xFFFFFFF3u;
-    }
-
-    // 80326214: or   r5, r6, r5
-    {
-        g5 = g6 | g5;
-    }
-
-    // 80326218: stw     r5, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        gx_st32(&s, 0x80326218u, 5u, ea, (u32)g5);
-    }
-
-    // 8032621C: stb     r3, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x8032621Cu, 4u, ea, (u8)g3);
-    }
-
-    // 80326220: lwz     r3, 0(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(0);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80326224: stw     r3, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80326224u, 2u, ea, (u32)g3);
-    }
-
-    // 80326228: sth     r0, 2(r7)
-    {
-        u32 ea = g7 + (u32)(s32)(2);
-        gx_st16(&s, 0x80326228u, 1u, ea, (u16)g0);
-    }
-
-    // 8032622C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->gpr[8] = g8;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetAlphaCompare (803262C8): 803262C8..8032631C */
-static int gxn_803262C8(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_803262C8;
-B_803262C8: /* 21 cycles */
-    if (!gx_block(&s, 21u))
-        return gx_decline(&s);
-    // 803262C8: rlwinm r0, r4, 0, 24, 31
-    {
-        g0 = gx_rotl32(g4, 0u) & 0x000000FFu;
-    }
-
-    // 803262CC: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 803262D0: oris    r0, r0, 0xF300
-    g0 = g0 | (0xF300u << 16);
-
-    // 803262D4: rlwinm r0, r0, 0, 24, 15
-    {
-        g0 = gx_rotl32(g0, 0u) & 0xFFFF00FFu;
-    }
-
-    // 803262D8: rlwimi r0, r7, 8, 16, 23
-    {
-        u32 rot = gx_rotl32(g7, 8u);
-        g0 = (g0 & ~0x0000FF00u) | (rot & 0x0000FF00u);
-    }
-
-    // 803262DC: rlwinm r7, r0, 0, 16, 12
-    {
-        g7 = gx_rotl32(g0, 0u) & 0xFFF8FFFFu;
-    }
-
-    // 803262E0: rlwinm r0, r3, 16, 0, 15
-    {
-        g0 = gx_rotl32(g3, 16u) & 0xFFFF0000u;
-    }
-
-    // 803262E4: or   r0, r7, r0
-    {
-        g0 = g7 | g0;
-    }
-
-    // 803262E8: rlwinm r3, r0, 0, 13, 9
-    {
-        g3 = gx_rotl32(g0, 0u) & 0xFFC7FFFFu;
-    }
-
-    // 803262EC: rlwinm r0, r6, 19, 0, 12
-    {
-        g0 = gx_rotl32(g6, 19u) & 0xFFF80000u;
-    }
-
-    // 803262F0: or   r6, r3, r0
-    {
-        g6 = g3 | g0;
-    }
-
-    // 803262F4: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 803262F8: lis     r3, -13311
-    g3 = ((u32)(s32)(-13311) << 16);
-
-    // 803262FC: stb     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x803262FCu, 7u, ea, (u8)g0);
-    }
-
-    // 80326300: rlwinm r6, r6, 0, 10, 7
-    {
-        g6 = gx_rotl32(g6, 0u) & 0xFF3FFFFFu;
-    }
-
-    // 80326304: rlwinm r0, r5, 22, 0, 9
-    {
-        g0 = gx_rotl32(g5, 22u) & 0xFFC00000u;
-    }
-
-    // 80326308: or   r0, r6, r0
-    {
-        g0 = g6 | g0;
-    }
-
-    // 8032630C: stw     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x8032630Cu, 3u, ea, (u32)g0);
-    }
-
-    // 80326310: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80326314: sth     r0, 2(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(2);
-        gx_st16(&s, 0x80326314u, 1u, ea, (u16)g0);
-    }
-
-    // 80326318: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetNumTevStages (80326578): 80326578..803265A8 */
-static int gxn_80326578(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80326578;
-B_80326578: /* 12 cycles */
-    if (!gx_block(&s, 12u))
-        return gx_decline(&s);
-    // 80326578: lwz     r4, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g4 = gx_ld32(&s, ea);
-    }
-
-    // 8032657C: rlwinm r3, r3, 0, 24, 31
-    {
-        g3 = gx_rotl32(g3, 0u) & 0x000000FFu;
-    }
-
-    // 80326580: addi    r0, r3, -1
-    g0 = g3 + (u32)(s32)(-1);
-
-    // 80326584: lwz     r3, 516(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(516);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80326588: rlwinm r0, r0, 10, 0, 21
-    {
-        g0 = gx_rotl32(g0, 10u) & 0xFFFFFC00u;
-    }
-
-    // 8032658C: rlwinm r3, r3, 0, 22, 17
-    {
-        g3 = gx_rotl32(g3, 0u) & 0xFFFFC3FFu;
-    }
-
-    // 80326590: or   r0, r3, r0
-    {
-        g0 = g3 | g0;
-    }
-
-    // 80326594: stw     r0, 516(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(516);
-        gx_st32(&s, 0x80326594u, 4u, ea, (u32)g0);
-    }
-
-    // 80326598: lwz     r0, 1268(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(1268);
-        g0 = gx_ld32(&s, ea);
-    }
-
-    // 8032659C: ori     r0, r0, 0x0004
-    g0 = g0 | 0x0004u;
-
-    // 803265A0: stw     r0, 1268(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(1268);
-        gx_st32(&s, 0x803265A0u, 1u, ea, (u32)g0);
-    }
-
-    // 803265A4: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetBlendMode (80326858): 80326858..803268AC */
-static int gxn_80326858(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 g8 = cpu->gpr[8];
-    u32 g9 = cpu->gpr[9];
-    u32 xer = cpu->xer;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80326858;
-B_80326858: /* 21 cycles */
-    if (!gx_block(&s, 21u))
-        return gx_decline(&s);
-    // 80326858: lwz     r8, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g8 = gx_ld32(&s, ea);
-    }
-
-    // 8032685C: subfic  r0, r3, 3
-    {
-        u64 res = (u64)(u32)(s32)(3) + (u64)(~g3) + 1u;
-        g0 = (u32)res;
-        xer = (xer & ~0x20000000u) | (((u32)(res >> 32) & 1u) << 29);
-    }
-
-    // 80326860: cntlzw r7, r0
-    {
-        u32 v = g0;
-        u32 n = 0;
-        while (n < 32 && ((v & (0x80000000u >> n)) == 0)) n++;
-        g7 = n;
-    }
-
-    // 80326864: subfic  r0, r3, 2
-    {
-        u64 res = (u64)(u32)(s32)(2) + (u64)(~g3) + 1u;
-        g0 = (u32)res;
-        xer = (xer & ~0x20000000u) | (((u32)(res >> 32) & 1u) << 29);
-    }
-
-    // 80326868: lwz     r9, 464(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(464);
-        g9 = gx_ld32(&s, ea);
-    }
-
-    // 8032686C: rlwimi r9, r7, 6, 20, 20
-    {
-        u32 rot = gx_rotl32(g7, 6u);
-        g9 = (g9 & ~0x00000800u) | (rot & 0x00000800u);
-    }
-
-    // 80326870: addi    r7, r9, 0
-    g7 = g9 + (u32)(s32)(0);
-
-    // 80326874: rlwimi r7, r3, 0, 31, 31
-    {
-        u32 rot = gx_rotl32(g3, 0u);
-        g7 = (g7 & ~0x00000001u) | (rot & 0x00000001u);
-    }
-
-    // 80326878: cntlzw r0, r0
-    {
-        u32 v = g0;
-        u32 n = 0;
-        while (n < 32 && ((v & (0x80000000u >> n)) == 0)) n++;
-        g0 = n;
-    }
-
-    // 8032687C: rlwimi r7, r0, 28, 30, 30
-    {
-        u32 rot = gx_rotl32(g0, 28u);
-        g7 = (g7 & ~0x00000002u) | (rot & 0x00000002u);
-    }
-
-    // 80326880: rlwimi r7, r6, 12, 16, 19
-    {
-        u32 rot = gx_rotl32(g6, 12u);
-        g7 = (g7 & ~0x0000F000u) | (rot & 0x0000F000u);
-    }
-
-    // 80326884: rlwimi r7, r4, 8, 21, 23
-    {
-        u32 rot = gx_rotl32(g4, 8u);
-        g7 = (g7 & ~0x00000700u) | (rot & 0x00000700u);
-    }
-
-    // 80326888: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 8032688C: lis     r3, -13311
-    g3 = ((u32)(s32)(-13311) << 16);
-
-    // 80326890: stb     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80326890u, 6u, ea, (u8)g0);
-    }
-
-    // 80326894: rlwimi r7, r5, 5, 24, 26
-    {
-        u32 rot = gx_rotl32(g5, 5u);
-        g7 = (g7 & ~0x000000E0u) | (rot & 0x000000E0u);
-    }
-
-    // 80326898: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 8032689C: stw     r7, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x8032689Cu, 3u, ea, (u32)g7);
-    }
-
-    // 803268A0: stw     r7, 464(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(464);
-        gx_st32(&s, 0x803268A0u, 2u, ea, (u32)g7);
-    }
-
-    // 803268A4: sth     r0, 2(r8)
-    {
-        u32 ea = g8 + (u32)(s32)(2);
-        gx_st16(&s, 0x803268A4u, 1u, ea, (u16)g0);
-    }
-
-    // 803268A8: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[7] = g7;
-    cpu->gpr[8] = g8;
-    cpu->gpr[9] = g9;
-    cpu->xer = xer;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetColorUpdate (803268AC): 803268AC..803268D8 */
-static int gxn_803268AC(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_803268AC;
-B_803268AC: /* 11 cycles */
-    if (!gx_block(&s, 11u))
-        return gx_decline(&s);
-    // 803268AC: lwz     r5, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 803268B0: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 803268B4: lis     r4, -13311
-    g4 = ((u32)(s32)(-13311) << 16);
-
-    // 803268B8: lwz     r6, 464(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(464);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 803268BC: rlwimi r6, r3, 3, 28, 28
-    {
-        u32 rot = gx_rotl32(g3, 3u);
-        g6 = (g6 & ~0x00000008u) | (rot & 0x00000008u);
-    }
-
-    // 803268C0: stb     r0, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x803268C0u, 5u, ea, (u8)g0);
-    }
-
-    // 803268C4: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 803268C8: stw     r6, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x803268C8u, 3u, ea, (u32)g6);
-    }
-
-    // 803268CC: stw     r6, 464(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(464);
-        gx_st32(&s, 0x803268CCu, 2u, ea, (u32)g6);
-    }
-
-    // 803268D0: sth     r0, 2(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(2);
-        gx_st16(&s, 0x803268D0u, 1u, ea, (u16)g0);
-    }
-
-    // 803268D4: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetAlphaUpdate (803268D8): 803268D8..80326904 */
-static int gxn_803268D8(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_803268D8;
-B_803268D8: /* 11 cycles */
-    if (!gx_block(&s, 11u))
-        return gx_decline(&s);
-    // 803268D8: lwz     r5, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 803268DC: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 803268E0: lis     r4, -13311
-    g4 = ((u32)(s32)(-13311) << 16);
-
-    // 803268E4: lwz     r6, 464(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(464);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 803268E8: rlwimi r6, r3, 4, 27, 27
-    {
-        u32 rot = gx_rotl32(g3, 4u);
-        g6 = (g6 & ~0x00000010u) | (rot & 0x00000010u);
-    }
-
-    // 803268EC: stb     r0, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x803268ECu, 5u, ea, (u8)g0);
-    }
-
-    // 803268F0: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 803268F4: stw     r6, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x803268F4u, 3u, ea, (u32)g6);
-    }
-
-    // 803268F8: stw     r6, 464(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(464);
-        gx_st32(&s, 0x803268F8u, 2u, ea, (u32)g6);
-    }
-
-    // 803268FC: sth     r0, 2(r5)
-    {
-        u32 ea = g5 + (u32)(s32)(2);
-        gx_st16(&s, 0x803268FCu, 1u, ea, (u16)g0);
-    }
-
-    // 80326900: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetZMode (80326904): 80326904..80326938 */
-static int gxn_80326904(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80326904;
-B_80326904: /* 13 cycles */
-    if (!gx_block(&s, 13u))
-        return gx_decline(&s);
-    // 80326904: lwz     r6, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 80326908: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 8032690C: lwz     r7, 472(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(472);
-        g7 = gx_ld32(&s, ea);
-    }
-
-    // 80326910: rlwimi r7, r3, 0, 31, 31
-    {
-        u32 rot = gx_rotl32(g3, 0u);
-        g7 = (g7 & ~0x00000001u) | (rot & 0x00000001u);
-    }
-
-    // 80326914: lis     r3, -13311
-    g3 = ((u32)(s32)(-13311) << 16);
-
-    // 80326918: stb     r0, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80326918u, 7u, ea, (u8)g0);
-    }
-
-    // 8032691C: rlwimi r7, r4, 1, 28, 30
-    {
-        u32 rot = gx_rotl32(g4, 1u);
-        g7 = (g7 & ~0x0000000Eu) | (rot & 0x0000000Eu);
-    }
-
-    // 80326920: rlwimi r7, r5, 4, 27, 27
-    {
-        u32 rot = gx_rotl32(g5, 4u);
-        g7 = (g7 & ~0x00000010u) | (rot & 0x00000010u);
-    }
-
-    // 80326924: stw     r7, -32768(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80326924u, 4u, ea, (u32)g7);
-    }
-
-    // 80326928: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 8032692C: stw     r7, 472(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(472);
-        gx_st32(&s, 0x8032692Cu, 2u, ea, (u32)g7);
-    }
-
-    // 80326930: sth     r0, 2(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(2);
-        gx_st16(&s, 0x80326930u, 1u, ea, (u16)g0);
-    }
-
-    // 80326934: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetZCompLoc (80326938): 80326938..80326970 */
-static int gxn_80326938(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80326938;
-B_80326938: /* 14 cycles */
-    if (!gx_block(&s, 14u))
-        return gx_decline(&s);
-    // 80326938: lwz     r6, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 8032693C: rlwinm r0, r3, 6, 18, 25
-    {
-        g0 = gx_rotl32(g3, 6u) & 0x00003FC0u;
-    }
-
-    // 80326940: li      r3, 97
-    g3 = (u32)(s32)(97);
-
-    // 80326944: lwz     r5, 476(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(476);
-        g5 = gx_ld32(&s, ea);
-    }
-
-    // 80326948: lis     r4, -13311
-    g4 = ((u32)(s32)(-13311) << 16);
-
-    // 8032694C: rlwinm r5, r5, 0, 26, 24
-    {
-        g5 = gx_rotl32(g5, 0u) & 0xFFFFFFBFu;
-    }
-
-    // 80326950: or   r0, r5, r0
-    {
-        g0 = g5 | g0;
-    }
-
-    // 80326954: stw     r0, 476(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(476);
-        gx_st32(&s, 0x80326954u, 6u, ea, (u32)g0);
-    }
-
-    // 80326958: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 8032695C: stb     r3, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x8032695Cu, 4u, ea, (u8)g3);
-    }
-
-    // 80326960: lwz     r3, 476(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(476);
-        g3 = gx_ld32(&s, ea);
-    }
-
-    // 80326964: stw     r3, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80326964u, 2u, ea, (u32)g3);
-    }
-
-    // 80326968: sth     r0, 2(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(2);
-        gx_st16(&s, 0x80326968u, 1u, ea, (u16)g0);
-    }
-
-    // 8032696C: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* GXSetDstAlpha (80326A8C): 80326A8C..80326AC8 */
-static int gxn_80326A8C(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!gx_start(&s, &s_gx_log, cpu))
-        return gx_decline(&s);
-    u32 g0 = cpu->gpr[0];
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    u32 g4 = cpu->gpr[4];
-    u32 g5 = cpu->gpr[5];
-    u32 g6 = cpu->gpr[6];
-    u32 g7 = cpu->gpr[7];
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_80326A8C;
-B_80326A8C: /* 15 cycles */
-    if (!gx_block(&s, 15u))
-        return gx_decline(&s);
-    // 80326A8C: lwz     r6, -12848(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-12848);
-        g6 = gx_ld32(&s, ea);
-    }
-
-    // 80326A90: rlwinm r5, r4, 0, 24, 31
-    {
-        g5 = gx_rotl32(g4, 0u) & 0x000000FFu;
-    }
-
-    // 80326A94: li      r0, 97
-    g0 = (u32)(s32)(97);
-
-    // 80326A98: lwz     r7, 468(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(468);
-        g7 = gx_ld32(&s, ea);
-    }
-
-    // 80326A9C: lis     r4, -13311
-    g4 = ((u32)(s32)(-13311) << 16);
-
-    // 80326AA0: rlwimi r7, r5, 0, 24, 31
-    {
-        u32 rot = gx_rotl32(g5, 0u);
-        g7 = (g7 & ~0x000000FFu) | (rot & 0x000000FFu);
-    }
-
-    // 80326AA4: stb     r0, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st8(&s, 0x80326AA4u, 8u, ea, (u8)g0);
-    }
-
-    // 80326AA8: rlwinm r0, r3, 0, 24, 31
-    {
-        g0 = gx_rotl32(g3, 0u) & 0x000000FFu;
-    }
-
-    // 80326AAC: addi    r3, r7, 0
-    g3 = g7 + (u32)(s32)(0);
-
-    // 80326AB0: rlwimi r3, r0, 8, 23, 23
-    {
-        u32 rot = gx_rotl32(g0, 8u);
-        g3 = (g3 & ~0x00000100u) | (rot & 0x00000100u);
-    }
-
-    // 80326AB4: stw     r3, -32768(r4)
-    {
-        u32 ea = g4 + (u32)(s32)(-32768);
-        gx_st32(&s, 0x80326AB4u, 4u, ea, (u32)g3);
-    }
-
-    // 80326AB8: li      r0, 0
-    g0 = (u32)(s32)(0);
-
-    // 80326ABC: stw     r3, 468(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(468);
-        gx_st32(&s, 0x80326ABCu, 2u, ea, (u32)g3);
-    }
-
-    // 80326AC0: sth     r0, 2(r6)
-    {
-        u32 ea = g6 + (u32)(s32)(2);
-        gx_st16(&s, 0x80326AC0u, 1u, ea, (u16)g0);
-    }
-
-    // 80326AC4: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return gx_decline(&s);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return gx_decline(&s);
-    gx_commit(&s);
-    cpu->gpr[0] = g0;
-    cpu->gpr[3] = g3;
-    cpu->gpr[4] = g4;
-    cpu->gpr[5] = g5;
-    cpu->gpr[6] = g6;
-    cpu->gpr[7] = g7;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
 /* GXSetCurrentMtx (80326FD8): 80326FD8..80327010, 80327364..803273E8 */
 static int gxn_80326FD8(CPUState* cpu, u32 at) {
     GxRun s;
@@ -18376,54 +12374,5851 @@ GX_DONE:
     return 1;
 }
 
-/* The natives by entry. */
-#define GX_NATIVES(X) \
-    X(0x80326F38u, gxn_80326F38, "GXLoadPosMtxImm", 80326F38) \
-    X(0x80326F88u, gxn_80326F88, "GXLoadNrmMtxImm", 80326F88) \
-    X(0x80325FA8u, gxn_80325FA8, "GXSetTevColor", 80325FA8) \
-    X(0x8032601Cu, gxn_8032601C, "GXSetTevColorS10", 8032601C) \
-    X(0x80326090u, gxn_80326090, "GXSetTevKColor", 80326090) \
-    X(0x80322568u, gxn_80322568, "GXSetArray", 80322568) \
-    X(0x803263A0u, gxn_803263A0, "GXSetTevOrder", 803263A0) \
-    X(0x80326B80u, gxn_80326B80, "GXCallDisplayList", 80326B80) \
-    X(0x803230C4u, gxn_803230C4, "GXBegin", 803230C4) \
-    X(0x80324D50u, gxn_80324D50, "GXLoadTexObjPreLoaded", 80324D50) \
-    X(0x80324EE8u, gxn_80324EE8, "GXLoadTexObj", 80324EE8) \
-    X(0x803253B8u, gxn_803253B8, "__GXSetSUTexRegs", 803253B8) \
-    X(0x803221D8u, gxn_803221D8, "__GXSetVAT", 803221D8) \
-    X(0x80327364u, gxn_80327364, "__GXSetMatrixIndex", 80327364) \
-    X(0x80325CD4u, gxn_80325CD4, "__GXUpdateBPMask", 80325CD4) \
-    X(0x803233B0u, gxn_803233B0, "__GXSetGenMode", 803233B0) \
-    X(0x80321958u, gxn_80321958, "__GXSetVCD", 80321958) \
-    X(0x803214B0u, gxn_803214B0, "__GXXfVtxSpecs", 803214B0) \
-    X(0x803219ACu, gxn_803219AC, "__GXCalculateVLim", 803219AC) \
-    X(0x80321608u, gxn_80321608, "GXSetVtxDesc", 80321608) \
-    X(0x80321AD0u, gxn_80321AD0, "GXClearVtxDesc", 80321AD0) \
-    X(0x80321B08u, gxn_80321B08, "GXSetVtxAttrFmt", 80321B08) \
-    X(0x80322604u, gxn_80322604, "GXSetTexCoordGen2", 80322604) \
-    X(0x803228D4u, gxn_803228D4, "GXSetNumTexGens", 803228D4) \
-    X(0x80323328u, gxn_80323328, "GXSetCullMode", 80323328) \
-    X(0x80324390u, gxn_80324390, "GXSetChanAmbColor", 80324390) \
-    X(0x80324484u, gxn_80324484, "GXSetChanMatColor", 80324484) \
-    X(0x80324578u, gxn_80324578, "GXSetNumChans", 80324578) \
-    X(0x803245BCu, gxn_803245BC, "GXSetChanCtrl", 803245BC) \
-    X(0x80324D28u, gxn_80324D28, "GXGetTexObjFmt", 80324D28) \
-    X(0x80325774u, gxn_80325774, "GXSetTevIndirect", 80325774) \
-    X(0x80325C00u, gxn_80325C00, "GXSetNumIndStages", 80325C00) \
-    X(0x80325C28u, gxn_80325C28, "GXSetTevDirect", 80325C28) \
-    X(0x80325E50u, gxn_80325E50, "GXSetTevColorIn", 80325E50) \
-    X(0x80325E94u, gxn_80325E94, "GXSetTevAlphaIn", 80325E94) \
-    X(0x80325ED8u, gxn_80325ED8, "GXSetTevColorOp", 80325ED8) \
-    X(0x80325F40u, gxn_80325F40, "GXSetTevAlphaOp", 80325F40) \
-    X(0x80326104u, gxn_80326104, "GXSetTevKColorSel", 80326104) \
-    X(0x80326170u, gxn_80326170, "GXSetTevKAlphaSel", 80326170) \
-    X(0x803261DCu, gxn_803261DC, "GXSetTevSwapMode", 803261DC) \
-    X(0x803262C8u, gxn_803262C8, "GXSetAlphaCompare", 803262C8) \
-    X(0x80326578u, gxn_80326578, "GXSetNumTevStages", 80326578) \
-    X(0x80326858u, gxn_80326858, "GXSetBlendMode", 80326858) \
-    X(0x803268ACu, gxn_803268AC, "GXSetColorUpdate", 803268AC) \
-    X(0x803268D8u, gxn_803268D8, "GXSetAlphaUpdate", 803268D8) \
-    X(0x80326904u, gxn_80326904, "GXSetZMode", 80326904) \
-    X(0x80326938u, gxn_80326938, "GXSetZCompLoc", 80326938) \
-    X(0x80326A8Cu, gxn_80326A8C, "GXSetDstAlpha", 80326A8C) \
-    X(0x80326FD8u, gxn_80326FD8, "GXSetCurrentMtx", 80326FD8)
+/* GXSetFog (803265A8): 803265A8..80326758, 80328E10..80328E6C */
+static int gxn_803265A8(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    if (!gx_fp_ready(cpu))
+        return gx_decline(&s);
+    if (!gx_fp_arith_ready(cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g1 = cpu->gpr[1];
+    u32 g2 = cpu->gpr[2];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 g8 = cpu->gpr[8];
+    u32 g9 = cpu->gpr[9];
+    u32 g10 = cpu->gpr[10];
+    u32 g11 = cpu->gpr[11];
+    u32 g12 = cpu->gpr[12];
+    u32 g29 = cpu->gpr[29];
+    u32 g30 = cpu->gpr[30];
+    u32 g31 = cpu->gpr[31];
+    f64 F0 = cpu->fpr[0];
+    f64 F1 = cpu->fpr[1];
+    f64 F2 = cpu->fpr[2];
+    f64 F3 = cpu->fpr[3];
+    f64 F4 = cpu->fpr[4];
+    f64 F5 = cpu->fpr[5];
+    f64 P0 = cpu->ps1[0];
+    f64 P1 = cpu->ps1[1];
+    f64 P2 = cpu->ps1[2];
+    f64 P3 = cpu->ps1[3];
+    f64 P4 = cpu->ps1[4];
+    f64 P5 = cpu->ps1[5];
+    u32 cr = cpu->cr;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_803265A8;
+B_803265A8: /* 10 cycles */
+    if (!gx_block(&s, 10u))
+        return gx_decline(&s);
+    s.suffix = 9u;
+    // 803265A8: mflr    r0
+    g0 = lr;
+
+    // 803265AC: fcmpu   cr0, f4, f3
+    gx_fcmp(&s.fp, &cr, 0u, F4, F3);
+
+    // 803265B0: stw     r0, 4(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(4);
+        gx_st32(&s, 0x803265B0u, 7u, ea, (u32)g0);
+    }
+
+    // 803265B4: stwu     r1, -72(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-72);
+        gx_st32(&s, 0x803265B4u, 6u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    // 803265B8: stw     r31, 68(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(68);
+        gx_st32(&s, 0x803265B8u, 5u, ea, (u32)g31);
+    }
+
+    // 803265BC: addi    r31, r3, 0
+    g31 = g3 + (u32)(s32)(0);
+
+    // 803265C0: stw     r30, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        gx_st32(&s, 0x803265C0u, 3u, ea, (u32)g30);
+    }
+
+    // 803265C4: stw     r29, 60(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(60);
+        gx_st32(&s, 0x803265C4u, 2u, ea, (u32)g29);
+    }
+
+    // 803265C8: addi    r29, r4, 0
+    g29 = g4 + (u32)(s32)(0);
+
+    // 803265CC: bc    12, 2, 0x803265D8
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_803265D8;
+        }
+    }
+    goto B_803265D0;
+B_803265D0: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 803265D0: fcmpu   cr0, f2, f1
+    gx_fcmp(&s.fp, &cr, 0u, F2, F1);
+
+    // 803265D4: bc    4, 2, 0x803265E8
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_803265E8;
+        }
+    }
+    goto B_803265D8;
+B_803265D8: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 803265D8: lfs     f3, -12696(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12696);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F3 = value;
+        P3 = value;
+    }
+
+    s.suffix = 2u;
+    // 803265DC: lfs     f4, -12692(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12692);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F4 = value;
+        P4 = value;
+    }
+
+    // 803265E0: fmr    f5, f3
+    F5 = F3;
+
+    // 803265E4: b       0x80326604
+    {
+            goto B_80326604;
+    }
+B_803265E8: /* 55 cycles */
+    if (!gx_block(&s, 55u))
+        return gx_decline(&s);
+    // 803265E8: fsubs   f0, f4, f3
+    F0 = P0 = nr_fsubs(&s.fp, F4, F3);
+
+    // 803265EC: fsubs   f5, f2, f1
+    F5 = P5 = nr_fsubs(&s.fp, F2, F1);
+
+    // 803265F0: fmuls   f2, f4, f3
+    F2 = P2 = nr_fmuls(&s.fp, F4, F3);
+
+    // 803265F4: fdivs   f4, f4, f0
+    F4 = P4 = nr_fdivs(&s.fp, F4, F0);
+
+    // 803265F8: fmuls   f0, f0, f5
+    F0 = P0 = nr_fmuls(&s.fp, F0, F5);
+
+    // 803265FC: fdivs   f5, f1, f5
+    F5 = P5 = nr_fdivs(&s.fp, F1, F5);
+
+    // 80326600: fdivs   f3, f2, f0
+    F3 = P3 = nr_fdivs(&s.fp, F2, F0);
+    goto B_80326604;
+B_80326604: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 80326604: lfs     f1, -12692(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12692);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 80326608: li      r3, 0
+    g3 = (u32)(s32)(0);
+
+    s.suffix = 1u;
+    // 8032660C: lfd     f0, -12688(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12688);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 80326610: b       0x8032661C
+    {
+            goto B_8032661C;
+    }
+B_80326614: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80326614: fmuls   f4, f4, f1
+    F4 = P4 = nr_fmuls(&s.fp, F4, F1);
+
+    // 80326618: addi    r3, r3, 1
+    g3 = g3 + (u32)(s32)(1);
+    goto B_8032661C;
+B_8032661C: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 8032661C: fcmpo   cr0, f4, f0
+    gx_fcmp(&s.fp, &cr, 0u, F4, F0);
+
+    // 80326620: bc    12, 1, 0x80326614
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_80326614;
+        }
+    }
+    goto B_80326624;
+B_80326624: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 80326624: lfd     f0, -12672(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12672);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 2u;
+    // 80326628: lfs     f2, -12680(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12680);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 1u;
+    // 8032662C: lfs     f1, -12696(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12696);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 80326630: b       0x8032663C
+    {
+            goto B_8032663C;
+    }
+B_80326634: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80326634: fmuls   f4, f4, f2
+    F4 = P4 = nr_fmuls(&s.fp, F4, F2);
+
+    // 80326638: addi    r3, r3, -1
+    g3 = g3 + (u32)(s32)(-1);
+    goto B_8032663C;
+B_8032663C: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 8032663C: fcmpo   cr0, f4, f1
+    gx_fcmp(&s.fp, &cr, 0u, F4, F1);
+
+    // 80326640: bc    4, 1, 0x8032664C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8032664C;
+        }
+    }
+    goto B_80326644;
+B_80326644: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80326644: fcmpo   cr0, f4, f0
+    gx_fcmp(&s.fp, &cr, 0u, F4, F0);
+
+    // 80326648: bc    12, 0, 0x80326634
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_80326634;
+        }
+    }
+    goto B_8032664C;
+B_8032664C: /* 32 cycles */
+    if (!gx_block(&s, 32u))
+        return gx_decline(&s);
+    // 8032664C: addi    r30, r3, 1
+    g30 = g3 + (u32)(s32)(1);
+
+    s.suffix = 30u;
+    // 80326650: lfs     f0, -12664(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12664);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80326654: li      r0, 1
+    g0 = (u32)(s32)(1);
+
+    s.suffix = 28u;
+    // 80326658: lfd     f2, -12656(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12656);
+        F2 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8032665C: slw   r0, r0, r30
+    {
+        u32 sh = g30 & 0x3Fu;
+        g0 = sh > 31 ? 0u : (g0 << sh);
+    }
+
+    // 80326660: fmuls   f1, f0, f4
+    F1 = P1 = nr_fmuls(&s.fp, F0, F4);
+
+    // 80326664: xoris   r3, r0, 0x8000
+    g3 = g0 ^ (0x8000u << 16);
+
+    s.suffix = 24u;
+    // 80326668: stfs     f5, 40(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(40);
+        gx_stp32(&s, 0x80326668u, ea, gx_f32_to_bits(F5));
+    }
+
+    // 8032666C: lis     r0, 17200
+    g0 = ((u32)(s32)(17200) << 16);
+
+    // 80326670: stw     r3, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        gx_st32(&s, 0x80326670u, 22u, ea, (u32)g3);
+    }
+
+    // 80326674: stw     r0, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        gx_st32(&s, 0x80326674u, 21u, ea, (u32)g0);
+    }
+
+    s.suffix = 20u;
+    // 80326678: lfd     f0, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8032667C: fsubs   f0, f0, f2
+    F0 = P0 = nr_fsubs(&s.fp, F0, F2);
+
+    // 80326680: fdivs   f0, f3, f0
+    F0 = P0 = nr_fdivs(&s.fp, F3, F0);
+
+    s.suffix = 1u;
+    // 80326684: stfs     f0, 44(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(44);
+        gx_stp32(&s, 0x80326684u, ea, gx_f32_to_bits(F0));
+    }
+
+    // 80326688: bl      0x80328E10
+    {
+            lr = 0x8032668Cu;
+            s.depth++;
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_80328E10;
+    }
+    goto B_8032668C;
+B_8032668C: /* 52 cycles */
+    if (!gx_block(&s, 52u))
+        return gx_decline(&s);
+    // 8032668C: lwz     r0, 44(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(44);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 80326690: rlwinm r9, r3, 0, 8, 31
+    {
+        g9 = gx_rotl32(g3, 0u) & 0x00FFFFFFu;
+    }
+
+    // 80326694: lbz     r6, 1(r29)
+    {
+        u32 ea = g29 + (u32)(s32)(1);
+        g6 = gx_ld8(&s, ea);
+    }
+
+    // 80326698: rlwinm r8, r30, 0, 8, 31
+    {
+        g8 = gx_rotl32(g30, 0u) & 0x00FFFFFFu;
+    }
+
+    // 8032669C: rlwinm r4, r0, 20, 13, 20
+    {
+        g4 = gx_rotl32(g0, 20u) & 0x0007F800u;
+    }
+
+    // 803266A0: rlwimi r4, r0, 20, 21, 31
+    {
+        u32 rot = gx_rotl32(g0, 20u);
+        g4 = (g4 & ~0x000007FFu) | (rot & 0x000007FFu);
+    }
+
+    // 803266A4: lbz     r11, 2(r29)
+    {
+        u32 ea = g29 + (u32)(s32)(2);
+        g11 = gx_ld8(&s, ea);
+    }
+
+    // 803266A8: rlwinm r0, r0, 20, 12, 12
+    {
+        g0 = gx_rotl32(g0, 20u) & 0x00080000u;
+    }
+
+    // 803266AC: lbz     r5, 0(r29)
+    {
+        u32 ea = g29 + (u32)(s32)(0);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 803266B0: rlwimi r0, r4, 0, 13, 31
+    {
+        u32 rot = gx_rotl32(g4, 0u);
+        g0 = (g0 & ~0x0007FFFFu) | (rot & 0x0007FFFFu);
+    }
+
+    // 803266B4: lwz     r12, 40(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(40);
+        g12 = gx_ld32(&s, ea);
+    }
+
+    // 803266B8: rlwinm r7, r0, 0, 8, 31
+    {
+        g7 = gx_rotl32(g0, 0u) & 0x00FFFFFFu;
+    }
+
+    // 803266BC: lwz     r3, -12848(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12848);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 803266C0: oris    r10, r7, 0xEE00
+    g10 = g7 | (0xEE00u << 16);
+
+    // 803266C4: li      r0, 97
+    g0 = (u32)(s32)(97);
+
+    // 803266C8: lis     r4, -13311
+    g4 = ((u32)(s32)(-13311) << 16);
+
+    // 803266CC: stb     r0, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x803266CCu, 35u, ea, (u8)g0);
+    }
+
+    // 803266D0: oris    r7, r9, 0xEF00
+    g7 = g9 | (0xEF00u << 16);
+
+    // 803266D4: rlwinm r6, r6, 8, 0, 23
+    {
+        g6 = gx_rotl32(g6, 8u) & 0xFFFFFF00u;
+    }
+
+    // 803266D8: stw     r10, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x803266D8u, 32u, ea, (u32)g10);
+    }
+
+    // 803266DC: rlwinm r10, r12, 20, 13, 20
+    {
+        g10 = gx_rotl32(g12, 20u) & 0x0007F800u;
+    }
+
+    // 803266E0: rlwimi r10, r12, 20, 21, 31
+    {
+        u32 rot = gx_rotl32(g12, 20u);
+        g10 = (g10 & ~0x000007FFu) | (rot & 0x000007FFu);
+    }
+
+    // 803266E4: stb     r0, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x803266E4u, 29u, ea, (u8)g0);
+    }
+
+    // 803266E8: rlwinm r9, r12, 20, 12, 12
+    {
+        g9 = gx_rotl32(g12, 20u) & 0x00080000u;
+    }
+
+    // 803266EC: rlwimi r9, r10, 0, 13, 31
+    {
+        u32 rot = gx_rotl32(g10, 0u);
+        g9 = (g9 & ~0x0007FFFFu) | (rot & 0x0007FFFFu);
+    }
+
+    // 803266F0: stw     r7, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x803266F0u, 26u, ea, (u32)g7);
+    }
+
+    // 803266F4: oris    r7, r8, 0xF000
+    g7 = g8 | (0xF000u << 16);
+
+    // 803266F8: rlwimi r6, r11, 0, 24, 31
+    {
+        u32 rot = gx_rotl32(g11, 0u);
+        g6 = (g6 & ~0x000000FFu) | (rot & 0x000000FFu);
+    }
+
+    // 803266FC: stb     r0, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x803266FCu, 23u, ea, (u8)g0);
+    }
+
+    // 80326700: stw     r7, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x80326700u, 22u, ea, (u32)g7);
+    }
+
+    // 80326704: rlwinm r7, r31, 21, 0, 10
+    {
+        g7 = gx_rotl32(g31, 21u) & 0xFFE00000u;
+    }
+
+    // 80326708: rlwimi r7, r9, 0, 12, 31
+    {
+        u32 rot = gx_rotl32(g9, 0u);
+        g7 = (g7 & ~0x000FFFFFu) | (rot & 0x000FFFFFu);
+    }
+
+    // 8032670C: rlwinm r7, r7, 0, 8, 31
+    {
+        g7 = gx_rotl32(g7, 0u) & 0x00FFFFFFu;
+    }
+
+    // 80326710: stb     r0, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x80326710u, 18u, ea, (u8)g0);
+    }
+
+    // 80326714: oris    r7, r7, 0xF100
+    g7 = g7 | (0xF100u << 16);
+
+    // 80326718: stw     r7, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x80326718u, 16u, ea, (u32)g7);
+    }
+
+    // 8032671C: stb     r0, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x8032671Cu, 15u, ea, (u8)g0);
+    }
+
+    // 80326720: rlwinm r0, r5, 16, 0, 15
+    {
+        g0 = gx_rotl32(g5, 16u) & 0xFFFF0000u;
+    }
+
+    // 80326724: rlwimi r0, r6, 0, 16, 31
+    {
+        u32 rot = gx_rotl32(g6, 0u);
+        g0 = (g0 & ~0x0000FFFFu) | (rot & 0x0000FFFFu);
+    }
+
+    // 80326728: rlwinm r0, r0, 0, 8, 31
+    {
+        g0 = gx_rotl32(g0, 0u) & 0x00FFFFFFu;
+    }
+
+    // 8032672C: oris    r0, r0, 0xF200
+    g0 = g0 | (0xF200u << 16);
+
+    // 80326730: stw     r0, -32768(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x80326730u, 10u, ea, (u32)g0);
+    }
+
+    // 80326734: li      r0, 0
+    g0 = (u32)(s32)(0);
+
+    // 80326738: sth     r0, 2(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(2);
+        gx_st16(&s, 0x80326738u, 8u, ea, (u16)g0);
+    }
+
+    // 8032673C: lwz     r0, 76(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(76);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 80326740: lwz     r31, 68(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(68);
+        g31 = gx_ld32(&s, ea);
+    }
+
+    // 80326744: lwz     r30, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        g30 = gx_ld32(&s, ea);
+    }
+
+    // 80326748: lwz     r29, 60(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(60);
+        g29 = gx_ld32(&s, ea);
+    }
+
+    // 8032674C: addi    r1, r1, 72
+    g1 = g1 + (u32)(s32)(72);
+
+    s.suffix = 1u;
+    // 80326750: mtlr    r0
+    lr = g0;
+
+    // 80326754: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_80328E10: /* 10 cycles */
+    if (!gx_block(&s, 10u))
+        return gx_decline(&s);
+    // 80328E10: stwu     r1, -16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-16);
+        gx_st32(&s, 0x80328E10u, 9u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    // 80328E14: lis     r4, -32713
+    g4 = ((u32)(s32)(-32713) << 16);
+
+    // 80328E18: ori     r4, r4, 0x0FC8
+    g4 = g4 | 0x0FC8u;
+
+    // 80328E1C: li      r3, 0
+    g3 = (u32)(s32)(0);
+
+    s.suffix = 5u;
+    // 80328E20: lfd     f0, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 4u;
+    // 80328E24: lfd     f3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        F3 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 3u;
+    // 80328E28: lfd     f4, 16(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(16);
+        F4 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 80328E2C: fcmpu   cr0, f1, f0
+    gx_fcmp(&s.fp, &cr, 0u, F1, F0);
+
+    // 80328E30: fcmpu   cr6, f1, f3
+    gx_fcmp(&s.fp, &cr, 6u, F1, F3);
+
+    // 80328E34: bc    12, 0, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E38;
+B_80328E38: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80328E38: addi    r3, r3, -1
+    g3 = g3 + (u32)(s32)(-1);
+
+    // 80328E3C: bc    4, 24, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000080u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E40;
+B_80328E40: /* 3 cycles */
+    if (!gx_block(&s, 3u))
+        return gx_decline(&s);
+    // 80328E40: fcmpu   cr7, f1, f4
+    gx_fcmp(&s.fp, &cr, 7u, F1, F4);
+
+    // 80328E44: fmr    f2, f1
+    F2 = F1;
+
+    // 80328E48: bc    12, 28, 0x80328E50
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000008u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E50;
+        }
+    }
+    goto B_80328E4C;
+B_80328E4C: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80328E4C: fsub   f2, f1, f4
+    F2 = gx_fsub(&s.fp, F1, F4);
+    goto B_80328E50;
+B_80328E50: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 80328E50: fctiwz    f2, f2
+    { u64 result; if (gx_fctiw(&s.fp, F2, true, &result)) F2 = gx_f64_from_bits(result); }
+
+    s.suffix = 2u;
+    // 80328E54: stfd     f2, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        gx_stp64(&s, 0x80328E54u, ea, gx_f64_to_bits(F2));
+    }
+
+    // 80328E58: lwz     r3, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 80328E5C: bc    12, 28, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000008u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E60;
+B_80328E60: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80328E60: addis   r3, r3, -32768
+    g3 = g3 + ((u32)(s32)(-32768) << 16);
+    goto B_80328E64;
+B_80328E64: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80328E64: addi    r1, r1, 16
+    g1 = g1 + (u32)(s32)(16);
+
+    // 80328E68: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    s.depth--;
+    if (!gx_live(&s))
+        return gx_decline(&s);
+    switch (gx_t) {
+    case 0x8032668Cu: goto B_8032668C;
+    default: return gx_decline(&s);
+    }
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[1] = g1;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[7] = g7;
+    cpu->gpr[8] = g8;
+    cpu->gpr[9] = g9;
+    cpu->gpr[10] = g10;
+    cpu->gpr[11] = g11;
+    cpu->gpr[12] = g12;
+    cpu->gpr[29] = g29;
+    cpu->gpr[30] = g30;
+    cpu->gpr[31] = g31;
+    cpu->fpr[0] = F0;
+    cpu->fpr[1] = F1;
+    cpu->fpr[2] = F2;
+    cpu->fpr[3] = F3;
+    cpu->fpr[4] = F4;
+    cpu->fpr[5] = F5;
+    cpu->ps1[0] = P0;
+    cpu->ps1[1] = P1;
+    cpu->ps1[2] = P2;
+    cpu->ps1[3] = P3;
+    cpu->ps1[4] = P4;
+    cpu->ps1[5] = P5;
+    cpu->cr = cr;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* GXSetFogRangeAdj (80326758): 80326758..80326858 */
+static int gxn_80326758(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g2 = cpu->gpr[2];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 g8 = cpu->gpr[8];
+    u32 g9 = cpu->gpr[9];
+    u32 g10 = cpu->gpr[10];
+    u32 cr = cpu->cr;
+    u32 xer = cpu->xer;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_80326758;
+B_80326758: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80326758: rlwinm. r0, r3, 0, 24, 31
+    {
+        g0 = gx_rotl32(g3, 0u) & 0x000000FFu;
+        u32 cr_bits = 0;
+        s32 cr_value = (s32)g0;
+        if (cr_value < 0)  cr_bits |= 0x8u;
+        if (cr_value > 0)  cr_bits |= 0x4u;
+        if (cr_value == 0) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
+    }
+
+    // 8032675C: bc    12, 2, 0x8032681C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8032681C;
+        }
+    }
+    goto B_80326760;
+B_80326760: /* 47 cycles */
+    if (!gx_block(&s, 47u))
+        return gx_decline(&s);
+    // 80326760: lhz     r8, 2(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(2);
+        g8 = gx_ld16(&s, ea);
+    }
+
+    // 80326764: li      r0, 97
+    g0 = (u32)(s32)(97);
+
+    // 80326768: lhz     r10, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        g10 = gx_ld16(&s, ea);
+    }
+
+    // 8032676C: lis     r6, -13311
+    g6 = ((u32)(s32)(-13311) << 16);
+
+    // 80326770: rlwinm r8, r8, 12, 0, 19
+    {
+        g8 = gx_rotl32(g8, 12u) & 0xFFFFF000u;
+    }
+
+    // 80326774: rlwimi r8, r10, 0, 20, 31
+    {
+        u32 rot = gx_rotl32(g10, 0u);
+        g8 = (g8 & ~0x00000FFFu) | (rot & 0x00000FFFu);
+    }
+
+    // 80326778: stb     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x80326778u, 40u, ea, (u8)g0);
+    }
+
+    // 8032677C: li      r7, 233
+    g7 = (u32)(s32)(233);
+
+    // 80326780: rlwinm r9, r8, 0, 8, 31
+    {
+        g9 = gx_rotl32(g8, 0u) & 0x00FFFFFFu;
+    }
+
+    // 80326784: rlwimi r9, r7, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g7, 24u);
+        g9 = (g9 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    // 80326788: stw     r9, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x80326788u, 36u, ea, (u32)g9);
+    }
+
+    // 8032678C: li      r7, 234
+    g7 = (u32)(s32)(234);
+
+    // 80326790: rlwinm r9, r7, 24, 0, 7
+    {
+        g9 = gx_rotl32(g7, 24u) & 0xFF000000u;
+    }
+
+    // 80326794: lhzu     r10, 4(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(4);
+        g10 = gx_ld16(&s, ea);
+        g5 = ea;
+    }
+
+    // 80326798: li      r7, 235
+    g7 = (u32)(s32)(235);
+
+    // 8032679C: lhz     r8, 2(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(2);
+        g8 = gx_ld16(&s, ea);
+    }
+
+    // 803267A0: rlwinm r8, r8, 12, 0, 19
+    {
+        g8 = gx_rotl32(g8, 12u) & 0xFFFFF000u;
+    }
+
+    // 803267A4: stb     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x803267A4u, 29u, ea, (u8)g0);
+    }
+
+    // 803267A8: rlwimi r8, r10, 0, 20, 31
+    {
+        u32 rot = gx_rotl32(g10, 0u);
+        g8 = (g8 & ~0x00000FFFu) | (rot & 0x00000FFFu);
+    }
+
+    // 803267AC: rlwimi r9, r8, 0, 8, 31
+    {
+        u32 rot = gx_rotl32(g8, 0u);
+        g9 = (g9 & ~0x00FFFFFFu) | (rot & 0x00FFFFFFu);
+    }
+
+    // 803267B0: stw     r9, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x803267B0u, 26u, ea, (u32)g9);
+    }
+
+    // 803267B4: rlwinm r9, r7, 24, 0, 7
+    {
+        g9 = gx_rotl32(g7, 24u) & 0xFF000000u;
+    }
+
+    // 803267B8: li      r7, 236
+    g7 = (u32)(s32)(236);
+
+    // 803267BC: lhz     r8, 6(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(6);
+        g8 = gx_ld16(&s, ea);
+    }
+
+    // 803267C0: lhz     r10, 4(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(4);
+        g10 = gx_ld16(&s, ea);
+    }
+
+    // 803267C4: rlwinm r8, r8, 12, 0, 19
+    {
+        g8 = gx_rotl32(g8, 12u) & 0xFFFFF000u;
+    }
+
+    // 803267C8: rlwimi r8, r10, 0, 20, 31
+    {
+        u32 rot = gx_rotl32(g10, 0u);
+        g8 = (g8 & ~0x00000FFFu) | (rot & 0x00000FFFu);
+    }
+
+    // 803267CC: stb     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x803267CCu, 19u, ea, (u8)g0);
+    }
+
+    // 803267D0: rlwimi r9, r8, 0, 8, 31
+    {
+        u32 rot = gx_rotl32(g8, 0u);
+        g9 = (g9 & ~0x00FFFFFFu) | (rot & 0x00FFFFFFu);
+    }
+
+    // 803267D4: stw     r9, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x803267D4u, 17u, ea, (u32)g9);
+    }
+
+    // 803267D8: rlwinm r9, r7, 24, 0, 7
+    {
+        g9 = gx_rotl32(g7, 24u) & 0xFF000000u;
+    }
+
+    // 803267DC: li      r7, 237
+    g7 = (u32)(s32)(237);
+
+    // 803267E0: lhz     r8, 10(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(10);
+        g8 = gx_ld16(&s, ea);
+    }
+
+    // 803267E4: lhz     r10, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        g10 = gx_ld16(&s, ea);
+    }
+
+    // 803267E8: rlwinm r8, r8, 12, 0, 19
+    {
+        g8 = gx_rotl32(g8, 12u) & 0xFFFFF000u;
+    }
+
+    // 803267EC: rlwimi r8, r10, 0, 20, 31
+    {
+        u32 rot = gx_rotl32(g10, 0u);
+        g8 = (g8 & ~0x00000FFFu) | (rot & 0x00000FFFu);
+    }
+
+    // 803267F0: stb     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x803267F0u, 10u, ea, (u8)g0);
+    }
+
+    // 803267F4: rlwimi r9, r8, 0, 8, 31
+    {
+        u32 rot = gx_rotl32(g8, 0u);
+        g9 = (g9 & ~0x00FFFFFFu) | (rot & 0x00FFFFFFu);
+    }
+
+    // 803267F8: stw     r9, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x803267F8u, 8u, ea, (u32)g9);
+    }
+
+    // 803267FC: lhz     r8, 14(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(14);
+        g8 = gx_ld16(&s, ea);
+    }
+
+    // 80326800: lhz     r10, 12(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(12);
+        g10 = gx_ld16(&s, ea);
+    }
+
+    // 80326804: rlwinm r8, r8, 12, 0, 19
+    {
+        g8 = gx_rotl32(g8, 12u) & 0xFFFFF000u;
+    }
+
+    // 80326808: rlwimi r8, r10, 0, 20, 31
+    {
+        u32 rot = gx_rotl32(g10, 0u);
+        g8 = (g8 & ~0x00000FFFu) | (rot & 0x00000FFFu);
+    }
+
+    // 8032680C: stb     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x8032680Cu, 3u, ea, (u8)g0);
+    }
+
+    // 80326810: rlwinm r9, r8, 0, 8, 31
+    {
+        g9 = gx_rotl32(g8, 0u) & 0x00FFFFFFu;
+    }
+
+    // 80326814: rlwimi r9, r7, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g7, 24u);
+        g9 = (g9 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    s.suffix = 0u;
+    // 80326818: stw     r9, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_stp32(&s, 0x80326818u, ea, (u32)g9);
+    }
+
+    goto B_8032681C;
+B_8032681C: /* 15 cycles */
+    if (!gx_block(&s, 15u))
+        return gx_decline(&s);
+    // 8032681C: rlwinm r5, r4, 0, 16, 31
+    {
+        g5 = gx_rotl32(g4, 0u) & 0x0000FFFFu;
+    }
+
+    // 80326820: lwz     r4, -12848(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12848);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 80326824: addi    r0, r5, 342
+    g0 = g5 + (u32)(s32)(342);
+
+    // 80326828: rlwinm r5, r0, 0, 22, 20
+    {
+        g5 = gx_rotl32(g0, 0u) & 0xFFFFFBFFu;
+    }
+
+    // 8032682C: rlwinm r0, r3, 10, 14, 21
+    {
+        g0 = gx_rotl32(g3, 10u) & 0x0003FC00u;
+    }
+
+    // 80326830: or   r0, r5, r0
+    {
+        g0 = g5 | g0;
+    }
+
+    // 80326834: rlwinm r5, r0, 0, 8, 31
+    {
+        g5 = gx_rotl32(g0, 0u) & 0x00FFFFFFu;
+    }
+
+    // 80326838: li      r0, 97
+    g0 = (u32)(s32)(97);
+
+    // 8032683C: lis     r3, -13311
+    g3 = ((u32)(s32)(-13311) << 16);
+
+    // 80326840: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x80326840u, 5u, ea, (u8)g0);
+    }
+
+    // 80326844: oris    r5, r5, 0xE800
+    g5 = g5 | (0xE800u << 16);
+
+    // 80326848: li      r0, 0
+    g0 = (u32)(s32)(0);
+
+    // 8032684C: stw     r5, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x8032684Cu, 2u, ea, (u32)g5);
+    }
+
+    // 80326850: sth     r0, 2(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(2);
+        gx_st16(&s, 0x80326850u, 1u, ea, (u16)g0);
+    }
+
+    // 80326854: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    return gx_decline(&s);
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[7] = g7;
+    cpu->gpr[8] = g8;
+    cpu->gpr[9] = g9;
+    cpu->gpr[10] = g10;
+    cpu->cr = cr;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* GXInitTexObjLOD (80324B68): 80324B68..80324CFC */
+static int gxn_80324B68(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    if (!gx_fp_ready(cpu))
+        return gx_decline(&s);
+    if (!gx_fp_arith_ready(cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g1 = cpu->gpr[1];
+    u32 g2 = cpu->gpr[2];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 g8 = cpu->gpr[8];
+    u32 g9 = cpu->gpr[9];
+    u32 g13 = cpu->gpr[13];
+    f64 F0 = cpu->fpr[0];
+    f64 F1 = cpu->fpr[1];
+    f64 F2 = cpu->fpr[2];
+    f64 F3 = cpu->fpr[3];
+    f64 P0 = cpu->ps1[0];
+    f64 P1 = cpu->ps1[1];
+    f64 P3 = cpu->ps1[3];
+    u32 cr = cpu->cr;
+    u32 xer = cpu->xer;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_80324B68;
+B_80324B68: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 80324B68: stwu     r1, -56(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-56);
+        gx_st32(&s, 0x80324B68u, 3u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    s.suffix = 2u;
+    // 80324B6C: lfs     f0, -12728(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12728);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324B70: fcmpo   cr0, f3, f0
+    gx_fcmp(&s.fp, &cr, 0u, F3, F0);
+
+    // 80324B74: bc    4, 0, 0x80324B80
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80324B80;
+        }
+    }
+    goto B_80324B78;
+B_80324B78: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80324B78: fmr    f3, f0
+    F3 = F0;
+
+    // 80324B7C: b       0x80324B94
+    {
+            goto B_80324B94;
+    }
+B_80324B80: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 80324B80: lfs     f0, -12724(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12724);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324B84: fcmpo   cr0, f3, f0
+    gx_fcmp(&s.fp, &cr, 0u, F3, F0);
+
+    // 80324B88: cror    2, 1, 2
+    {
+        u32 a = (cr >> (31u - 1u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 80324B8C: bc    4, 2, 0x80324B94
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80324B94;
+        }
+    }
+    goto B_80324B90;
+B_80324B90: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    s.suffix = 0u;
+    // 80324B90: lfs     f3, -12720(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12720);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F3 = value;
+        P3 = value;
+    }
+
+    goto B_80324B94;
+B_80324B94: /* 11 cycles */
+    if (!gx_block(&s, 11u))
+        return gx_decline(&s);
+    s.suffix = 10u;
+    // 80324B94: lfs     f0, -12716(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12716);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324B98: cmpwi   r5, 1
+    {
+        s32 val_a = (s32)(g5);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 80324B9C: lwz     r0, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 80324BA0: fmuls   f0, f0, f3
+    F0 = P0 = nr_fmuls(&s.fp, F0, F3);
+
+    // 80324BA4: rlwinm r5, r0, 0, 23, 14
+    {
+        g5 = gx_rotl32(g0, 0u) & 0xFFFE01FFu;
+    }
+
+    // 80324BA8: fctiwz    f0, f0
+    { u64 result; if (gx_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 4u;
+    // 80324BAC: stfd     f0, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        gx_stp64(&s, 0x80324BACu, ea, gx_f64_to_bits(F0));
+    }
+
+    // 80324BB0: lwz     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 80324BB4: rlwimi r5, r0, 9, 15, 22
+    {
+        u32 rot = gx_rotl32(g0, 9u);
+        g5 = (g5 & ~0x0001FE00u) | (rot & 0x0001FE00u);
+    }
+
+    // 80324BB8: stw     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324BB8u, 1u, ea, (u32)g5);
+    }
+
+    // 80324BBC: bc    4, 2, 0x80324BC8
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80324BC8;
+        }
+    }
+    goto B_80324BC0;
+B_80324BC0: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80324BC0: li      r5, 1
+    g5 = (u32)(s32)(1);
+
+    // 80324BC4: b       0x80324BCC
+    {
+            goto B_80324BCC;
+    }
+B_80324BC8: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80324BC8: li      r5, 0
+    g5 = (u32)(s32)(0);
+    goto B_80324BCC;
+B_80324BCC: /* 14 cycles */
+    if (!gx_block(&s, 14u))
+        return gx_decline(&s);
+    // 80324BCC: lwz     r9, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g9 = gx_ld32(&s, ea);
+    }
+
+    // 80324BD0: rlwinm. r0, r7, 0, 24, 31
+    {
+        g0 = gx_rotl32(g7, 0u) & 0x000000FFu;
+        u32 cr_bits = 0;
+        s32 cr_value = (s32)g0;
+        if (cr_value < 0)  cr_bits |= 0x8u;
+        if (cr_value > 0)  cr_bits |= 0x4u;
+        if (cr_value == 0) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
+    }
+
+    // 80324BD4: rlwinm r5, r5, 4, 0, 27
+    {
+        g5 = gx_rotl32(g5, 4u) & 0xFFFFFFF0u;
+    }
+
+    // 80324BD8: rlwinm r7, r9, 0, 28, 26
+    {
+        g7 = gx_rotl32(g9, 0u) & 0xFFFFFFEFu;
+    }
+
+    // 80324BDC: or   r5, r7, r5
+    {
+        g5 = g7 | g5;
+    }
+
+    // 80324BE0: stw     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324BE0u, 8u, ea, (u32)g5);
+    }
+
+    // 80324BE4: addi    r5, r13, -30968
+    g5 = g13 + (u32)(s32)(-30968);
+
+    // 80324BE8: lbzx    r0, r5, r4
+    {
+        u32 ea = g5 + g4;
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 80324BEC: lwz     r7, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 80324BF0: rlwinm r0, r0, 5, 0, 26
+    {
+        g0 = gx_rotl32(g0, 5u) & 0xFFFFFFE0u;
+    }
+
+    // 80324BF4: rlwinm r4, r7, 0, 27, 23
+    {
+        g4 = gx_rotl32(g7, 0u) & 0xFFFFFF1Fu;
+    }
+
+    // 80324BF8: or   r0, r4, r0
+    {
+        g0 = g4 | g0;
+    }
+
+    // 80324BFC: stw     r0, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324BFCu, 1u, ea, (u32)g0);
+    }
+
+    // 80324C00: bc    12, 2, 0x80324C0C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80324C0C;
+        }
+    }
+    goto B_80324C04;
+B_80324C04: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80324C04: li      r0, 0
+    g0 = (u32)(s32)(0);
+
+    // 80324C08: b       0x80324C10
+    {
+            goto B_80324C10;
+    }
+B_80324C0C: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80324C0C: li      r0, 1
+    g0 = (u32)(s32)(1);
+    goto B_80324C10;
+B_80324C10: /* 24 cycles */
+    if (!gx_block(&s, 24u))
+        return gx_decline(&s);
+    // 80324C10: lwz     r4, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 80324C14: rlwinm r0, r0, 8, 0, 23
+    {
+        g0 = gx_rotl32(g0, 8u) & 0xFFFFFF00u;
+    }
+
+    // 80324C18: rlwinm r4, r4, 0, 24, 22
+    {
+        g4 = gx_rotl32(g4, 0u) & 0xFFFFFEFFu;
+    }
+
+    // 80324C1C: or   r0, r4, r0
+    {
+        g0 = g4 | g0;
+    }
+
+    // 80324C20: stw     r0, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324C20u, 19u, ea, (u32)g0);
+    }
+
+    // 80324C24: rlwinm r4, r8, 19, 0, 12
+    {
+        g4 = gx_rotl32(g8, 19u) & 0xFFF80000u;
+    }
+
+    // 80324C28: rlwinm r0, r6, 21, 3, 10
+    {
+        g0 = gx_rotl32(g6, 21u) & 0x1FE00000u;
+    }
+
+    // 80324C2C: lwz     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 80324C30: rlwinm r5, r5, 0, 15, 13
+    {
+        g5 = gx_rotl32(g5, 0u) & 0xFFFDFFFFu;
+    }
+
+    // 80324C34: stw     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324C34u, 14u, ea, (u32)g5);
+    }
+
+    // 80324C38: lwz     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 80324C3C: rlwinm r5, r5, 0, 14, 12
+    {
+        g5 = gx_rotl32(g5, 0u) & 0xFFFBFFFFu;
+    }
+
+    // 80324C40: stw     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324C40u, 11u, ea, (u32)g5);
+    }
+
+    // 80324C44: lwz     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 80324C48: rlwinm r5, r5, 0, 13, 10
+    {
+        g5 = gx_rotl32(g5, 0u) & 0xFFE7FFFFu;
+    }
+
+    // 80324C4C: or   r4, r5, r4
+    {
+        g4 = g5 | g4;
+    }
+
+    // 80324C50: stw     r4, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324C50u, 7u, ea, (u32)g4);
+    }
+
+    // 80324C54: lwz     r4, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 80324C58: rlwinm r4, r4, 0, 11, 9
+    {
+        g4 = gx_rotl32(g4, 0u) & 0xFFDFFFFFu;
+    }
+
+    // 80324C5C: or   r0, r4, r0
+    {
+        g0 = g4 | g0;
+    }
+
+    // 80324C60: stw     r0, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st32(&s, 0x80324C60u, 3u, ea, (u32)g0);
+    }
+
+    s.suffix = 2u;
+    // 80324C64: lfs     f0, -12712(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12712);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324C68: fcmpo   cr0, f1, f0
+    gx_fcmp(&s.fp, &cr, 0u, F1, F0);
+
+    // 80324C6C: bc    4, 0, 0x80324C78
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80324C78;
+        }
+    }
+    goto B_80324C70;
+B_80324C70: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80324C70: fmr    f1, f0
+    F1 = F0;
+
+    // 80324C74: b       0x80324C88
+    {
+            goto B_80324C88;
+    }
+B_80324C78: /* 3 cycles */
+    if (!gx_block(&s, 3u))
+        return gx_decline(&s);
+    s.suffix = 2u;
+    // 80324C78: lfs     f0, -12708(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12708);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324C7C: fcmpo   cr0, f1, f0
+    gx_fcmp(&s.fp, &cr, 0u, F1, F0);
+
+    // 80324C80: bc    4, 1, 0x80324C88
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80324C88;
+        }
+    }
+    goto B_80324C84;
+B_80324C84: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80324C84: fmr    f1, f0
+    F1 = F0;
+    goto B_80324C88;
+B_80324C88: /* 8 cycles */
+    if (!gx_block(&s, 8u))
+        return gx_decline(&s);
+    s.suffix = 7u;
+    // 80324C88: lfs     f3, -12744(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12744);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F3 = value;
+        P3 = value;
+    }
+
+    s.suffix = 6u;
+    // 80324C8C: lfs     f0, -12712(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12712);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324C90: fmuls   f1, f3, f1
+    F1 = P1 = nr_fmuls(&s.fp, F3, F1);
+
+    // 80324C94: fcmpo   cr0, f2, f0
+    gx_fcmp(&s.fp, &cr, 0u, F2, F0);
+
+    // 80324C98: fctiwz    f1, f1
+    { u64 result; if (gx_fctiw(&s.fp, F1, true, &result)) F1 = gx_f64_from_bits(result); }
+
+    s.suffix = 2u;
+    // 80324C9C: stfd     f1, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        gx_stp64(&s, 0x80324C9Cu, ea, gx_f64_to_bits(F1));
+    }
+
+    // 80324CA0: lwz     r4, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 80324CA4: bc    4, 0, 0x80324CB0
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80324CB0;
+        }
+    }
+    goto B_80324CA8;
+B_80324CA8: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80324CA8: fmr    f2, f0
+    F2 = F0;
+
+    // 80324CAC: b       0x80324CC0
+    {
+            goto B_80324CC0;
+    }
+B_80324CB0: /* 3 cycles */
+    if (!gx_block(&s, 3u))
+        return gx_decline(&s);
+    s.suffix = 2u;
+    // 80324CB0: lfs     f0, -12708(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12708);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324CB4: fcmpo   cr0, f2, f0
+    gx_fcmp(&s.fp, &cr, 0u, F2, F0);
+
+    // 80324CB8: bc    4, 1, 0x80324CC0
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80324CC0;
+        }
+    }
+    goto B_80324CBC;
+B_80324CBC: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80324CBC: fmr    f2, f0
+    F2 = F0;
+    goto B_80324CC0;
+B_80324CC0: /* 15 cycles */
+    if (!gx_block(&s, 15u))
+        return gx_decline(&s);
+    // 80324CC0: lwz     r0, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 80324CC4: rlwinm r0, r0, 0, 0, 23
+    {
+        g0 = gx_rotl32(g0, 0u) & 0xFFFFFF00u;
+    }
+
+    // 80324CC8: rlwimi r0, r4, 0, 24, 31
+    {
+        u32 rot = gx_rotl32(g4, 0u);
+        g0 = (g0 & ~0x000000FFu) | (rot & 0x000000FFu);
+    }
+
+    // 80324CCC: stw     r0, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        gx_st32(&s, 0x80324CCCu, 11u, ea, (u32)g0);
+    }
+
+    s.suffix = 10u;
+    // 80324CD0: lfs     f0, -12744(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12744);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80324CD4: lwz     r0, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 80324CD8: fmuls   f0, f0, f2
+    F0 = P0 = nr_fmuls(&s.fp, F0, F2);
+
+    // 80324CDC: rlwinm r4, r0, 0, 24, 15
+    {
+        g4 = gx_rotl32(g0, 0u) & 0xFFFF00FFu;
+    }
+
+    // 80324CE0: fctiwz    f0, f0
+    { u64 result; if (gx_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 5u;
+    // 80324CE4: stfd     f0, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        gx_stp64(&s, 0x80324CE4u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 80324CE8: lwz     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 80324CEC: rlwimi r4, r0, 8, 16, 23
+    {
+        u32 rot = gx_rotl32(g0, 8u);
+        g4 = (g4 & ~0x0000FF00u) | (rot & 0x0000FF00u);
+    }
+
+    // 80324CF0: stw     r4, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        gx_st32(&s, 0x80324CF0u, 2u, ea, (u32)g4);
+    }
+
+    // 80324CF4: addi    r1, r1, 56
+    g1 = g1 + (u32)(s32)(56);
+
+    // 80324CF8: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    return gx_decline(&s);
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[1] = g1;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[7] = g7;
+    cpu->gpr[9] = g9;
+    cpu->fpr[0] = F0;
+    cpu->fpr[1] = F1;
+    cpu->fpr[2] = F2;
+    cpu->fpr[3] = F3;
+    cpu->ps1[0] = P0;
+    cpu->ps1[1] = P1;
+    cpu->ps1[3] = P3;
+    cpu->cr = cr;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* GXSetIndTexMtx (80325810): 80325810..80325970 */
+static int gxn_80325810(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    if (!gx_fp_ready(cpu))
+        return gx_decline(&s);
+    if (!gx_fp_arith_ready(cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g1 = cpu->gpr[1];
+    u32 g2 = cpu->gpr[2];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 g8 = cpu->gpr[8];
+    u32 g9 = cpu->gpr[9];
+    u32 g10 = cpu->gpr[10];
+    u32 g11 = cpu->gpr[11];
+    f64 F0 = cpu->fpr[0];
+    f64 F1 = cpu->fpr[1];
+    f64 F2 = cpu->fpr[2];
+    f64 P0 = cpu->ps1[0];
+    f64 P1 = cpu->ps1[1];
+    f64 P2 = cpu->ps1[2];
+    u32 cr = cpu->cr;
+    u32 xer = cpu->xer;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_80325810;
+B_80325810: /* 3 cycles */
+    if (!gx_block(&s, 3u))
+        return gx_decline(&s);
+    // 80325810: cmpwi   r3, 8
+    {
+        s32 val_a = (s32)(g3);
+        s32 val_b = (s32)(8);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 80325814: stwu     r1, -120(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-120);
+        gx_st32(&s, 0x80325814u, 1u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    // 80325818: bc    12, 2, 0x8032585C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8032585C;
+        }
+    }
+    goto B_8032581C;
+B_8032581C: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 8032581C: bc    4, 0, 0x80325838
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80325838;
+        }
+    }
+    goto B_80325820;
+B_80325820: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80325820: cmpwi   r3, 4
+    {
+        s32 val_a = (s32)(g3);
+        s32 val_b = (s32)(4);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 80325824: bc    12, 2, 0x8032585C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8032585C;
+        }
+    }
+    goto B_80325828;
+B_80325828: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80325828: bc    4, 0, 0x8032584C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8032584C;
+        }
+    }
+    goto B_8032582C;
+B_8032582C: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 8032582C: cmpwi   r3, 1
+    {
+        s32 val_a = (s32)(g3);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 80325830: bc    4, 0, 0x80325844
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80325844;
+        }
+    }
+    goto B_80325834;
+B_80325834: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80325834: b       0x8032585C
+    {
+            goto B_8032585C;
+    }
+    goto B_80325838;
+B_80325838: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80325838: cmpwi   r3, 12
+    {
+        s32 val_a = (s32)(g3);
+        s32 val_b = (s32)(12);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8032583C: bc    4, 0, 0x8032585C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8032585C;
+        }
+    }
+    goto B_80325840;
+B_80325840: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80325840: b       0x80325854
+    {
+            goto B_80325854;
+    }
+    goto B_80325844;
+B_80325844: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80325844: addi    r0, r3, -1
+    g0 = g3 + (u32)(s32)(-1);
+
+    // 80325848: b       0x80325860
+    {
+            goto B_80325860;
+    }
+B_8032584C: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 8032584C: addi    r0, r3, -5
+    g0 = g3 + (u32)(s32)(-5);
+
+    // 80325850: b       0x80325860
+    {
+            goto B_80325860;
+    }
+B_80325854: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80325854: addi    r0, r3, -9
+    g0 = g3 + (u32)(s32)(-9);
+
+    // 80325858: b       0x80325860
+    {
+            goto B_80325860;
+    }
+B_8032585C: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 8032585C: li      r0, 0
+    g0 = (u32)(s32)(0);
+    goto B_80325860;
+B_80325860: /* 70 cycles */
+    if (!gx_block(&s, 70u))
+        return gx_decline(&s);
+    s.suffix = 69u;
+    // 80325860: lfs     f2, -12704(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12704);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    // 80325864: mulli   r3, r0, 3
+    g3 = (u32)((s64)(s32)g0 * (s64)(s32)3);
+
+    s.suffix = 65u;
+    // 80325868: lfs     f1, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    s.suffix = 64u;
+    // 8032586C: lfs     f0, 12(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(12);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80325870: fmuls   f1, f2, f1
+    F1 = P1 = nr_fmuls(&s.fp, F2, F1);
+
+    // 80325874: addi    r11, r5, 17
+    g11 = g5 + (u32)(s32)(17);
+
+    // 80325878: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8032587C: addi    r0, r3, 6
+    g0 = g3 + (u32)(s32)(6);
+
+    // 80325880: extsb r11, r11
+    {
+        g11 = (u32)(s32)(s8)g11;
+    }
+
+    // 80325884: fctiwz    f1, f1
+    { u64 result; if (gx_fctiw(&s.fp, F1, true, &result)) F1 = gx_f64_from_bits(result); }
+
+    // 80325888: li      r10, 97
+    g10 = (u32)(s32)(97);
+
+    // 8032588C: fctiwz    f0, f0
+    { u64 result; if (gx_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    // 80325890: lis     r9, -13311
+    g9 = ((u32)(s32)(-13311) << 16);
+
+    // 80325894: stb     r10, -32768(r9)
+    {
+        u32 ea = g9 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x80325894u, 54u, ea, (u8)g10);
+    }
+
+    s.suffix = 53u;
+    // 80325898: stfd     f1, 112(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(112);
+        gx_stp64(&s, 0x80325898u, ea, gx_f64_to_bits(F1));
+    }
+
+    // 8032589C: rlwinm r0, r0, 24, 0, 7
+    {
+        g0 = gx_rotl32(g0, 24u) & 0xFF000000u;
+    }
+
+    // 803258A0: addi    r6, r3, 7
+    g6 = g3 + (u32)(s32)(7);
+
+    s.suffix = 50u;
+    // 803258A4: stfd     f0, 104(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(104);
+        gx_stp64(&s, 0x803258A4u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 803258A8: addi    r5, r3, 8
+    g5 = g3 + (u32)(s32)(8);
+
+    // 803258AC: lwz     r8, 116(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(116);
+        g8 = gx_ld32(&s, ea);
+    }
+
+    // 803258B0: lwz     r7, 108(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(108);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 803258B4: lwz     r3, -12848(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-12848);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 803258B8: rlwinm r7, r7, 11, 10, 20
+    {
+        g7 = gx_rotl32(g7, 11u) & 0x003FF800u;
+    }
+
+    // 803258BC: rlwimi r7, r8, 0, 21, 31
+    {
+        u32 rot = gx_rotl32(g8, 0u);
+        g7 = (g7 & ~0x000007FFu) | (rot & 0x000007FFu);
+    }
+
+    // 803258C0: rlwinm r7, r7, 0, 10, 7
+    {
+        g7 = gx_rotl32(g7, 0u) & 0xFF3FFFFFu;
+    }
+
+    // 803258C4: rlwimi r7, r11, 22, 8, 9
+    {
+        u32 rot = gx_rotl32(g11, 22u);
+        g7 = (g7 & ~0x00C00000u) | (rot & 0x00C00000u);
+    }
+
+    // 803258C8: rlwimi r0, r7, 0, 8, 31
+    {
+        u32 rot = gx_rotl32(g7, 0u);
+        g0 = (g0 & ~0x00FFFFFFu) | (rot & 0x00FFFFFFu);
+    }
+
+    // 803258CC: stw     r0, -32768(r9)
+    {
+        u32 ea = g9 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x803258CCu, 40u, ea, (u32)g0);
+    }
+
+    // 803258D0: li      r0, 0
+    g0 = (u32)(s32)(0);
+
+    s.suffix = 38u;
+    // 803258D4: lfs     f1, 4(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(4);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    s.suffix = 37u;
+    // 803258D8: lfs     f0, 16(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(16);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 803258DC: fmuls   f1, f2, f1
+    F1 = P1 = nr_fmuls(&s.fp, F2, F1);
+
+    // 803258E0: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 803258E4: stb     r10, -32768(r9)
+    {
+        u32 ea = g9 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x803258E4u, 34u, ea, (u8)g10);
+    }
+
+    // 803258E8: fctiwz    f1, f1
+    { u64 result; if (gx_fctiw(&s.fp, F1, true, &result)) F1 = gx_f64_from_bits(result); }
+
+    // 803258EC: fctiwz    f0, f0
+    { u64 result; if (gx_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 31u;
+    // 803258F0: stfd     f1, 96(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(96);
+        gx_stp64(&s, 0x803258F0u, ea, gx_f64_to_bits(F1));
+    }
+
+    s.suffix = 30u;
+    // 803258F4: stfd     f0, 88(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(88);
+        gx_stp64(&s, 0x803258F4u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 803258F8: lwz     r8, 100(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(100);
+        g8 = gx_ld32(&s, ea);
+    }
+
+    // 803258FC: lwz     r7, 92(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(92);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 80325900: rlwinm r7, r7, 11, 10, 20
+    {
+        g7 = gx_rotl32(g7, 11u) & 0x003FF800u;
+    }
+
+    // 80325904: rlwimi r7, r8, 0, 21, 31
+    {
+        u32 rot = gx_rotl32(g8, 0u);
+        g7 = (g7 & ~0x000007FFu) | (rot & 0x000007FFu);
+    }
+
+    // 80325908: rlwinm r7, r7, 0, 10, 7
+    {
+        g7 = gx_rotl32(g7, 0u) & 0xFF3FFFFFu;
+    }
+
+    // 8032590C: rlwimi r7, r11, 20, 8, 9
+    {
+        u32 rot = gx_rotl32(g11, 20u);
+        g7 = (g7 & ~0x00C00000u) | (rot & 0x00C00000u);
+    }
+
+    // 80325910: rlwinm r7, r7, 0, 8, 31
+    {
+        g7 = gx_rotl32(g7, 0u) & 0x00FFFFFFu;
+    }
+
+    // 80325914: rlwimi r7, r6, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g6, 24u);
+        g7 = (g7 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    // 80325918: stw     r7, -32768(r9)
+    {
+        u32 ea = g9 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x80325918u, 21u, ea, (u32)g7);
+    }
+
+    s.suffix = 20u;
+    // 8032591C: lfs     f1, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    s.suffix = 19u;
+    // 80325920: lfs     f0, 20(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(20);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 80325924: fmuls   f1, f2, f1
+    F1 = P1 = nr_fmuls(&s.fp, F2, F1);
+
+    // 80325928: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8032592C: stb     r10, -32768(r9)
+    {
+        u32 ea = g9 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x8032592Cu, 16u, ea, (u8)g10);
+    }
+
+    // 80325930: fctiwz    f1, f1
+    { u64 result; if (gx_fctiw(&s.fp, F1, true, &result)) F1 = gx_f64_from_bits(result); }
+
+    // 80325934: fctiwz    f0, f0
+    { u64 result; if (gx_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 13u;
+    // 80325938: stfd     f1, 80(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(80);
+        gx_stp64(&s, 0x80325938u, ea, gx_f64_to_bits(F1));
+    }
+
+    s.suffix = 12u;
+    // 8032593C: stfd     f0, 72(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(72);
+        gx_stp64(&s, 0x8032593Cu, ea, gx_f64_to_bits(F0));
+    }
+
+    // 80325940: lwz     r6, 84(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(84);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 80325944: lwz     r4, 76(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(76);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 80325948: rlwinm r4, r4, 11, 10, 20
+    {
+        g4 = gx_rotl32(g4, 11u) & 0x003FF800u;
+    }
+
+    // 8032594C: rlwimi r4, r6, 0, 21, 31
+    {
+        u32 rot = gx_rotl32(g6, 0u);
+        g4 = (g4 & ~0x000007FFu) | (rot & 0x000007FFu);
+    }
+
+    // 80325950: rlwinm r4, r4, 0, 10, 7
+    {
+        g4 = gx_rotl32(g4, 0u) & 0xFF3FFFFFu;
+    }
+
+    // 80325954: rlwimi r4, r11, 18, 8, 9
+    {
+        u32 rot = gx_rotl32(g11, 18u);
+        g4 = (g4 & ~0x00C00000u) | (rot & 0x00C00000u);
+    }
+
+    // 80325958: rlwinm r4, r4, 0, 8, 31
+    {
+        g4 = gx_rotl32(g4, 0u) & 0x00FFFFFFu;
+    }
+
+    // 8032595C: rlwimi r4, r5, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g5, 24u);
+        g4 = (g4 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    // 80325960: stw     r4, -32768(r9)
+    {
+        u32 ea = g9 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x80325960u, 3u, ea, (u32)g4);
+    }
+
+    // 80325964: sth     r0, 2(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(2);
+        gx_st16(&s, 0x80325964u, 2u, ea, (u16)g0);
+    }
+
+    // 80325968: addi    r1, r1, 120
+    g1 = g1 + (u32)(s32)(120);
+
+    // 8032596C: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    return gx_decline(&s);
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[1] = g1;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[7] = g7;
+    cpu->gpr[8] = g8;
+    cpu->gpr[9] = g9;
+    cpu->gpr[10] = g10;
+    cpu->gpr[11] = g11;
+    cpu->fpr[0] = F0;
+    cpu->fpr[1] = F1;
+    cpu->fpr[2] = F2;
+    cpu->ps1[0] = P0;
+    cpu->ps1[1] = P1;
+    cpu->ps1[2] = P2;
+    cpu->cr = cr;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* J3DGDSetFog (802D85F8): 802D85F8..802D895C, 80328E10..80328E6C */
+static int gxn_802D85F8(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    if (!gx_fp_ready(cpu))
+        return gx_decline(&s);
+    if (!gx_fp_arith_ready(cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g1 = cpu->gpr[1];
+    u32 g2 = cpu->gpr[2];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 g8 = cpu->gpr[8];
+    u32 g9 = cpu->gpr[9];
+    u32 g11 = cpu->gpr[11];
+    u32 g13 = cpu->gpr[13];
+    u32 g29 = cpu->gpr[29];
+    u32 g30 = cpu->gpr[30];
+    u32 g31 = cpu->gpr[31];
+    f64 F0 = cpu->fpr[0];
+    f64 F1 = cpu->fpr[1];
+    f64 F2 = cpu->fpr[2];
+    f64 F3 = cpu->fpr[3];
+    f64 F4 = cpu->fpr[4];
+    f64 F5 = cpu->fpr[5];
+    f64 P0 = cpu->ps1[0];
+    f64 P1 = cpu->ps1[1];
+    f64 P2 = cpu->ps1[2];
+    f64 P3 = cpu->ps1[3];
+    f64 P5 = cpu->ps1[5];
+    u32 cr = cpu->cr;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_802D85F8;
+B_802D85F8: /* 5 cycles */
+    if (!gx_block(&s, 5u))
+        return gx_decline(&s);
+    // 802D85F8: stwu     r1, -48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-48);
+        gx_st32(&s, 0x802D85F8u, 4u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    s.suffix = 3u;
+    // 802D85FC: mflr    r0
+    g0 = lr;
+
+    // 802D8600: stw     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        gx_st32(&s, 0x802D8600u, 2u, ea, (u32)g0);
+    }
+
+    // 802D8604: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 802D8608: bl      0x80328F40
+    {
+            lr = 0x802D860Cu;
+            if (!(s.downcount - 3 > -s.budget))
+                return gx_decline(&s); /* the routine itself, through the chassis */
+            s.downcount -= 4;
+            const u32 frame = g11;
+            gx_stp32(&s, 0x802D8608u, frame + (u32)(s32)(-12), (u32)g29);
+            gx_stp32(&s, 0x802D8608u, frame + (u32)(s32)(-8), (u32)g30);
+            gx_stp32(&s, 0x802D8608u, frame + (u32)(s32)(-4), (u32)g31);
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802D860C;
+    }
+    goto B_802D860C;
+B_802D860C: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 802D860C: or   r29, r3, r3
+    {
+        g29 = g3 | g3;
+    }
+
+    // 802D8610: or   r30, r4, r4
+    {
+        g30 = g4 | g4;
+    }
+
+    // 802D8614: fcmpu   cr0, f4, f3
+    gx_fcmp(&s.fp, &cr, 0u, F4, F3);
+
+    // 802D8618: bc    12, 2, 0x802D8624
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_802D8624;
+        }
+    }
+    goto B_802D861C;
+B_802D861C: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D861C: fcmpu   cr0, f2, f1
+    gx_fcmp(&s.fp, &cr, 0u, F2, F1);
+
+    // 802D8620: bc    4, 2, 0x802D8634
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_802D8634;
+        }
+    }
+    goto B_802D8624;
+B_802D8624: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 802D8624: lfs     f5, -13404(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13404);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F5 = value;
+        P5 = value;
+    }
+
+    s.suffix = 2u;
+    // 802D8628: lfs     f3, -13400(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13400);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F3 = value;
+        P3 = value;
+    }
+
+    s.suffix = 1u;
+    // 802D862C: stfs     f5, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        gx_stp32(&s, 0x802D862Cu, ea, gx_f32_to_bits(F5));
+    }
+
+    // 802D8630: b       0x802D8654
+    {
+            goto B_802D8654;
+    }
+B_802D8634: /* 56 cycles */
+    if (!gx_block(&s, 56u))
+        return gx_decline(&s);
+    // 802D8634: fmuls   f5, f4, f3
+    F5 = P5 = nr_fmuls(&s.fp, F4, F3);
+
+    // 802D8638: fsubs   f3, f4, f3
+    F3 = P3 = nr_fsubs(&s.fp, F4, F3);
+
+    // 802D863C: fsubs   f2, f2, f1
+    F2 = P2 = nr_fsubs(&s.fp, F2, F1);
+
+    // 802D8640: fmuls   f0, f3, f2
+    F0 = P0 = nr_fmuls(&s.fp, F3, F2);
+
+    // 802D8644: fdivs   f5, f5, f0
+    F5 = P5 = nr_fdivs(&s.fp, F5, F0);
+
+    // 802D8648: fdivs   f3, f4, f3
+    F3 = P3 = nr_fdivs(&s.fp, F4, F3);
+
+    // 802D864C: fdivs   f0, f1, f2
+    F0 = P0 = nr_fdivs(&s.fp, F1, F2);
+
+    s.suffix = 0u;
+    // 802D8650: stfs     f0, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        gx_stp32(&s, 0x802D8650u, ea, gx_f32_to_bits(F0));
+    }
+
+    goto B_802D8654;
+B_802D8654: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 802D8654: li      r31, 1
+    g31 = (u32)(s32)(1);
+
+    s.suffix = 2u;
+    // 802D8658: lfs     f1, -13400(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13400);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    s.suffix = 1u;
+    // 802D865C: lfd     f0, -13392(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13392);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 802D8660: b       0x802D866C
+    {
+            goto B_802D866C;
+    }
+B_802D8664: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D8664: fmuls   f3, f3, f1
+    F3 = P3 = nr_fmuls(&s.fp, F3, F1);
+
+    // 802D8668: addi    r31, r31, 1
+    g31 = g31 + (u32)(s32)(1);
+    goto B_802D866C;
+B_802D866C: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D866C: fcmpo   cr0, f3, f0
+    gx_fcmp(&s.fp, &cr, 0u, F3, F0);
+
+    // 802D8670: bc    12, 1, 0x802D8664
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802D8664;
+        }
+    }
+    goto B_802D8674;
+B_802D8674: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 802D8674: lfd     f0, -13376(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13376);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 2u;
+    // 802D8678: lfs     f2, -13384(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13384);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 1u;
+    // 802D867C: lfs     f1, -13404(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13404);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 802D8680: b       0x802D868C
+    {
+            goto B_802D868C;
+    }
+B_802D8684: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D8684: fmuls   f3, f3, f2
+    F3 = P3 = nr_fmuls(&s.fp, F3, F2);
+
+    // 802D8688: addi    r31, r31, -1
+    g31 = g31 + (u32)(s32)(-1);
+    goto B_802D868C;
+B_802D868C: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D868C: fcmpo   cr0, f3, f1
+    gx_fcmp(&s.fp, &cr, 0u, F3, F1);
+
+    // 802D8690: bc    4, 1, 0x802D869C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_802D869C;
+        }
+    }
+    goto B_802D8694;
+B_802D8694: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D8694: fcmpo   cr0, f3, f0
+    gx_fcmp(&s.fp, &cr, 0u, F3, F0);
+
+    // 802D8698: bc    12, 0, 0x802D8684
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802D8684;
+        }
+    }
+    goto B_802D869C;
+B_802D869C: /* 30 cycles */
+    if (!gx_block(&s, 30u))
+        return gx_decline(&s);
+    // 802D869C: li      r0, 1
+    g0 = (u32)(s32)(1);
+
+    // 802D86A0: slw   r0, r0, r31
+    {
+        u32 sh = g31 & 0x3Fu;
+        g0 = sh > 31 ? 0u : (g0 << sh);
+    }
+
+    s.suffix = 27u;
+    // 802D86A4: lfd     f1, -13360(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13360);
+        F1 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 802D86A8: xoris   r0, r0, 0x8000
+    g0 = g0 ^ (0x8000u << 16);
+
+    // 802D86AC: stw     r0, 20(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(20);
+        gx_st32(&s, 0x802D86ACu, 25u, ea, (u32)g0);
+    }
+
+    // 802D86B0: lis     r0, 17200
+    g0 = ((u32)(s32)(17200) << 16);
+
+    // 802D86B4: stw     r0, 16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(16);
+        gx_st32(&s, 0x802D86B4u, 23u, ea, (u32)g0);
+    }
+
+    s.suffix = 22u;
+    // 802D86B8: lfd     f0, 16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(16);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 802D86BC: fsubs   f0, f0, f1
+    F0 = P0 = nr_fsubs(&s.fp, F0, F1);
+
+    // 802D86C0: fdivs   f0, f5, f0
+    F0 = P0 = nr_fdivs(&s.fp, F5, F0);
+
+    s.suffix = 3u;
+    // 802D86C4: stfs     f0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        gx_stp32(&s, 0x802D86C4u, ea, gx_f32_to_bits(F0));
+    }
+
+    s.suffix = 2u;
+    // 802D86C8: lfs     f0, -13368(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-13368);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 802D86CC: fmuls   f1, f0, f3
+    F1 = P1 = nr_fmuls(&s.fp, F0, F3);
+
+    // 802D86D0: bl      0x80328E10
+    {
+            lr = 0x802D86D4u;
+            s.depth++;
+            if (!gx_silent(&s, 0x80328E10u) || !gx_silent(&s, 0x802D86D4u))
+                return gx_decline(&s);
+            goto B_80328E10;
+    }
+    goto B_802D86D4;
+B_802D86D4: /* 158 cycles */
+    if (!gx_block(&s, 158u))
+        return gx_decline(&s);
+    // 802D86D4: lwz     r8, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        g8 = gx_ld32(&s, ea);
+    }
+
+    // 802D86D8: lwz     r4, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D86DC: li      r0, 97
+    g0 = (u32)(s32)(97);
+
+    // 802D86E0: lwz     r7, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 802D86E4: lwz     r6, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D86E8: addi    r5, r6, 1
+    g5 = g6 + (u32)(s32)(1);
+
+    // 802D86EC: stw     r5, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D86ECu, 151u, ea, (u32)g5);
+    }
+
+    // 802D86F0: stb     r0, 0(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D86F0u, 150u, ea, (u8)g0);
+    }
+
+    // 802D86F4: rlwinm r5, r8, 20, 12, 31
+    {
+        g5 = gx_rotl32(g8, 20u) & 0x000FFFFFu;
+    }
+
+    // 802D86F8: oris    r9, r5, 0xEE00
+    g9 = g5 | (0xEE00u << 16);
+
+    // 802D86FC: rlwinm r8, r9, 8, 24, 31
+    {
+        g8 = gx_rotl32(g9, 8u) & 0x000000FFu;
+    }
+
+    // 802D8700: lwz     r7, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 802D8704: lwz     r6, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8708: addi    r5, r6, 1
+    g5 = g6 + (u32)(s32)(1);
+
+    // 802D870C: stw     r5, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D870Cu, 143u, ea, (u32)g5);
+    }
+
+    // 802D8710: stb     r8, 0(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8710u, 142u, ea, (u8)g8);
+    }
+
+    // 802D8714: rlwinm r8, r9, 16, 24, 31
+    {
+        g8 = gx_rotl32(g9, 16u) & 0x000000FFu;
+    }
+
+    // 802D8718: lwz     r7, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 802D871C: lwz     r6, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8720: addi    r5, r6, 1
+    g5 = g6 + (u32)(s32)(1);
+
+    // 802D8724: stw     r5, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8724u, 137u, ea, (u32)g5);
+    }
+
+    // 802D8728: stb     r8, 0(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8728u, 136u, ea, (u8)g8);
+    }
+
+    // 802D872C: rlwinm r8, r9, 24, 24, 31
+    {
+        g8 = gx_rotl32(g9, 24u) & 0x000000FFu;
+    }
+
+    // 802D8730: lwz     r7, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 802D8734: lwz     r6, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8738: addi    r5, r6, 1
+    g5 = g6 + (u32)(s32)(1);
+
+    // 802D873C: stw     r5, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D873Cu, 131u, ea, (u32)g5);
+    }
+
+    // 802D8740: stb     r8, 0(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8740u, 130u, ea, (u8)g8);
+    }
+
+    // 802D8744: lwz     r7, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 802D8748: lwz     r6, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D874C: addi    r5, r6, 1
+    g5 = g6 + (u32)(s32)(1);
+
+    // 802D8750: stw     r5, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8750u, 126u, ea, (u32)g5);
+    }
+
+    // 802D8754: stb     r9, 0(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8754u, 125u, ea, (u8)g9);
+    }
+
+    // 802D8758: lwz     r7, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 802D875C: lwz     r6, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8760: addi    r5, r6, 1
+    g5 = g6 + (u32)(s32)(1);
+
+    // 802D8764: stw     r5, 8(r7)
+    {
+        u32 ea = g7 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8764u, 121u, ea, (u32)g5);
+    }
+
+    // 802D8768: stb     r0, 0(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8768u, 120u, ea, (u8)g0);
+    }
+
+    // 802D876C: oris    r8, r3, 0xEF00
+    g8 = g3 | (0xEF00u << 16);
+
+    // 802D8770: rlwinm r7, r8, 8, 24, 31
+    {
+        g7 = gx_rotl32(g8, 8u) & 0x000000FFu;
+    }
+
+    // 802D8774: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8778: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D877C: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D8780: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8780u, 114u, ea, (u32)g3);
+    }
+
+    // 802D8784: stb     r7, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8784u, 113u, ea, (u8)g7);
+    }
+
+    // 802D8788: rlwinm r7, r8, 16, 24, 31
+    {
+        g7 = gx_rotl32(g8, 16u) & 0x000000FFu;
+    }
+
+    // 802D878C: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8790: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8794: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D8798: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8798u, 108u, ea, (u32)g3);
+    }
+
+    // 802D879C: stb     r7, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D879Cu, 107u, ea, (u8)g7);
+    }
+
+    // 802D87A0: rlwinm r7, r8, 24, 24, 31
+    {
+        g7 = gx_rotl32(g8, 24u) & 0x000000FFu;
+    }
+
+    // 802D87A4: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D87A8: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D87AC: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D87B0: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D87B0u, 102u, ea, (u32)g3);
+    }
+
+    // 802D87B4: stb     r7, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D87B4u, 101u, ea, (u8)g7);
+    }
+
+    // 802D87B8: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D87BC: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D87C0: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D87C4: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D87C4u, 97u, ea, (u32)g3);
+    }
+
+    // 802D87C8: stb     r8, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D87C8u, 96u, ea, (u8)g8);
+    }
+
+    // 802D87CC: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D87D0: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D87D4: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D87D8: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D87D8u, 92u, ea, (u32)g3);
+    }
+
+    // 802D87DC: stb     r0, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D87DCu, 91u, ea, (u8)g0);
+    }
+
+    // 802D87E0: oris    r8, r31, 0xF000
+    g8 = g31 | (0xF000u << 16);
+
+    // 802D87E4: rlwinm r7, r8, 8, 24, 31
+    {
+        g7 = gx_rotl32(g8, 8u) & 0x000000FFu;
+    }
+
+    // 802D87E8: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D87EC: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D87F0: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D87F4: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D87F4u, 85u, ea, (u32)g3);
+    }
+
+    // 802D87F8: stb     r7, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D87F8u, 84u, ea, (u8)g7);
+    }
+
+    // 802D87FC: rlwinm r7, r8, 16, 24, 31
+    {
+        g7 = gx_rotl32(g8, 16u) & 0x000000FFu;
+    }
+
+    // 802D8800: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8804: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8808: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D880C: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D880Cu, 79u, ea, (u32)g3);
+    }
+
+    // 802D8810: stb     r7, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8810u, 78u, ea, (u8)g7);
+    }
+
+    // 802D8814: rlwinm r7, r8, 24, 24, 31
+    {
+        g7 = gx_rotl32(g8, 24u) & 0x000000FFu;
+    }
+
+    // 802D8818: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D881C: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8820: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D8824: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8824u, 73u, ea, (u32)g3);
+    }
+
+    // 802D8828: stb     r7, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8828u, 72u, ea, (u8)g7);
+    }
+
+    // 802D882C: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8830: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8834: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D8838: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8838u, 68u, ea, (u32)g3);
+    }
+
+    // 802D883C: stb     r8, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D883Cu, 67u, ea, (u8)g8);
+    }
+
+    // 802D8840: lwz     r6, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 802D8844: lwz     r5, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8848: addi    r3, r5, 1
+    g3 = g5 + (u32)(s32)(1);
+
+    // 802D884C: stw     r3, 8(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D884Cu, 63u, ea, (u32)g3);
+    }
+
+    // 802D8850: stb     r0, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8850u, 62u, ea, (u8)g0);
+    }
+
+    // 802D8854: rlwinm r3, r29, 21, 0, 10
+    {
+        g3 = gx_rotl32(g29, 21u) & 0xFFE00000u;
+    }
+
+    // 802D8858: rlwimi r3, r4, 20, 12, 31
+    {
+        u32 rot = gx_rotl32(g4, 20u);
+        g3 = (g3 & ~0x000FFFFFu) | (rot & 0x000FFFFFu);
+    }
+
+    // 802D885C: oris    r7, r3, 0xF100
+    g7 = g3 | (0xF100u << 16);
+
+    // 802D8860: rlwinm r6, r7, 8, 24, 31
+    {
+        g6 = gx_rotl32(g7, 8u) & 0x000000FFu;
+    }
+
+    // 802D8864: lwz     r5, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8868: lwz     r4, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D886C: addi    r3, r4, 1
+    g3 = g4 + (u32)(s32)(1);
+
+    // 802D8870: stw     r3, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8870u, 54u, ea, (u32)g3);
+    }
+
+    // 802D8874: stb     r6, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8874u, 53u, ea, (u8)g6);
+    }
+
+    // 802D8878: rlwinm r6, r7, 16, 24, 31
+    {
+        g6 = gx_rotl32(g7, 16u) & 0x000000FFu;
+    }
+
+    // 802D887C: lwz     r5, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8880: lwz     r4, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D8884: addi    r3, r4, 1
+    g3 = g4 + (u32)(s32)(1);
+
+    // 802D8888: stw     r3, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8888u, 48u, ea, (u32)g3);
+    }
+
+    // 802D888C: stb     r6, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D888Cu, 47u, ea, (u8)g6);
+    }
+
+    // 802D8890: rlwinm r6, r7, 24, 24, 31
+    {
+        g6 = gx_rotl32(g7, 24u) & 0x000000FFu;
+    }
+
+    // 802D8894: lwz     r5, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D8898: lwz     r4, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D889C: addi    r3, r4, 1
+    g3 = g4 + (u32)(s32)(1);
+
+    // 802D88A0: stw     r3, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D88A0u, 42u, ea, (u32)g3);
+    }
+
+    // 802D88A4: stb     r6, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D88A4u, 41u, ea, (u8)g6);
+    }
+
+    // 802D88A8: lwz     r5, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D88AC: lwz     r4, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D88B0: addi    r3, r4, 1
+    g3 = g4 + (u32)(s32)(1);
+
+    // 802D88B4: stw     r3, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D88B4u, 37u, ea, (u32)g3);
+    }
+
+    // 802D88B8: stb     r7, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D88B8u, 36u, ea, (u8)g7);
+    }
+
+    // 802D88BC: lbz     r5, 0(r30)
+    {
+        u32 ea = g30 + (u32)(s32)(0);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 802D88C0: lbz     r4, 2(r30)
+    {
+        u32 ea = g30 + (u32)(s32)(2);
+        g4 = gx_ld8(&s, ea);
+    }
+
+    // 802D88C4: lbz     r3, 1(r30)
+    {
+        u32 ea = g30 + (u32)(s32)(1);
+        g3 = gx_ld8(&s, ea);
+    }
+
+    // 802D88C8: rlwimi r4, r3, 8, 16, 23
+    {
+        u32 rot = gx_rotl32(g3, 8u);
+        g4 = (g4 & ~0x0000FF00u) | (rot & 0x0000FF00u);
+    }
+
+    // 802D88CC: rlwimi r4, r5, 16, 8, 15
+    {
+        u32 rot = gx_rotl32(g5, 16u);
+        g4 = (g4 & ~0x00FF0000u) | (rot & 0x00FF0000u);
+    }
+
+    // 802D88D0: oris    r6, r4, 0xF200
+    g6 = g4 | (0xF200u << 16);
+
+    // 802D88D4: lwz     r5, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 802D88D8: lwz     r4, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D88DC: addi    r3, r4, 1
+    g3 = g4 + (u32)(s32)(1);
+
+    // 802D88E0: stw     r3, 8(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D88E0u, 26u, ea, (u32)g3);
+    }
+
+    // 802D88E4: stb     r0, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D88E4u, 25u, ea, (u8)g0);
+    }
+
+    // 802D88E8: rlwinm r5, r6, 8, 24, 31
+    {
+        g5 = gx_rotl32(g6, 8u) & 0x000000FFu;
+    }
+
+    // 802D88EC: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D88F0: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D88F4: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D88F8: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D88F8u, 20u, ea, (u32)g0);
+    }
+
+    // 802D88FC: stb     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D88FCu, 19u, ea, (u8)g5);
+    }
+
+    // 802D8900: rlwinm r5, r6, 16, 24, 31
+    {
+        g5 = gx_rotl32(g6, 16u) & 0x000000FFu;
+    }
+
+    // 802D8904: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D8908: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D890C: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D8910: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8910u, 14u, ea, (u32)g0);
+    }
+
+    // 802D8914: stb     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8914u, 13u, ea, (u8)g5);
+    }
+
+    // 802D8918: rlwinm r5, r6, 24, 24, 31
+    {
+        g5 = gx_rotl32(g6, 24u) & 0x000000FFu;
+    }
+
+    // 802D891C: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D8920: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D8924: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D8928: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8928u, 8u, ea, (u32)g0);
+    }
+
+    // 802D892C: stb     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D892Cu, 7u, ea, (u8)g5);
+    }
+
+    // 802D8930: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D8934: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D8938: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D893C: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D893Cu, 3u, ea, (u32)g0);
+    }
+
+    // 802D8940: stb     r6, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8940u, 2u, ea, (u8)g6);
+    }
+
+    // 802D8944: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 802D8948: bl      0x80328F8C
+    {
+            lr = 0x802D894Cu;
+            if (!(s.downcount - 3 > -s.budget))
+                return gx_decline(&s); /* the routine itself, through the chassis */
+            s.downcount -= 4;
+            const u32 frame = g11;
+            g29 = gx_ld32(&s, frame + (u32)(s32)(-12));
+            g30 = gx_ld32(&s, frame + (u32)(s32)(-8));
+            g31 = gx_ld32(&s, frame + (u32)(s32)(-4));
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802D894C;
+    }
+    goto B_802D894C;
+B_802D894C: /* 5 cycles */
+    if (!gx_block(&s, 5u))
+        return gx_decline(&s);
+    // 802D894C: lwz     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 2u;
+    // 802D8950: mtlr    r0
+    lr = g0;
+
+    // 802D8954: addi    r1, r1, 48
+    g1 = g1 + (u32)(s32)(48);
+
+    // 802D8958: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_80328E10: /* 10 cycles */
+    if (!gx_block(&s, 10u))
+        return gx_decline(&s);
+    // 80328E10: stwu     r1, -16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-16);
+        gx_st32(&s, 0x80328E10u, 9u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    // 80328E14: lis     r4, -32713
+    g4 = ((u32)(s32)(-32713) << 16);
+
+    // 80328E18: ori     r4, r4, 0x0FC8
+    g4 = g4 | 0x0FC8u;
+
+    // 80328E1C: li      r3, 0
+    g3 = (u32)(s32)(0);
+
+    s.suffix = 5u;
+    // 80328E20: lfd     f0, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 4u;
+    // 80328E24: lfd     f3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        F3 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 3u;
+    // 80328E28: lfd     f4, 16(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(16);
+        F4 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 80328E2C: fcmpu   cr0, f1, f0
+    gx_fcmp(&s.fp, &cr, 0u, F1, F0);
+
+    // 80328E30: fcmpu   cr6, f1, f3
+    gx_fcmp(&s.fp, &cr, 6u, F1, F3);
+
+    // 80328E34: bc    12, 0, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E38;
+B_80328E38: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80328E38: addi    r3, r3, -1
+    g3 = g3 + (u32)(s32)(-1);
+
+    // 80328E3C: bc    4, 24, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000080u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E40;
+B_80328E40: /* 3 cycles */
+    if (!gx_block(&s, 3u))
+        return gx_decline(&s);
+    // 80328E40: fcmpu   cr7, f1, f4
+    gx_fcmp(&s.fp, &cr, 7u, F1, F4);
+
+    // 80328E44: fmr    f2, f1
+    F2 = F1;
+
+    // 80328E48: bc    12, 28, 0x80328E50
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000008u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E50;
+        }
+    }
+    goto B_80328E4C;
+B_80328E4C: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80328E4C: fsub   f2, f1, f4
+    F2 = gx_fsub(&s.fp, F1, F4);
+    goto B_80328E50;
+B_80328E50: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 80328E50: fctiwz    f2, f2
+    { u64 result; if (gx_fctiw(&s.fp, F2, true, &result)) F2 = gx_f64_from_bits(result); }
+
+    s.suffix = 2u;
+    // 80328E54: stfd     f2, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        gx_stp64(&s, 0x80328E54u, ea, gx_f64_to_bits(F2));
+    }
+
+    // 80328E58: lwz     r3, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 80328E5C: bc    12, 28, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000008u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E60;
+B_80328E60: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80328E60: addis   r3, r3, -32768
+    g3 = g3 + ((u32)(s32)(-32768) << 16);
+    goto B_80328E64;
+B_80328E64: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80328E64: addi    r1, r1, 16
+    g1 = g1 + (u32)(s32)(16);
+
+    // 80328E68: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            if (s.depth == 0u && (gx_t - 0x802D56E0u < 0x4000u || gx_t - 0x803256E0u < 0x4000u))
+                return gx_decline(&s);
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    s.depth--;
+    if (!gx_live(&s))
+        return gx_decline(&s);
+    switch (gx_t) {
+    case 0x802D86D4u: goto B_802D86D4;
+    default: return gx_decline(&s);
+    }
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[1] = g1;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[7] = g7;
+    cpu->gpr[8] = g8;
+    cpu->gpr[9] = g9;
+    cpu->gpr[11] = g11;
+    cpu->gpr[29] = g29;
+    cpu->gpr[30] = g30;
+    cpu->gpr[31] = g31;
+    cpu->fpr[0] = F0;
+    cpu->fpr[1] = F1;
+    cpu->fpr[2] = F2;
+    cpu->fpr[3] = F3;
+    cpu->fpr[4] = F4;
+    cpu->fpr[5] = F5;
+    cpu->ps1[0] = P0;
+    cpu->ps1[1] = P1;
+    cpu->ps1[2] = P2;
+    cpu->ps1[3] = P3;
+    cpu->ps1[5] = P5;
+    cpu->cr = cr;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* J3DGDSetTevOrder (802D80D0): 802D80D0..802D825C */
+static int gxn_802D80D0(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g1 = cpu->gpr[1];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 g8 = cpu->gpr[8];
+    u32 g9 = cpu->gpr[9];
+    u32 g10 = cpu->gpr[10];
+    u32 g11 = cpu->gpr[11];
+    u32 g13 = cpu->gpr[13];
+    u32 g25 = cpu->gpr[25];
+    u32 g26 = cpu->gpr[26];
+    u32 g27 = cpu->gpr[27];
+    u32 g28 = cpu->gpr[28];
+    u32 g29 = cpu->gpr[29];
+    u32 g30 = cpu->gpr[30];
+    u32 g31 = cpu->gpr[31];
+    u32 cr = cpu->cr;
+    u32 xer = cpu->xer;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_802D80D0;
+B_802D80D0: /* 5 cycles */
+    if (!gx_block(&s, 5u))
+        return gx_decline(&s);
+    // 802D80D0: stwu     r1, -48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-48);
+        gx_st32(&s, 0x802D80D0u, 4u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    s.suffix = 3u;
+    // 802D80D4: mflr    r0
+    g0 = lr;
+
+    // 802D80D8: stw     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        gx_st32(&s, 0x802D80D8u, 2u, ea, (u32)g0);
+    }
+
+    // 802D80DC: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 802D80E0: bl      0x80328F30
+    {
+            lr = 0x802D80E4u;
+            if (!(s.downcount - 7 > -s.budget))
+                return gx_decline(&s); /* the routine itself, through the chassis */
+            s.downcount -= 8;
+            const u32 frame = g11;
+            gx_stp32(&s, 0x802D80E0u, frame + (u32)(s32)(-28), (u32)g25);
+            gx_stp32(&s, 0x802D80E0u, frame + (u32)(s32)(-24), (u32)g26);
+            gx_stp32(&s, 0x802D80E0u, frame + (u32)(s32)(-20), (u32)g27);
+            gx_stp32(&s, 0x802D80E0u, frame + (u32)(s32)(-16), (u32)g28);
+            gx_stp32(&s, 0x802D80E0u, frame + (u32)(s32)(-12), (u32)g29);
+            gx_stp32(&s, 0x802D80E0u, frame + (u32)(s32)(-8), (u32)g30);
+            gx_stp32(&s, 0x802D80E0u, frame + (u32)(s32)(-4), (u32)g31);
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802D80E4;
+    }
+    goto B_802D80E4;
+B_802D80E4: /* 8 cycles */
+    if (!gx_block(&s, 8u))
+        return gx_decline(&s);
+    // 802D80E4: or   r25, r3, r3
+    {
+        g25 = g3 | g3;
+    }
+
+    // 802D80E8: or   r27, r5, r5
+    {
+        g27 = g5 | g5;
+    }
+
+    // 802D80EC: or   r28, r6, r6
+    {
+        g28 = g6 | g6;
+    }
+
+    // 802D80F0: or   r29, r8, r8
+    {
+        g29 = g8 | g8;
+    }
+
+    // 802D80F4: or   r26, r9, r9
+    {
+        g26 = g9 | g9;
+    }
+
+    // 802D80F8: cmpwi   r4, 8
+    {
+        s32 val_a = (s32)(g4);
+        s32 val_b = (s32)(8);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 802D80FC: or   r30, r4, r4
+    {
+        g30 = g4 | g4;
+    }
+
+    // 802D8100: bc    12, 0, 0x802D8108
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_802D8108;
+        }
+    }
+    goto B_802D8104;
+B_802D8104: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 802D8104: li      r30, 0
+    g30 = (u32)(s32)(0);
+    goto B_802D8108;
+B_802D8108: /* 3 cycles */
+    if (!gx_block(&s, 3u))
+        return gx_decline(&s);
+    // 802D8108: cmpwi   r7, 8
+    {
+        s32 val_a = (s32)(g7);
+        s32 val_b = (s32)(8);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 802D810C: or   r31, r7, r7
+    {
+        g31 = g7 | g7;
+    }
+
+    // 802D8110: bc    12, 0, 0x802D8118
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_802D8118;
+        }
+    }
+    goto B_802D8114;
+B_802D8114: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 802D8114: li      r31, 0
+    g31 = (u32)(s32)(0);
+    goto B_802D8118;
+B_802D8118: /* 6 cycles */
+    if (!gx_block(&s, 6u))
+        return gx_decline(&s);
+    // 802D8118: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D811C: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D8120: addi    r3, r3, 5
+    g3 = g3 + (u32)(s32)(5);
+
+    // 802D8124: lwz     r0, 12(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(12);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 802D8128: cmplw   r3, r0
+    {
+        u32 val_a = (u32)(g3);
+        u32 val_b = (u32)(g0);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 802D812C: bc    4, 1, 0x802D8134
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_802D8134;
+        }
+    }
+    goto B_802D8130;
+B_802D8130: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 802D8130: bl      0x80327E40
+    {
+            return gx_decline(&s); /* a call to 80327E40: not replayed here */
+    }
+    goto B_802D8134;
+B_802D8134: /* 12 cycles */
+    if (!gx_block(&s, 12u))
+        return gx_decline(&s);
+    // 802D8134: srawi r0, r25, 1
+    {
+        u32 sh = 1u;
+        u32 value = g25;
+        bool ca = false;
+        if (sh == 0) {
+            g0 = value;
+        } else if (sh > 31) {
+            g0 = (value & 0x80000000u) ? 0xFFFFFFFFu : 0u;
+            ca = (value & 0x80000000u) != 0;
+        } else {
+            g0 = (u32)((s32)value >> sh);
+            ca = (value & 0x80000000u) && ((value << (32u - sh)) != 0);
+        }
+        xer = (xer & ~0x20000000u) | (ca ? 0x20000000u : 0u);
+    }
+
+    // 802D8138: addze  r3, r0
+    {
+        u32 a = g0;
+        u64 wide = (u64)a + ((xer >> 29) & 1u);
+        u32 res = (u32)wide;
+        g3 = res;
+        xer = (xer & ~0x20000000u) | (((u32)(wide >> 32) & 1u) << 29);
+    }
+
+    // 802D813C: addi    r0, r3, 40
+    g0 = g3 + (u32)(s32)(40);
+
+    // 802D8140: rlwinm r0, r0, 24, 0, 7
+    {
+        g0 = gx_rotl32(g0, 24u) & 0xFF000000u;
+    }
+
+    // 802D8144: rlwinm r4, r26, 0, 28, 31
+    {
+        g4 = gx_rotl32(g26, 0u) & 0x0000000Fu;
+    }
+
+    // 802D8148: lis     r3, -32710
+    g3 = ((u32)(s32)(-32710) << 16);
+
+    // 802D814C: addi    r3, r3, -10176
+    g3 = g3 + (u32)(s32)(-10176);
+
+    // 802D8150: lbzx    r3, r3, r4
+    {
+        u32 ea = g3 + g4;
+        g3 = gx_ld8(&s, ea);
+    }
+
+    // 802D8154: rlwinm r10, r3, 19, 0, 12
+    {
+        g10 = gx_rotl32(g3, 19u) & 0xFFF80000u;
+    }
+
+    // 802D8158: li      r4, 0
+    g4 = (u32)(s32)(0);
+
+    // 802D815C: cmpwi   r29, 255
+    {
+        s32 val_a = (s32)(g29);
+        s32 val_b = (s32)(255);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 802D8160: bc    12, 2, 0x802D8170
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_802D8170;
+        }
+    }
+    goto B_802D8164;
+B_802D8164: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D8164: rlwinm. r3, r29, 0, 23, 23
+    {
+        g3 = gx_rotl32(g29, 0u) & 0x00000100u;
+        u32 cr_bits = 0;
+        s32 cr_value = (s32)g3;
+        if (cr_value < 0)  cr_bits |= 0x8u;
+        if (cr_value > 0)  cr_bits |= 0x4u;
+        if (cr_value == 0) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
+    }
+
+    // 802D8168: bc    4, 2, 0x802D8170
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_802D8170;
+        }
+    }
+    goto B_802D816C;
+B_802D816C: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 802D816C: li      r4, 1
+    g4 = (u32)(s32)(1);
+    goto B_802D8170;
+B_802D8170: /* 13 cycles */
+    if (!gx_block(&s, 13u))
+        return gx_decline(&s);
+    // 802D8170: rlwinm r9, r4, 18, 6, 13
+    {
+        g9 = gx_rotl32(g4, 18u) & 0x03FC0000u;
+    }
+
+    // 802D8174: rlwinm r8, r31, 15, 0, 16
+    {
+        g8 = gx_rotl32(g31, 15u) & 0xFFFF8000u;
+    }
+
+    // 802D8178: rlwinm r7, r29, 12, 17, 19
+    {
+        g7 = gx_rotl32(g29, 12u) & 0x00007000u;
+    }
+
+    // 802D817C: rlwinm r4, r28, 0, 28, 31
+    {
+        g4 = gx_rotl32(g28, 0u) & 0x0000000Fu;
+    }
+
+    // 802D8180: lis     r3, -32710
+    g3 = ((u32)(s32)(-32710) << 16);
+
+    // 802D8184: addi    r3, r3, -10176
+    g3 = g3 + (u32)(s32)(-10176);
+
+    // 802D8188: lbzx    r3, r3, r4
+    {
+        u32 ea = g3 + g4;
+        g3 = gx_ld8(&s, ea);
+    }
+
+    // 802D818C: rlwinm r6, r3, 7, 0, 24
+    {
+        g6 = gx_rotl32(g3, 7u) & 0xFFFFFF80u;
+    }
+
+    // 802D8190: rlwinm r5, r30, 3, 0, 28
+    {
+        g5 = gx_rotl32(g30, 3u) & 0xFFFFFFF8u;
+    }
+
+    // 802D8194: rlwimi r5, r27, 0, 29, 31
+    {
+        u32 rot = gx_rotl32(g27, 0u);
+        g5 = (g5 & ~0x00000007u) | (rot & 0x00000007u);
+    }
+
+    // 802D8198: li      r4, 0
+    g4 = (u32)(s32)(0);
+
+    // 802D819C: cmpwi   r27, 255
+    {
+        s32 val_a = (s32)(g27);
+        s32 val_b = (s32)(255);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 802D81A0: bc    12, 2, 0x802D81B0
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_802D81B0;
+        }
+    }
+    goto B_802D81A4;
+B_802D81A4: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802D81A4: rlwinm. r3, r27, 0, 23, 23
+    {
+        g3 = gx_rotl32(g27, 0u) & 0x00000100u;
+        u32 cr_bits = 0;
+        s32 cr_value = (s32)g3;
+        if (cr_value < 0)  cr_bits |= 0x8u;
+        if (cr_value > 0)  cr_bits |= 0x4u;
+        if (cr_value == 0) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
+    }
+
+    // 802D81A8: bc    4, 2, 0x802D81B0
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_802D81B0;
+        }
+    }
+    goto B_802D81AC;
+B_802D81AC: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 802D81AC: li      r4, 1
+    g4 = (u32)(s32)(1);
+    goto B_802D81B0;
+B_802D81B0: /* 39 cycles */
+    if (!gx_block(&s, 39u))
+        return gx_decline(&s);
+    // 802D81B0: rlwinm r3, r4, 6, 18, 25
+    {
+        g3 = gx_rotl32(g4, 6u) & 0x00003FC0u;
+    }
+
+    // 802D81B4: or   r3, r5, r3
+    {
+        g3 = g5 | g3;
+    }
+
+    // 802D81B8: or   r3, r6, r3
+    {
+        g3 = g6 | g3;
+    }
+
+    // 802D81BC: or   r3, r7, r3
+    {
+        g3 = g7 | g3;
+    }
+
+    // 802D81C0: or   r3, r8, r3
+    {
+        g3 = g8 | g3;
+    }
+
+    // 802D81C4: or   r3, r9, r3
+    {
+        g3 = g9 | g3;
+    }
+
+    // 802D81C8: or   r3, r10, r3
+    {
+        g3 = g10 | g3;
+    }
+
+    // 802D81CC: or   r6, r0, r3
+    {
+        g6 = g0 | g3;
+    }
+
+    // 802D81D0: li      r5, 97
+    g5 = (u32)(s32)(97);
+
+    // 802D81D4: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D81D8: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D81DC: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D81E0: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D81E0u, 26u, ea, (u32)g0);
+    }
+
+    // 802D81E4: stb     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D81E4u, 25u, ea, (u8)g5);
+    }
+
+    // 802D81E8: rlwinm r5, r6, 8, 24, 31
+    {
+        g5 = gx_rotl32(g6, 8u) & 0x000000FFu;
+    }
+
+    // 802D81EC: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D81F0: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D81F4: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D81F8: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D81F8u, 20u, ea, (u32)g0);
+    }
+
+    // 802D81FC: stb     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D81FCu, 19u, ea, (u8)g5);
+    }
+
+    // 802D8200: rlwinm r5, r6, 16, 24, 31
+    {
+        g5 = gx_rotl32(g6, 16u) & 0x000000FFu;
+    }
+
+    // 802D8204: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D8208: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D820C: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D8210: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8210u, 14u, ea, (u32)g0);
+    }
+
+    // 802D8214: stb     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8214u, 13u, ea, (u8)g5);
+    }
+
+    // 802D8218: rlwinm r5, r6, 24, 24, 31
+    {
+        g5 = gx_rotl32(g6, 24u) & 0x000000FFu;
+    }
+
+    // 802D821C: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D8220: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D8224: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D8228: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D8228u, 8u, ea, (u32)g0);
+    }
+
+    // 802D822C: stb     r5, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D822Cu, 7u, ea, (u8)g5);
+    }
+
+    // 802D8230: lwz     r4, -25656(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-25656);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 802D8234: lwz     r3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 802D8238: addi    r0, r3, 1
+    g0 = g3 + (u32)(s32)(1);
+
+    // 802D823C: stw     r0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        gx_st32(&s, 0x802D823Cu, 3u, ea, (u32)g0);
+    }
+
+    // 802D8240: stb     r6, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        gx_st8(&s, 0x802D8240u, 2u, ea, (u8)g6);
+    }
+
+    // 802D8244: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 802D8248: bl      0x80328F7C
+    {
+            lr = 0x802D824Cu;
+            if (!(s.downcount - 7 > -s.budget))
+                return gx_decline(&s); /* the routine itself, through the chassis */
+            s.downcount -= 8;
+            const u32 frame = g11;
+            g25 = gx_ld32(&s, frame + (u32)(s32)(-28));
+            g26 = gx_ld32(&s, frame + (u32)(s32)(-24));
+            g27 = gx_ld32(&s, frame + (u32)(s32)(-20));
+            g28 = gx_ld32(&s, frame + (u32)(s32)(-16));
+            g29 = gx_ld32(&s, frame + (u32)(s32)(-12));
+            g30 = gx_ld32(&s, frame + (u32)(s32)(-8));
+            g31 = gx_ld32(&s, frame + (u32)(s32)(-4));
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802D824C;
+    }
+    goto B_802D824C;
+B_802D824C: /* 5 cycles */
+    if (!gx_block(&s, 5u))
+        return gx_decline(&s);
+    // 802D824C: lwz     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 2u;
+    // 802D8250: mtlr    r0
+    lr = g0;
+
+    // 802D8254: addi    r1, r1, 48
+    g1 = g1 + (u32)(s32)(48);
+
+    // 802D8258: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    s.depth--;
+    if (!gx_live(&s))
+        return gx_decline(&s);
+    switch (gx_t) {
+    case 0x802D8134u: goto B_802D8134;
+    default: return gx_decline(&s);
+    }
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[1] = g1;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[7] = g7;
+    cpu->gpr[8] = g8;
+    cpu->gpr[9] = g9;
+    cpu->gpr[10] = g10;
+    cpu->gpr[11] = g11;
+    cpu->gpr[25] = g25;
+    cpu->gpr[26] = g26;
+    cpu->gpr[27] = g27;
+    cpu->gpr[28] = g28;
+    cpu->gpr[29] = g29;
+    cpu->gpr[30] = g30;
+    cpu->gpr[31] = g31;
+    cpu->cr = cr;
+    cpu->xer = xer;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* GFSetTevColor (802AFDDC): 802AFDDC..802AFE38 */
+static int gxn_802AFDDC(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_802AFDDC;
+B_802AFDDC: /* 23 cycles */
+    if (!gx_block(&s, 23u))
+        return gx_decline(&s);
+    // 802AFDDC: lbz     r5, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 802AFDE0: lbz     r0, 3(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(3);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 802AFDE4: rlwimi r5, r0, 12, 12, 19
+    {
+        u32 rot = gx_rotl32(g0, 12u);
+        g5 = (g5 & ~0x000FF000u) | (rot & 0x000FF000u);
+    }
+
+    // 802AFDE8: rlwinm r6, r3, 1, 0, 30
+    {
+        g6 = gx_rotl32(g3, 1u) & 0xFFFFFFFEu;
+    }
+
+    // 802AFDEC: addi    r0, r6, 224
+    g0 = g6 + (u32)(s32)(224);
+
+    // 802AFDF0: rlwimi r5, r0, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g0, 24u);
+        g5 = (g5 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    // 802AFDF4: lbz     r3, 2(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(2);
+        g3 = gx_ld8(&s, ea);
+    }
+
+    // 802AFDF8: lbz     r0, 1(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(1);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 802AFDFC: rlwimi r3, r0, 12, 12, 19
+    {
+        u32 rot = gx_rotl32(g0, 12u);
+        g3 = (g3 & ~0x000FF000u) | (rot & 0x000FF000u);
+    }
+
+    // 802AFE00: addi    r0, r6, 225
+    g0 = g6 + (u32)(s32)(225);
+
+    // 802AFE04: or   r4, r3, r3
+    {
+        g4 = g3 | g3;
+    }
+
+    // 802AFE08: rlwimi r4, r0, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g0, 24u);
+        g4 = (g4 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    // 802AFE0C: li      r0, 97
+    g0 = (u32)(s32)(97);
+
+    // 802AFE10: lis     r3, -13311
+    g3 = ((u32)(s32)(-13311) << 16);
+
+    // 802AFE14: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE14u, 8u, ea, (u8)g0);
+    }
+
+    // 802AFE18: stw     r5, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE18u, 7u, ea, (u32)g5);
+    }
+
+    // 802AFE1C: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE1Cu, 6u, ea, (u8)g0);
+    }
+
+    // 802AFE20: stw     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE20u, 5u, ea, (u32)g4);
+    }
+
+    // 802AFE24: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE24u, 4u, ea, (u8)g0);
+    }
+
+    // 802AFE28: stw     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE28u, 3u, ea, (u32)g4);
+    }
+
+    // 802AFE2C: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE2Cu, 2u, ea, (u8)g0);
+    }
+
+    // 802AFE30: stw     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE30u, 1u, ea, (u32)g4);
+    }
+
+    // 802AFE34: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    return gx_decline(&s);
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* GFSetTevColorS10 (802AFE38): 802AFE38..802AFEA0 */
+static int gxn_802AFE38(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_802AFE38;
+B_802AFE38: /* 26 cycles */
+    if (!gx_block(&s, 26u))
+        return gx_decline(&s);
+    // 802AFE38: lha     r6, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        g6 = (u32)(s32)(s16)gx_ld16(&s, ea);
+    }
+
+    // 802AFE3C: lha     r0, 6(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(6);
+        g0 = (u32)(s32)(s16)gx_ld16(&s, ea);
+    }
+
+    // 802AFE40: rlwinm r5, r0, 12, 9, 19
+    {
+        g5 = gx_rotl32(g0, 12u) & 0x007FF000u;
+    }
+
+    // 802AFE44: rlwimi r5, r6, 0, 21, 31
+    {
+        u32 rot = gx_rotl32(g6, 0u);
+        g5 = (g5 & ~0x000007FFu) | (rot & 0x000007FFu);
+    }
+
+    // 802AFE48: rlwinm r6, r3, 1, 0, 30
+    {
+        g6 = gx_rotl32(g3, 1u) & 0xFFFFFFFEu;
+    }
+
+    // 802AFE4C: addi    r0, r6, 224
+    g0 = g6 + (u32)(s32)(224);
+
+    // 802AFE50: or   r7, r5, r5
+    {
+        g7 = g5 | g5;
+    }
+
+    // 802AFE54: rlwimi r7, r0, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g0, 24u);
+        g7 = (g7 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    // 802AFE58: lha     r5, 4(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(4);
+        g5 = (u32)(s32)(s16)gx_ld16(&s, ea);
+    }
+
+    // 802AFE5C: lha     r0, 2(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(2);
+        g0 = (u32)(s32)(s16)gx_ld16(&s, ea);
+    }
+
+    // 802AFE60: rlwinm r3, r0, 12, 9, 19
+    {
+        g3 = gx_rotl32(g0, 12u) & 0x007FF000u;
+    }
+
+    // 802AFE64: rlwimi r3, r5, 0, 21, 31
+    {
+        u32 rot = gx_rotl32(g5, 0u);
+        g3 = (g3 & ~0x000007FFu) | (rot & 0x000007FFu);
+    }
+
+    // 802AFE68: addi    r0, r6, 225
+    g0 = g6 + (u32)(s32)(225);
+
+    // 802AFE6C: or   r4, r3, r3
+    {
+        g4 = g3 | g3;
+    }
+
+    // 802AFE70: rlwimi r4, r0, 24, 0, 7
+    {
+        u32 rot = gx_rotl32(g0, 24u);
+        g4 = (g4 & ~0xFF000000u) | (rot & 0xFF000000u);
+    }
+
+    // 802AFE74: li      r0, 97
+    g0 = (u32)(s32)(97);
+
+    // 802AFE78: lis     r3, -13311
+    g3 = ((u32)(s32)(-13311) << 16);
+
+    // 802AFE7C: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE7Cu, 8u, ea, (u8)g0);
+    }
+
+    // 802AFE80: stw     r7, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE80u, 7u, ea, (u32)g7);
+    }
+
+    // 802AFE84: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE84u, 6u, ea, (u8)g0);
+    }
+
+    // 802AFE88: stw     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE88u, 5u, ea, (u32)g4);
+    }
+
+    // 802AFE8C: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE8Cu, 4u, ea, (u8)g0);
+    }
+
+    // 802AFE90: stw     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE90u, 3u, ea, (u32)g4);
+    }
+
+    // 802AFE94: stb     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFE94u, 2u, ea, (u8)g0);
+    }
+
+    // 802AFE98: stw     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFE98u, 1u, ea, (u32)g4);
+    }
+
+    // 802AFE9C: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    return gx_decline(&s);
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[7] = g7;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* GFSetFog (802AFBD4): 802AFBD4..802AFD3C, 80328E10..80328E6C */
+static int gxn_802AFBD4(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!gx_start(&s, &s_gx_log, cpu))
+        return gx_decline(&s);
+    if (!gx_fp_ready(cpu))
+        return gx_decline(&s);
+    if (!gx_fp_arith_ready(cpu))
+        return gx_decline(&s);
+    u32 g0 = cpu->gpr[0];
+    u32 g1 = cpu->gpr[1];
+    u32 g2 = cpu->gpr[2];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g11 = cpu->gpr[11];
+    u32 g28 = cpu->gpr[28];
+    u32 g29 = cpu->gpr[29];
+    u32 g30 = cpu->gpr[30];
+    u32 g31 = cpu->gpr[31];
+    f64 F0 = cpu->fpr[0];
+    f64 F1 = cpu->fpr[1];
+    f64 F2 = cpu->fpr[2];
+    f64 F3 = cpu->fpr[3];
+    f64 F4 = cpu->fpr[4];
+    f64 F5 = cpu->fpr[5];
+    f64 P0 = cpu->ps1[0];
+    f64 P1 = cpu->ps1[1];
+    f64 P2 = cpu->ps1[2];
+    f64 P3 = cpu->ps1[3];
+    f64 P5 = cpu->ps1[5];
+    u32 cr = cpu->cr;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_802AFBD4;
+B_802AFBD4: /* 5 cycles */
+    if (!gx_block(&s, 5u))
+        return gx_decline(&s);
+    // 802AFBD4: stwu     r1, -48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-48);
+        gx_st32(&s, 0x802AFBD4u, 4u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    s.suffix = 3u;
+    // 802AFBD8: mflr    r0
+    g0 = lr;
+
+    // 802AFBDC: stw     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        gx_st32(&s, 0x802AFBDCu, 2u, ea, (u32)g0);
+    }
+
+    // 802AFBE0: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 802AFBE4: bl      0x80328F3C
+    {
+            lr = 0x802AFBE8u;
+            if (!(s.downcount - 4 > -s.budget))
+                return gx_decline(&s); /* the routine itself, through the chassis */
+            s.downcount -= 5;
+            const u32 frame = g11;
+            gx_stp32(&s, 0x802AFBE4u, frame + (u32)(s32)(-16), (u32)g28);
+            gx_stp32(&s, 0x802AFBE4u, frame + (u32)(s32)(-12), (u32)g29);
+            gx_stp32(&s, 0x802AFBE4u, frame + (u32)(s32)(-8), (u32)g30);
+            gx_stp32(&s, 0x802AFBE4u, frame + (u32)(s32)(-4), (u32)g31);
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802AFBE8;
+    }
+    goto B_802AFBE8;
+B_802AFBE8: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 802AFBE8: or   r28, r3, r3
+    {
+        g28 = g3 | g3;
+    }
+
+    // 802AFBEC: or   r31, r4, r4
+    {
+        g31 = g4 | g4;
+    }
+
+    // 802AFBF0: fcmpu   cr0, f4, f3
+    gx_fcmp(&s.fp, &cr, 0u, F4, F3);
+
+    // 802AFBF4: bc    12, 2, 0x802AFC00
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_802AFC00;
+        }
+    }
+    goto B_802AFBF8;
+B_802AFBF8: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802AFBF8: fcmpu   cr0, f2, f1
+    gx_fcmp(&s.fp, &cr, 0u, F2, F1);
+
+    // 802AFBFC: bc    4, 2, 0x802AFC10
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_802AFC10;
+        }
+    }
+    goto B_802AFC00;
+B_802AFC00: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 802AFC00: lfs     f5, -14056(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14056);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F5 = value;
+        P5 = value;
+    }
+
+    s.suffix = 2u;
+    // 802AFC04: lfs     f3, -14052(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14052);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F3 = value;
+        P3 = value;
+    }
+
+    s.suffix = 1u;
+    // 802AFC08: stfs     f5, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        gx_stp32(&s, 0x802AFC08u, ea, gx_f32_to_bits(F5));
+    }
+
+    // 802AFC0C: b       0x802AFC30
+    {
+            goto B_802AFC30;
+    }
+B_802AFC10: /* 56 cycles */
+    if (!gx_block(&s, 56u))
+        return gx_decline(&s);
+    // 802AFC10: fmuls   f5, f4, f3
+    F5 = P5 = nr_fmuls(&s.fp, F4, F3);
+
+    // 802AFC14: fsubs   f3, f4, f3
+    F3 = P3 = nr_fsubs(&s.fp, F4, F3);
+
+    // 802AFC18: fsubs   f2, f2, f1
+    F2 = P2 = nr_fsubs(&s.fp, F2, F1);
+
+    // 802AFC1C: fmuls   f0, f3, f2
+    F0 = P0 = nr_fmuls(&s.fp, F3, F2);
+
+    // 802AFC20: fdivs   f5, f5, f0
+    F5 = P5 = nr_fdivs(&s.fp, F5, F0);
+
+    // 802AFC24: fdivs   f3, f4, f3
+    F3 = P3 = nr_fdivs(&s.fp, F4, F3);
+
+    // 802AFC28: fdivs   f0, f1, f2
+    F0 = P0 = nr_fdivs(&s.fp, F1, F2);
+
+    s.suffix = 0u;
+    // 802AFC2C: stfs     f0, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        gx_stp32(&s, 0x802AFC2Cu, ea, gx_f32_to_bits(F0));
+    }
+
+    goto B_802AFC30;
+B_802AFC30: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 802AFC30: li      r30, 1
+    g30 = (u32)(s32)(1);
+
+    s.suffix = 2u;
+    // 802AFC34: lfs     f1, -14052(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14052);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    s.suffix = 1u;
+    // 802AFC38: lfd     f0, -14048(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14048);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 802AFC3C: b       0x802AFC48
+    {
+            goto B_802AFC48;
+    }
+B_802AFC40: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802AFC40: fmuls   f3, f3, f1
+    F3 = P3 = nr_fmuls(&s.fp, F3, F1);
+
+    // 802AFC44: addi    r30, r30, 1
+    g30 = g30 + (u32)(s32)(1);
+    goto B_802AFC48;
+B_802AFC48: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802AFC48: fcmpo   cr0, f3, f0
+    gx_fcmp(&s.fp, &cr, 0u, F3, F0);
+
+    // 802AFC4C: bc    12, 1, 0x802AFC40
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802AFC40;
+        }
+    }
+    goto B_802AFC50;
+B_802AFC50: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    s.suffix = 3u;
+    // 802AFC50: lfd     f0, -14032(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14032);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 2u;
+    // 802AFC54: lfs     f2, -14040(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14040);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 1u;
+    // 802AFC58: lfs     f1, -14056(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14056);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 802AFC5C: b       0x802AFC68
+    {
+            goto B_802AFC68;
+    }
+B_802AFC60: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802AFC60: fmuls   f3, f3, f2
+    F3 = P3 = nr_fmuls(&s.fp, F3, F2);
+
+    // 802AFC64: addi    r30, r30, -1
+    g30 = g30 + (u32)(s32)(-1);
+    goto B_802AFC68;
+B_802AFC68: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802AFC68: fcmpo   cr0, f3, f1
+    gx_fcmp(&s.fp, &cr, 0u, F3, F1);
+
+    // 802AFC6C: bc    4, 1, 0x802AFC78
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_802AFC78;
+        }
+    }
+    goto B_802AFC70;
+B_802AFC70: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 802AFC70: fcmpo   cr0, f3, f0
+    gx_fcmp(&s.fp, &cr, 0u, F3, F0);
+
+    // 802AFC74: bc    12, 0, 0x802AFC60
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802AFC60;
+        }
+    }
+    goto B_802AFC78;
+B_802AFC78: /* 39 cycles */
+    if (!gx_block(&s, 39u))
+        return gx_decline(&s);
+    // 802AFC78: li      r0, 1
+    g0 = (u32)(s32)(1);
+
+    // 802AFC7C: slw   r0, r0, r30
+    {
+        u32 sh = g30 & 0x3Fu;
+        g0 = sh > 31 ? 0u : (g0 << sh);
+    }
+
+    s.suffix = 36u;
+    // 802AFC80: lfd     f1, -14016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14016);
+        F1 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 802AFC84: xoris   r0, r0, 0x8000
+    g0 = g0 ^ (0x8000u << 16);
+
+    // 802AFC88: stw     r0, 20(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(20);
+        gx_st32(&s, 0x802AFC88u, 34u, ea, (u32)g0);
+    }
+
+    // 802AFC8C: lis     r0, 17200
+    g0 = ((u32)(s32)(17200) << 16);
+
+    // 802AFC90: stw     r0, 16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(16);
+        gx_st32(&s, 0x802AFC90u, 32u, ea, (u32)g0);
+    }
+
+    s.suffix = 31u;
+    // 802AFC94: lfd     f0, 16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(16);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 802AFC98: fsubs   f0, f0, f1
+    F0 = P0 = nr_fsubs(&s.fp, F0, F1);
+
+    // 802AFC9C: fdivs   f0, f5, f0
+    F0 = P0 = nr_fdivs(&s.fp, F5, F0);
+
+    s.suffix = 12u;
+    // 802AFCA0: stfs     f0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        gx_stp32(&s, 0x802AFCA0u, ea, gx_f32_to_bits(F0));
+    }
+
+    // 802AFCA4: lwz     r0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 802AFCA8: lwz     r29, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g29 = gx_ld32(&s, ea);
+    }
+
+    // 802AFCAC: li      r4, 97
+    g4 = (u32)(s32)(97);
+
+    // 802AFCB0: lis     r3, -13311
+    g3 = ((u32)(s32)(-13311) << 16);
+
+    // 802AFCB4: stb     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFCB4u, 7u, ea, (u8)g4);
+    }
+
+    // 802AFCB8: rlwinm r0, r0, 20, 12, 31
+    {
+        g0 = gx_rotl32(g0, 20u) & 0x000FFFFFu;
+    }
+
+    // 802AFCBC: oris    r0, r0, 0xEE00
+    g0 = g0 | (0xEE00u << 16);
+
+    // 802AFCC0: stw     r0, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFCC0u, 4u, ea, (u32)g0);
+    }
+
+    // 802AFCC4: stb     r4, -32768(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFCC4u, 3u, ea, (u8)g4);
+    }
+
+    s.suffix = 2u;
+    // 802AFCC8: lfs     f0, -14024(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-14024);
+        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 802AFCCC: fmuls   f1, f0, f3
+    F1 = P1 = nr_fmuls(&s.fp, F0, F3);
+
+    // 802AFCD0: bl      0x80328E10
+    {
+            lr = 0x802AFCD4u;
+            s.depth++;
+            if (!gx_silent(&s, 0x80328E10u) || !gx_silent(&s, 0x802AFCD4u))
+                return gx_decline(&s);
+            goto B_80328E10;
+    }
+    goto B_802AFCD4;
+B_802AFCD4: /* 22 cycles */
+    if (!gx_block(&s, 22u))
+        return gx_decline(&s);
+    // 802AFCD4: oris    r0, r3, 0xEF00
+    g0 = g3 | (0xEF00u << 16);
+
+    // 802AFCD8: lis     r6, -13311
+    g6 = ((u32)(s32)(-13311) << 16);
+
+    // 802AFCDC: stw     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFCDCu, 19u, ea, (u32)g0);
+    }
+
+    // 802AFCE0: li      r5, 97
+    g5 = (u32)(s32)(97);
+
+    // 802AFCE4: stb     r5, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFCE4u, 17u, ea, (u8)g5);
+    }
+
+    // 802AFCE8: oris    r0, r30, 0xF000
+    g0 = g30 | (0xF000u << 16);
+
+    // 802AFCEC: stw     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFCECu, 15u, ea, (u32)g0);
+    }
+
+    // 802AFCF0: stb     r5, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFCF0u, 14u, ea, (u8)g5);
+    }
+
+    // 802AFCF4: rlwinm r0, r28, 21, 0, 10
+    {
+        g0 = gx_rotl32(g28, 21u) & 0xFFE00000u;
+    }
+
+    // 802AFCF8: rlwimi r0, r29, 20, 12, 31
+    {
+        u32 rot = gx_rotl32(g29, 20u);
+        g0 = (g0 & ~0x000FFFFFu) | (rot & 0x000FFFFFu);
+    }
+
+    // 802AFCFC: oris    r0, r0, 0xF100
+    g0 = g0 | (0xF100u << 16);
+
+    // 802AFD00: stw     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFD00u, 10u, ea, (u32)g0);
+    }
+
+    // 802AFD04: lbz     r4, 0(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(0);
+        g4 = gx_ld8(&s, ea);
+    }
+
+    // 802AFD08: lbz     r3, 2(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(2);
+        g3 = gx_ld8(&s, ea);
+    }
+
+    // 802AFD0C: lbz     r0, 1(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(1);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 802AFD10: rlwimi r3, r0, 8, 16, 23
+    {
+        u32 rot = gx_rotl32(g0, 8u);
+        g3 = (g3 & ~0x0000FF00u) | (rot & 0x0000FF00u);
+    }
+
+    // 802AFD14: rlwimi r3, r4, 16, 8, 15
+    {
+        u32 rot = gx_rotl32(g4, 16u);
+        g3 = (g3 & ~0x00FF0000u) | (rot & 0x00FF0000u);
+    }
+
+    // 802AFD18: oris    r0, r3, 0xF200
+    g0 = g3 | (0xF200u << 16);
+
+    // 802AFD1C: stb     r5, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st8(&s, 0x802AFD1Cu, 3u, ea, (u8)g5);
+    }
+
+    // 802AFD20: stw     r0, -32768(r6)
+    {
+        u32 ea = g6 + (u32)(s32)(-32768);
+        gx_st32(&s, 0x802AFD20u, 2u, ea, (u32)g0);
+    }
+
+    // 802AFD24: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 802AFD28: bl      0x80328F88
+    {
+            lr = 0x802AFD2Cu;
+            if (!(s.downcount - 4 > -s.budget))
+                return gx_decline(&s); /* the routine itself, through the chassis */
+            s.downcount -= 5;
+            const u32 frame = g11;
+            g28 = gx_ld32(&s, frame + (u32)(s32)(-16));
+            g29 = gx_ld32(&s, frame + (u32)(s32)(-12));
+            g30 = gx_ld32(&s, frame + (u32)(s32)(-8));
+            g31 = gx_ld32(&s, frame + (u32)(s32)(-4));
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return gx_decline(&s);
+            goto B_802AFD2C;
+    }
+    goto B_802AFD2C;
+B_802AFD2C: /* 5 cycles */
+    if (!gx_block(&s, 5u))
+        return gx_decline(&s);
+    // 802AFD2C: lwz     r0, 52(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(52);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 2u;
+    // 802AFD30: mtlr    r0
+    lr = g0;
+
+    // 802AFD34: addi    r1, r1, 48
+    g1 = g1 + (u32)(s32)(48);
+
+    // 802AFD38: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_80328E10: /* 10 cycles */
+    if (!gx_block(&s, 10u))
+        return gx_decline(&s);
+    // 80328E10: stwu     r1, -16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-16);
+        gx_st32(&s, 0x80328E10u, 9u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    // 80328E14: lis     r4, -32713
+    g4 = ((u32)(s32)(-32713) << 16);
+
+    // 80328E18: ori     r4, r4, 0x0FC8
+    g4 = g4 | 0x0FC8u;
+
+    // 80328E1C: li      r3, 0
+    g3 = (u32)(s32)(0);
+
+    s.suffix = 5u;
+    // 80328E20: lfd     f0, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 4u;
+    // 80328E24: lfd     f3, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        F3 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 3u;
+    // 80328E28: lfd     f4, 16(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(16);
+        F4 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 80328E2C: fcmpu   cr0, f1, f0
+    gx_fcmp(&s.fp, &cr, 0u, F1, F0);
+
+    // 80328E30: fcmpu   cr6, f1, f3
+    gx_fcmp(&s.fp, &cr, 6u, F1, F3);
+
+    // 80328E34: bc    12, 0, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E38;
+B_80328E38: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80328E38: addi    r3, r3, -1
+    g3 = g3 + (u32)(s32)(-1);
+
+    // 80328E3C: bc    4, 24, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000080u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E40;
+B_80328E40: /* 3 cycles */
+    if (!gx_block(&s, 3u))
+        return gx_decline(&s);
+    // 80328E40: fcmpu   cr7, f1, f4
+    gx_fcmp(&s.fp, &cr, 7u, F1, F4);
+
+    // 80328E44: fmr    f2, f1
+    F2 = F1;
+
+    // 80328E48: bc    12, 28, 0x80328E50
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000008u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E50;
+        }
+    }
+    goto B_80328E4C;
+B_80328E4C: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80328E4C: fsub   f2, f1, f4
+    F2 = gx_fsub(&s.fp, F1, F4);
+    goto B_80328E50;
+B_80328E50: /* 4 cycles */
+    if (!gx_block(&s, 4u))
+        return gx_decline(&s);
+    // 80328E50: fctiwz    f2, f2
+    { u64 result; if (gx_fctiw(&s.fp, F2, true, &result)) F2 = gx_f64_from_bits(result); }
+
+    s.suffix = 2u;
+    // 80328E54: stfd     f2, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        gx_stp64(&s, 0x80328E54u, ea, gx_f64_to_bits(F2));
+    }
+
+    // 80328E58: lwz     r3, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 80328E5C: bc    12, 28, 0x80328E64
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x00000008u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_80328E64;
+        }
+    }
+    goto B_80328E60;
+B_80328E60: /* 1 cycles */
+    if (!gx_block(&s, 1u))
+        return gx_decline(&s);
+    // 80328E60: addis   r3, r3, -32768
+    g3 = g3 + ((u32)(s32)(-32768) << 16);
+    goto B_80328E64;
+B_80328E64: /* 2 cycles */
+    if (!gx_block(&s, 2u))
+        return gx_decline(&s);
+    // 80328E64: addi    r1, r1, 16
+    g1 = g1 + (u32)(s32)(16);
+
+    // 80328E68: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            if (s.depth == 0u && (gx_t - 0x802AD6E0u < 0x4000u || gx_t - 0x803256E0u < 0x4000u))
+                return gx_decline(&s);
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    s.depth--;
+    if (!gx_live(&s))
+        return gx_decline(&s);
+    switch (gx_t) {
+    case 0x802AFCD4u: goto B_802AFCD4;
+    default: return gx_decline(&s);
+    }
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return gx_decline(&s);
+    gx_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[1] = g1;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[11] = g11;
+    cpu->gpr[28] = g28;
+    cpu->gpr[29] = g29;
+    cpu->gpr[30] = g30;
+    cpu->gpr[31] = g31;
+    cpu->fpr[0] = F0;
+    cpu->fpr[1] = F1;
+    cpu->fpr[2] = F2;
+    cpu->fpr[3] = F3;
+    cpu->fpr[4] = F4;
+    cpu->fpr[5] = F5;
+    cpu->ps1[0] = P0;
+    cpu->ps1[1] = P1;
+    cpu->ps1[2] = P2;
+    cpu->ps1[3] = P3;
+    cpu->ps1[5] = P5;
+    cpu->cr = cr;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
