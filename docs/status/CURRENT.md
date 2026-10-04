@@ -1,3 +1,32 @@
+## 2026-10-04 The fourth round of natives in the build: exact, in play, and what it saves
+
+**A builder fix first** (70b33dd). The builder runs its source steps twice over one tree (the base with
+the mods' variants, then in place). On the second pass `native_game_math.py` found the fourth round's
+hooks inside the animation fragments it certifies, took them for another translation and removed its own
+`key_s` and `transform_simple` hooks, and `native_entries.py`, whose hashes include those, then dropped
+J3DGetKeyFrameInterpolationS and calcTransform: a build with natives quietly off. Game math now ignores
+native_entries' hooks when it hashes. The builder log now reads, first pass, game math 10/12 (two fragments
+are certified in their prepared form) and native entries 25/25; second pass 12/12 and 25/25 with no hook
+lost.
+
+**Exact.** Link's position at all 621 probes of the Outset route identical to the build before. Smooth Motion
+dumps (game frames 900-904) at the sea by the Forsaken Fortress, Forest Haven, Dragon Roost, Hyrule, the
+Earth Temple's boss and the Forbidden Woods: real and in-between frames identical.
+
+**In play** (Forest Haven and Dragon Roost, paced, Smooth Motion at 60; native/declined): the collision
+setups `divide-over-area` 873,571/7,660 and `cyl-set-c` 961,508/6,816; `color-ratio` 2,085,198/24,533;
+J3DHermiteInterpolation 206,177/3,205, J3DGetKeyFrameInterpolation<f32> 162,453/5,213,
+J3DGetKeyFrameInterpolationS 37,538/11,482, J3DPSCalcInverseTranspose 301,777/1,251, and calcTransform
+556,619/248,603 (the declined third fall to the earlier `transform-simple` native, 219,349/29,254). These
+counts had stopped reaching the log: since the session log, stdout and stderr were pointed at NUL before
+the game module's exit handlers ran. They now go to the parent's redirect or terminal, else the end of the
+session log (7649d01).
+
+**What it saves** (four E-cores, uncapped, Smooth Motion off, two runs each, game thread CPU per game frame,
+ms): Forest Haven 20.48 -> 19.86, Dragon Roost 21.30 -> 21.18, the sea by the Fortress 23.02 -> 22.69,
+Outset 16.98 -> 16.71, Hyrule Castle's room 17.96 -> 16.85. One to three percent, six in Hyrule Castle's
+room, as the round's report estimated. The GX worker and the drain are unchanged.
+
 ## 2026-10-04 After fusion: the game by warp again, the game thread's share, and what did not help
 
 **The survey with fusion** (the 47 places of 2026-10-03, four E-cores `0x000F0000`, uncapped, Smooth Motion
