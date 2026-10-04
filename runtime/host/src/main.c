@@ -47,6 +47,7 @@
 #include "climb.h"
 #include "gxruntime/hle.h"
 #include <aurora/gfx.h>
+#include <SDL3/SDL_video.h>
 #include "external_memory.h"
 #include "fpu_context.h"
 #ifdef BLUEWAKE_HAS_DSP_ADAPTER
@@ -6767,10 +6768,26 @@ int main(int argc, char** argv) {
     // when no window server is reachable.
     const bool renderer_requested = renderer != NULL && renderer[0] != '\0';
     if (!renderer_requested || strcmp(renderer, "aurora") == 0) {
+        // The window is created where it stays, so it does not appear at the
+        // screen's corner (the title bar above the top edge) and then move:
+        // BLUEWAKE_WINDOW_POSITION=X,Y (the Windows host's saved spot, which
+        // win_settings.cpp passes on only where Aurora can open it), else
+        // centred. Fullscreen still opens on the same display.
+        int window_x = SDL_WINDOWPOS_CENTERED, window_y = SDL_WINDOWPOS_CENTERED;
+        const char* window_position = getenv("BLUEWAKE_WINDOW_POSITION");
+        int saved_x = 0, saved_y = 0;
+        char trailing;  // anything after X,Y makes it malformed: centred
+        if (window_position != NULL &&
+            sscanf(window_position, "%d,%d%c", &saved_x, &saved_y, &trailing) == 2) {
+            window_x = saved_x;
+            window_y = saved_y;
+        }
         const AuroraBackendConfig aurora_config = {
             .app_name = "BlueWake",
             .window_width = 960u,
             .window_height = 720u,
+            .window_pos_x = window_x,
+            .window_pos_y = window_y,
             .vsync = true,
             .allow_texture_dumps = false,
             .info_logging = true,

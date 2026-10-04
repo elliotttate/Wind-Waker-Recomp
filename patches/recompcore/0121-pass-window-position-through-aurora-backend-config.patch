@@ -1,0 +1,54 @@
+From b4e4d037c7c18f984ef12e2bc3ac67c2bed28e93 Mon Sep 17 00:00:00 2001
+From: saulo benigno <saulobenigno@gmail.com>
+Date: Thu, 1 Oct 2026 20:08:28 -0300
+Subject: [PATCH] Pass window position through Aurora backend config
+
+---
+ GXRuntime/backends/aurora/aurora_backend.cpp |  2 ++
+ GXRuntime/include/gxruntime/aurora_backend.h | 10 ++++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/GXRuntime/backends/aurora/aurora_backend.cpp b/GXRuntime/backends/aurora/aurora_backend.cpp
+index 957d602..ff1d872 100644
+--- a/GXRuntime/backends/aurora/aurora_backend.cpp
++++ b/GXRuntime/backends/aurora/aurora_backend.cpp
+@@ -276,6 +276,8 @@ bool dol_aurora_initialize(int argc, char** argv,
+     config.windowHeight = backend_config->window_height != 0
+                               ? backend_config->window_height
+                               : defaults.window_height;
++    config.windowPosX = backend_config->window_pos_x;
++    config.windowPosY = backend_config->window_pos_y;
+     // The display the picture is made for (desktop hosts; iOS fills its
+     // screen). DOL_AURORA_WINDOW=WxH sizes the window in points; otherwise a
+     // widened picture (DOL_AURORA_ASPECT_RATIO) gets a window of its shape at
+diff --git a/GXRuntime/include/gxruntime/aurora_backend.h b/GXRuntime/include/gxruntime/aurora_backend.h
+index 1a0aeeb..96538c2 100644
+--- a/GXRuntime/include/gxruntime/aurora_backend.h
++++ b/GXRuntime/include/gxruntime/aurora_backend.h
+@@ -6,6 +6,7 @@
+ 
+ #include <stdbool.h>
+ #include <stddef.h>
++#include <stdint.h>
+ 
+ #ifdef __cplusplus
+ extern "C" {
+@@ -20,6 +21,15 @@ typedef struct AuroraBackendConfig {
+     bool info_logging;
+     bool graphics_logging;
+     bool force_untextured;
++    // Where the window is created, passed to Aurora's windowPosX/windowPosY:
++    // a desktop position or an SDL_WINDOWPOS_* value such as
++    // SDL_WINDOWPOS_CENTERED. Aurora treats a negative coordinate as no
++    // position (SDL_WINDOWPOS_UNDEFINED for both), so a position left of or
++    // above the primary display is not kept. 0 (a config that leaves them
++    // out) keeps the screen's corner, as before. Last, so an initializer
++    // written before they existed keeps its meaning.
++    int32_t window_pos_x;
++    int32_t window_pos_y;
+ } AuroraBackendConfig;
+ 
+ bool dol_aurora_initialize(int argc, char** argv,
+-- 
+2.49.0.windows.1
+

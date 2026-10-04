@@ -21,7 +21,8 @@ compiling (on by default on D3D12), 0130, a draw's transform state copied only w
 version changed, and 0131, the Mac's water and HUD (0170 below without its lava part, which is 0120)
 merged with 0125's cloth and 0126's colours, and 0132, an HD replacement's own mip levels sampled
 (HD packs no longer shimmer while the camera turns), and 0133, only meshes whose positions the game
-wrote blended vertex by vertex (0131's water path without its cost for static models). 8ab24da is branch `bluewake`'s 6892947 (that tree plus 0098
+wrote blended vertex by vertex (0131's water path without its cost for static models). 8ab24da is
+branch `bluewake`'s 6892947 (that tree plus 0098
 to 0110), the Windows port's 0111 to 0116
 (the shader and pipeline caches where the host says, gather-pipe writes as a run of bytes, the GX stall
 watchdog on Mac and Linux only, constant blocks compared against a copy where staging is upload memory,

@@ -148,7 +148,6 @@ bool g_menu_open;
 bool g_toggle_menu, g_toggle_fullscreen;  // from the hotkeys, done in the frame
 bool g_dirty;
 Uint64 g_dirty_at, g_first_frame_at;
-bool g_placed;
 bool g_pad_applied;
 int g_pad_index = -2;
 float g_font_scale = 1.0f;  // the scale the UI font was drawn at (see load_font)
@@ -328,24 +327,15 @@ void set_fullscreen(SDL_Window* w, bool on) {
     std::fprintf(stderr, "[windows] fullscreen %s\n", on ? "on" : "off");
 }
 
-// Once the window exists: where it was last time, if that is still on a
-// screen with its title bar showing, else centred. Aurora would put its client
-// area at the screen's corner, the title bar above the top edge.
-void place_window(SDL_Window* w) {
-    if (is_fullscreen(w))
-        return;
-    const Settings& d = g_saved;
-    bool restored = false;
-    if (d.window_x != INT_MIN && d.window_y != INT_MIN) {
-        const SDL_Point title{d.window_x + 60, d.window_y - 16};
-        const SDL_Point corner{d.window_x + 60, d.window_y + 60};
-        if (SDL_GetDisplayForPoint(&title) != 0 && SDL_GetDisplayForPoint(&corner) != 0) {
-            SDL_SetWindowPosition(w, d.window_x, d.window_y);
-            restored = true;
-        }
-    }
-    if (!restored)
-        SDL_SetWindowPosition(w, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+// Whether a window whose client area starts at (x, y) has its title bar and
+// its top left on a connected monitor. Asked before the window exists, so
+// Win32 rather than SDL; the manifest makes BlueWake per-monitor DPI aware,
+// so these are the pixels SDL saved the position in.
+bool on_a_monitor(int x, int y) {
+    const POINT title{x + 60, y - 16};
+    const POINT corner{x + 60, y + 60};
+    return MonitorFromPoint(title, MONITOR_DEFAULTTONULL) != nullptr &&
+           MonitorFromPoint(corner, MONITOR_DEFAULTTONULL) != nullptr;
 }
 
 // Remember the window's place and size as the player leaves them.
@@ -1135,10 +1125,6 @@ void frame(void*) {
         load_font(w);
         return;  // the font is ImGui's default from the next frame
     }
-    if (!g_placed) {
-        g_placed = true;
-        place_window(w);
-    }
     if (g_toggle_fullscreen) {
         g_toggle_fullscreen = false;
         set_fullscreen(w, !is_fullscreen(w));
@@ -1340,6 +1326,18 @@ extern "C" void bw_settings_apply_launch(void) {
         default_window(aspect_ratio(aspect), &width, &height);
     }
     env_default("DOL_AURORA_WINDOW", std::to_string(width) + "x" + std::to_string(height));
+    // Where the window was last time, for main.c to create it there: nothing
+    // moves it once it is shown. Not passed on (the window opens centred) for
+    // a spot no longer on a monitor, or one left of or above the primary
+    // display: Aurora takes no negative position. Not for a fullscreen start,
+    // which keeps its display.
+    if (!d.fullscreen && d.window_x != INT_MIN && d.window_y != INT_MIN && on_a_monitor(d.window_x, d.window_y)) {
+        if (d.window_x >= 0 && d.window_y >= 0)
+            env_default("BLUEWAKE_WINDOW_POSITION", std::to_string(d.window_x) + "," + std::to_string(d.window_y));
+        else
+            std::fprintf(stderr, "[windows] window centred: Aurora cannot open it at the saved %d,%d (negative)\n",
+                         d.window_x, d.window_y);
+    }
     env_default("DOL_AURORA_RENDER_SCALE", std::to_string(d.render_scale));
     if (d.anisotropy > 1)
         env_default("DOL_AURORA_FORCE_ANISO", std::to_string(d.anisotropy));
