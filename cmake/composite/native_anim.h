@@ -20,7 +20,7 @@ extern int bluewake_native_anim_enabled;
  * `ctx`. */
 int bluewake_native_anim(CPUState* cpu, u32 address);
 void bluewake_native_anim_report(void);
-/* How many calls of entry `which` (0 hermite, 1 key-f, 2 key-s, 3 transform)
+/* How many calls of entry `which` (0 hermite, 1 key-f, 2 key-s, 3 transform, 4 inverse transpose)
  * the general (double-precision, checked) replay ran. */
 unsigned long long bluewake_native_anim_general(unsigned which);
 

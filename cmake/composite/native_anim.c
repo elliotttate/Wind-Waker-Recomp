@@ -59,10 +59,10 @@ static unsigned long long s_an_runs[AN_COUNT], s_an_declined[AN_COUNT], s_an_gen
 void bluewake_native_anim_report(void) {
     fprintf(stderr,
             "[native-anim] hermite=%llu/%llu key-f=%llu/%llu key-s=%llu/%llu transform=%llu/%llu "
-            "inverse-transpose=%llu/%llu (native/declined; general replays %llu %llu %llu %llu)\n",
+            "inverse-transpose=%llu/%llu (native/declined; general replays %llu %llu %llu %llu %llu)\n",
             s_an_runs[0], s_an_declined[0], s_an_runs[1], s_an_declined[1], s_an_runs[2], s_an_declined[2],
             s_an_runs[3], s_an_declined[3], s_an_runs[4], s_an_declined[4], s_an_general[0], s_an_general[1],
-            s_an_general[2], s_an_general[3]);
+            s_an_general[2], s_an_general[3], s_an_general[4]);
 }
 
 /* How many calls the general replay ran (the tests read it). */
@@ -986,6 +986,207 @@ AN void an_transform(An* s, f64 scale, bool fast) {
     s->g[1] = sp;
 }
 
+/* --- J3DPSCalcInverseTranspose (802DA584): r3 the 3x4 matrix, r4 the 3x3
+ * result; r3 1, or 0 for a zero determinant (then nothing stored). One block
+ * of 27 cycles, then 2 or 21. --------------------------------------------- */
+
+typedef struct AnInverse {
+    NrPair f[14];
+    u32 r3, cr0, suffix, cycles;
+    bool stores;
+} AnInverse;
+
+/* The general replay: inline_fp.h's paired-single paths on doubles. */
+AN void an_inverse_general(NrFp* fp, const u32 m[9], AnInverse* o) {
+    NrPair* f = o->f;
+    f[0] = (NrPair){nr_single_bits(m[0]), 1.0};                   /* psq_l f0, 0(r3), 1, 0 */
+    f[1] = (NrPair){nr_single_bits(m[1]), nr_single_bits(m[2])};  /* psq_l f1, 4(r3), 0, 0 */
+    f[2] = (NrPair){nr_single_bits(m[3]), 1.0};                   /* psq_l f2, 16(r3), 1, 0 */
+    f[6] = (NrPair){f[1].b, f[0].a};                              /* ps_merge10 f6, f1, f0 */
+    f[3] = (NrPair){nr_single_bits(m[4]), nr_single_bits(m[5])};  /* psq_l f3, 20(r3), 0, 0 */
+    f[4] = (NrPair){nr_single_bits(m[6]), 1.0};                   /* psq_l f4, 32(r3), 1, 0 */
+    f[7] = (NrPair){f[3].b, f[2].a};                              /* ps_merge10 f7, f3, f2 */
+    f[5] = (NrPair){nr_single_bits(m[7]), nr_single_bits(m[8])};  /* psq_l f5, 36(r3), 0, 0 */
+    f[11] = nr_ps_mul(fp, f[3], f[6]);                            /* ps_mul f11, f3, f6 */
+    f[8] = (NrPair){f[5].b, f[4].a};                              /* ps_merge10 f8, f5, f4 */
+    f[13] = nr_ps_mul(fp, f[5], f[7]);                            /* ps_mul f13, f5, f7 */
+    f[11] = nr_ps_madd(fp, f[1], f[7], f[11], true, false);       /* ps_msub f11, f1, f7, f11 */
+    f[12] = nr_ps_mul(fp, f[1], f[8]);                            /* ps_mul f12, f1, f8 */
+    f[13] = nr_ps_madd(fp, f[3], f[8], f[13], true, false);       /* ps_msub f13, f3, f8, f13 */
+    f[12] = nr_ps_madd(fp, f[5], f[6], f[12], true, false);       /* ps_msub f12, f5, f6, f12 */
+    f[10] = nr_ps_mul(fp, f[3], f[4]);                            /* ps_mul f10, f3, f4 */
+    f[9] = nr_ps_mul(fp, f[0], f[5]);                             /* ps_mul f9, f0, f5 */
+    f[8] = nr_ps_mul(fp, f[1], f[2]);                             /* ps_mul f8, f1, f2 */
+    f[10] = nr_ps_madd(fp, f[2], f[5], f[10], true, false);       /* ps_msub f10, f2, f5, f10 */
+    f[9] = nr_ps_madd(fp, f[1], f[4], f[9], true, false);         /* ps_msub f9, f1, f4, f9 */
+    f[8] = nr_ps_madd(fp, f[0], f[3], f[8], true, false);         /* ps_msub f8, f0, f3, f8 */
+    f[7] = nr_ps_mul(fp, f[0], f[13]);                            /* ps_mul f7, f0, f13 */
+    f[1] = nr_ps_sub(fp, f[1], f[1]);                             /* ps_sub f1, f1, f1 */
+    f[7] = nr_ps_madd(fp, f[2], f[12], f[7], false, false);       /* ps_madd f7, f2, f12, f7 */
+    f[7] = nr_ps_madd(fp, f[4], f[11], f[7], false, false);       /* ps_madd f7, f4, f11, f7 */
+    o->cr0 = nr_fcmp(fp, f[7].a, f[1].a);                         /* ps_cmpo0 cr0, f7, f1 */
+    o->suffix = 19u;                                              /* psq_l f5, 36(r3) */
+    if (o->cr0 & 0x2u) {
+        o->r3 = 0u;                                               /* li r3, 0; blr (2) */
+        o->cycles = 2u;
+        o->stores = false;
+        return;
+    }
+    f[0] = nr_ps_res(fp, f[7]);                                   /* ps_res f0, f7 */
+    f[6] = nr_ps_add(fp, f[0], f[0]);                             /* ps_add f6, f0, f0 */
+    f[5] = nr_ps_mul(fp, f[0], f[0]);                             /* ps_mul f5, f0, f0 */
+    f[0] = nr_ps_madd(fp, f[7], f[5], f[6], true, true);          /* ps_nmsub f0, f7, f5, f6 */
+    f[6] = nr_ps_add(fp, f[0], f[0]);
+    f[5] = nr_ps_mul(fp, f[0], f[0]);
+    f[0] = nr_ps_madd(fp, f[7], f[5], f[6], true, true);
+    for (unsigned r = 13u; r >= 8u; --r)                          /* ps_muls0 f13 .. f8, f0 */
+        f[r] = nr_ps_muls0(fp, f[r], f[0].a);
+    o->r3 = 1u;                                                   /* li r3, 1 */
+    o->cycles = 21u;
+    o->stores = true;
+    o->suffix = 1u;                                               /* psq_st f8, 32(r4), 1, 0 */
+}
+
+/* The same in single precision, where every value is a zero or a normal
+ * single of at least 2^-125 (as the splines'); false where it does not
+ * apply. A lane's 1.0 multiplies exactly; ps_msub's product before is
+ * rounded, then the fused multiply-subtract. */
+AN bool an_inverse_single(NrFp* fp, const u32 m[9], AnInverse* o) {
+    f32 a[9];
+    for (unsigned i = 0; i < 9u; ++i)
+        if (!an_plain_word(m[i], &a[i]))
+            return false;
+    bool bad = false;
+    const f32 m00 = a[0], m01 = a[1], m02 = a[2], m10 = a[3], m11 = a[4], m12 = a[5], m20 = a[6], m21 = a[7],
+              m22 = a[8];
+    const f32 f11a = an_r(fmaf(m01, m12, -an_r(m11 * m02, &bad)), &bad);
+    const f32 f11b = an_r(fmaf(m02, m10, -an_r(m12 * m00, &bad)), &bad);
+    const f32 f13a = an_r(fmaf(m11, m22, -an_r(m21 * m12, &bad)), &bad);
+    const f32 f13b = an_r(fmaf(m12, m20, -an_r(m22 * m10, &bad)), &bad);
+    const f32 f12a = an_r(fmaf(m21, m02, -an_r(m01 * m22, &bad)), &bad);
+    const f32 f12b = an_r(fmaf(m22, m00, -an_r(m02 * m20, &bad)), &bad);
+    const f32 f10a = an_r(fmaf(m10, m21, -an_r(m11 * m20, &bad)), &bad);
+    const f32 f10b = an_r(m22 - m12, &bad);
+    const f32 f9a = an_r(fmaf(m01, m20, -an_r(m00 * m21, &bad)), &bad);
+    const f32 f9b = an_r(m02 - m22, &bad);
+    const f32 f8a = an_r(fmaf(m00, m11, -an_r(m01 * m10, &bad)), &bad);
+    const f32 f8b = an_r(m12 - m02, &bad);
+    const f32 f7a = an_r(fmaf(m20, f11a, an_r(fmaf(m10, f12a, an_r(m00 * f13a, &bad)), &bad)), &bad);
+    const f32 f7b = an_r(f11b + an_r(f12b + f13b, &bad), &bad);
+    if (bad)
+        return false;
+    NrPair* f = o->f;
+    f[0] = (NrPair){m00, 1.0};
+    f[1] = (NrPair){0.0, 0.0};
+    f[2] = (NrPair){m10, 1.0};
+    f[3] = (NrPair){m11, m12};
+    f[4] = (NrPair){m20, 1.0};
+    f[5] = (NrPair){m21, m22};
+    f[6] = (NrPair){m02, m00};
+    f[7] = (NrPair){f7a, f7b};
+    f[8] = (NrPair){f8a, f8b};
+    f[9] = (NrPair){f9a, f9b};
+    f[10] = (NrPair){f10a, f10b};
+    f[11] = (NrPair){f11a, f11b};
+    f[12] = (NrPair){f12a, f12b};
+    f[13] = (NrPair){f13a, f13b};
+    const u32 compare = f7a < 0.0f ? 0x8u : f7a > 0.0f ? 0x4u : 0x2u;
+    fp->fpscr = (fp->fpscr & ~(0x1Fu << 12)) | (an_class_plain(f7a) << 12) | (compare << 12);
+    o->cr0 = compare;
+    o->suffix = 19u;
+    if (compare == 0x2u) {
+        o->r3 = 0u;
+        o->cycles = 2u;
+        o->stores = false;
+        return true;
+    }
+    /* ps_res of two nonzero halves (no exception), and two Newton steps. */
+    if (f7b == 0.0f)
+        return false;
+    f32 n0, n1;
+    if (!an_plain(ppc_approx_reciprocal(f7a), &n0) || !an_plain(ppc_approx_reciprocal(f7b), &n1))
+        return false;
+    f32 a0 = 0.0f, a1 = 0.0f, q0 = 0.0f, q1 = 0.0f;
+    for (unsigned step = 0; step < 2u; ++step) {
+        a0 = an_r(n0 + n0, &bad);
+        a1 = an_r(n1 + n1, &bad);
+        q0 = an_r(n0 * n0, &bad);
+        q1 = an_r(n1 * n1, &bad);
+        n0 = an_r(-fmaf(f7a, q0, -a0), &bad);
+        n1 = an_r(-fmaf(f7b, q1, -a1), &bad);
+    }
+    const f32 c[6][2] = {{f13a, f13b}, {f12a, f12b}, {f11a, f11b}, {f10a, f10b}, {f9a, f9b}, {f8a, f8b}};
+    f32 scaled[6][2];
+    for (unsigned i = 0; i < 6u; ++i) {
+        scaled[i][0] = an_r(c[i][0] * n0, &bad);
+        scaled[i][1] = an_r(c[i][1] * n0, &bad);
+    }
+    if (bad)
+        return false;
+    f[0] = (NrPair){n0, n1};
+    f[5] = (NrPair){q0, q1};
+    f[6] = (NrPair){a0, a1};
+    for (unsigned i = 0; i < 6u; ++i)
+        f[13u - i] = (NrPair){scaled[i][0], scaled[i][1]};
+    fp->fpscr = (fp->fpscr & ~(0x1Fu << 12)) | (an_class_plain(scaled[5][0]) << 12);
+    o->r3 = 1u;
+    o->cycles = 21u;
+    o->stores = true;
+    o->suffix = 1u;
+    return true;
+}
+
+static int an_entry_inverse(CPUState* cpu) {
+    NrClock k;
+    if (!nr_clock_start(cpu, &k) || !nr_pairs_plain(cpu))
+        return 0;
+    const u32 src = cpu->gpr[3], dst = cpu->gpr[4];
+    if (!nr_ram(cpu, src, 44u) || !nr_block(&k, 27u))
+        return 0;
+    static const u32 at[9] = {0u, 4u, 8u, 16u, 20u, 24u, 32u, 36u, 40u};
+    u32 m[9];
+    for (unsigned i = 0; i < 9u; ++i)
+        m[i] = nr_word(cpu, src + at[i]);
+    NrFp fp = {cpu->fpscr, false};
+    AnInverse o;
+    bool general = false;
+    if (!an_inverse_single(&fp, m, &o)) {
+        fp = (NrFp){cpu->fpscr, false};
+        an_inverse_general(&fp, m, &o);
+        if (fp.bad)
+            return 0;
+        general = true;
+    }
+    if (!nr_block(&k, o.cycles) || (o.stores && !nr_ram(cpu, dst, 36u)))
+        return 0;
+    if (o.stores) {
+        /* psq_st f13, 0; f12, 12; f11, 24 (both halves); f10, 8; f9, 20; f8, 32 (the first). */
+        const NrOut out = nr_out(cpu);
+        const NrPair* f = o.f;
+        nr_store32(&out, dst + 0u, nr_to_single_ftz(nr_bits(f[13].a)));
+        nr_store32(&out, dst + 4u, nr_to_single_ftz(nr_bits(f[13].b)));
+        nr_store32(&out, dst + 12u, nr_to_single_ftz(nr_bits(f[12].a)));
+        nr_store32(&out, dst + 16u, nr_to_single_ftz(nr_bits(f[12].b)));
+        nr_store32(&out, dst + 24u, nr_to_single_ftz(nr_bits(f[11].a)));
+        nr_store32(&out, dst + 28u, nr_to_single_ftz(nr_bits(f[11].b)));
+        nr_store32(&out, dst + 8u, nr_to_single_ftz(nr_bits(f[10].a)));
+        nr_store32(&out, dst + 20u, nr_to_single_ftz(nr_bits(f[9].a)));
+        nr_store32(&out, dst + 32u, nr_to_single_ftz(nr_bits(f[8].a)));
+    }
+    for (unsigned r = 0; r < 14u; ++r) {
+        cpu->fpr[r] = o.f[r].a;
+        cpu->ps1[r] = o.f[r].b;
+    }
+    cpu->gpr[3] = o.r3;
+    cpu->cr = (cpu->cr & 0x0FFFFFFFu) | (o.cr0 << 28);
+    cpu->fpscr = fp.fpscr;
+    cpu->downcount = k.downcount;
+    cpu->cycle_observation_suffix = o.suffix;
+    cpu->pc = cpu->lr & ~3u;
+    s_an_general[AN_INVERSE_TRANSPOSE] += general;
+    return 1;
+}
+
 /* --- The entries. --------------------------------------------------------- */
 
 static const u32 AN_KEY_F_BOUNDARIES[] = {BLUEWAKE_ANIM_HERMITE, AN_HERMITE_RETURN_0, AN_HERMITE_RETURN_1};
@@ -1130,6 +1331,7 @@ int bluewake_native_anim(CPUState* cpu, u32 address) {
     case BLUEWAKE_ANIM_KEY_F: which = AN_KEY_F; done = an_entry_key_f(cpu); break;
     case BLUEWAKE_ANIM_KEY_S: which = AN_KEY_S; done = an_entry_key_s(cpu); break;
     case BLUEWAKE_ANIM_TRANSFORM: which = AN_TRANSFORM; done = an_entry_transform(cpu); break;
+    case BLUEWAKE_ANIM_INVERSE_TRANSPOSE: which = AN_INVERSE_TRANSPOSE; done = an_entry_inverse(cpu); break;
     default: return 0;
     }
     if (done)

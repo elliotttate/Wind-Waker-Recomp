@@ -58,10 +58,12 @@
 static const Region TEST_REGIONS[] = {{AREA, AREA_BYTES}};
 
 static const u32 FUNCTIONS[] = {BLUEWAKE_ANIM_HERMITE, BLUEWAKE_ANIM_KEY_F, BLUEWAKE_ANIM_KEY_S,
-                                BLUEWAKE_ANIM_TRANSFORM};
+                                BLUEWAKE_ANIM_TRANSFORM, BLUEWAKE_ANIM_INVERSE_TRANSPOSE};
 static const char* const NAMES[] = {"JMAHermiteInterpolation", "J3DGetKeyFrameInterpolation<f32>",
-                                    "J3DGetKeyFrameInterpolationS", "J3DAnmTransformKey::calcTransform"};
-#define FUNCTION_COUNT 4u
+                                    "J3DGetKeyFrameInterpolationS", "J3DAnmTransformKey::calcTransform",
+                                    "J3DPSCalcInverseTranspose"};
+#define FUNCTION_COUNT 5u
+#define MATRIX (AREA + 0x600u)
 
 typedef struct Case {
     CPUState cpu;
@@ -218,6 +220,37 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
         c->gpr[4] = data;
         break;
     }
+    case 4: { /* J3DPSCalcInverseTranspose */
+        const u32 src = MATRIX + 4u * below(8u);
+        for (unsigned i = 0; i < 12u; ++i)
+            put32(ram, src + 4u * i, below(6u) == 0u ? any_single(s_specials ? s_specials : 2u)
+                                                    : bits_of((f32)((unit() - 0.5) * 8.0)));
+        switch (below(8u)) {
+        case 0: /* a zero determinant: two rows the same */
+            for (unsigned i = 0; i < 3u; ++i)
+                put32(ram, src + 16u + 4u * i, get32(ram, src + 4u * i));
+            break;
+        case 2: /* tiny or huge: products leave the normal range (the general replay's) */
+        case 3: {
+            const f32 scale = below(2u) ? 1e-20f : 3e18f;
+            for (unsigned i = 0; i < 12u; ++i)
+                put32(ram, src + 4u * i, bits_of((f32)((unit() - 0.5) * 8.0) * scale));
+            break;
+        }
+        case 1: /* a rotation and a scale */
+            put32(ram, src, bits_of(0.6f)), put32(ram, src + 4u, bits_of(-0.8f)), put32(ram, src + 8u, 0u);
+            put32(ram, src + 16u, bits_of(0.8f)), put32(ram, src + 20u, bits_of(0.6f)), put32(ram, src + 24u, 0u);
+            put32(ram, src + 32u, 0u), put32(ram, src + 36u, 0u), put32(ram, src + 40u, bits_of(2.0f));
+            break;
+        default: break;
+        }
+        c->gpr[3] = src;
+        c->gpr[4] = below(4u) == 0u ? src + 4u * below(8u) : MATRIX + 0x80u + 4u * below(8u); /* sometimes on the source */
+        if (below(32u) == 0u)
+            c->gpr[4] = 0xCC000000u; /* not RAM: only a zero determinant (no stores) may run */
+        c->gqr[0] = 0u;
+        break;
+    }
     default: { /* calcTransform */
         const u32 joint = below(16u);
         const u32 anm_table = TABLES + 2u * below(32u);
@@ -249,7 +282,7 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
     case 4: k.aliases = k.must_decline = true; break;
     case 5: c->fpscr = (c->fpscr & ~3u) | (1u + below(3u)); k.must_decline = true; break;
     case 6:
-        if (which >= 2u) {
+        if (which == 2u || which == 3u) {
             c->gqr[5] = (c->gqr[5] & ~0x00070000u) | (below(7u) << 16);
             k.must_decline = true;
         }
@@ -261,13 +294,13 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
         }
         break;
     case 8:
-        if (which == 3u) {
+        if (which >= 3u) {
             c->gqr[0] = below(2u) ? 0x00040000u : 0x00000006u;
             k.must_decline = true;
         }
         break;
     case 9:
-        if (which != 0u) {
+        if (which != 0u && which != 4u) {
             c->gpr[1] = 0x80000000u + 4u * below(3u); /* the frame below RAM */
             k.must_decline = true;
         }
@@ -279,6 +312,10 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
         }
         if (which == 3u) {
             c->gpr[3] = OBJECT | 0x40000000u; /* the object through the uncached mirror */
+            k.must_decline = true;
+        }
+        if (which == 4u) {
+            c->gpr[3] = below(2u) ? 0xCC000000u : MATRIX | 0x40000000u;
             k.must_decline = true;
         }
         break;
@@ -383,9 +420,10 @@ int main(int argc, char** argv) {
          * translation are one key each and whose rotation searches 20 keys a
          * channel (the common shape of a skeletal animation's joint); and one
          * whose nine channels all search. */
-        static const char* const SHAPES[] = {"spline", "20 keys", "20 keys", "rotation keyed", "all keyed"};
-        for (unsigned variant = 0; variant < 5u; ++variant) {
-            const unsigned which = variant < 4u ? variant : 3u;
+        static const char* const SHAPES[] = {"spline", "20 keys", "20 keys", "rotation keyed", "all keyed",
+                                             "a rotation and a scale"};
+        for (unsigned variant = 0; variant < 6u; ++variant) {
+            const unsigned which = variant < 4u ? variant : variant == 4u ? 3u : 4u;
             const u32 entry = FUNCTIONS[which];
             seed = 0x2545F491u + variant;
             Case k = build(h.native_ram, which, 1u);
@@ -422,6 +460,14 @@ int main(int argc, char** argv) {
                 c->gpr[3] = TABLES;
                 c->gpr[4] = KEYS;
                 c->fpr[1] = shorts ? 31.5 : 15.25;
+                break;
+            }
+            case 4: {
+                static const f32 m[12] = {0.6f, -0.8f, 0.0f, 5.0f, 0.8f, 0.6f, 0.0f, -2.0f, 0.0f, 0.0f, 2.0f, 1.0f};
+                for (unsigned i = 0; i < 12u; ++i)
+                    put32(ram, MATRIX + 4u * i, bits_of(m[i]));
+                c->gpr[3] = MATRIX;
+                c->gpr[4] = MATRIX + 0x80u;
                 break;
             }
             default: {

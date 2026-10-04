@@ -416,6 +416,112 @@ NR bool nr_fctiwz(NrFp* s, f64 value, u64* output) {
     return true;
 }
 
+/* --- Paired singles: inline_fp.h's inline paths on pairs. ------------------ */
+
+typedef struct NrPair {
+    f64 a, b; /* the first half (fpr) and the second (ps1) */
+} NrPair;
+
+NR bool nr_finite_pair(NrPair x) { return nr_finite(x.a) && nr_finite(x.b); }
+
+/* bw_fp_ps_write's single roundings, and the FPRF of the first half. */
+NR NrPair nr_ps_result(NrFp* s, f64 r0, f64 r1) {
+    const f32 s0 = nr_round(s, r0), s1 = nr_round(s, r1);
+    nr_fprf(s, nr_class32(s0));
+    return (NrPair){(f64)s0, (f64)s1};
+}
+
+/* ps_mul d, a, c */
+NR NrPair nr_ps_mul(NrFp* s, NrPair a, NrPair c) {
+    if (!(nr_finite_pair(a) && nr_finite_pair(c))) {
+        s->bad = true;
+        return a;
+    }
+    const f64 p0 = a.a * nr_25bit(c.a), p1 = a.b * nr_25bit(c.b);
+    if (p0 != p0 || p1 != p1) {
+        s->bad = true;
+        return a;
+    }
+    return nr_ps_result(s, p0, p1);
+}
+
+/* ps_muls0 d, a, c: c's first half. */
+NR NrPair nr_ps_muls0(NrFp* s, NrPair a, f64 c0) {
+    if (!(nr_finite_pair(a) && nr_finite(c0))) {
+        s->bad = true;
+        return a;
+    }
+    const f64 c_round = nr_25bit(c0);
+    const f64 p0 = a.a * c_round, p1 = a.b * c_round;
+    if (p0 != p0 || p1 != p1) {
+        s->bad = true;
+        return a;
+    }
+    return nr_ps_result(s, p0, p1);
+}
+
+/* ps_add, ps_sub */
+NR NrPair nr_ps_add(NrFp* s, NrPair a, NrPair b) {
+    if (!(nr_finite_pair(a) && nr_finite_pair(b))) {
+        s->bad = true;
+        return a;
+    }
+    return nr_ps_result(s, a.a + b.a, a.b + b.b);
+}
+
+NR NrPair nr_ps_sub(NrFp* s, NrPair a, NrPair b) {
+    if (!(nr_finite_pair(a) && nr_finite_pair(b))) {
+        s->bad = true;
+        return a;
+    }
+    return nr_ps_result(s, a.a - b.a, a.b - b.b);
+}
+
+/* ps_madd, ps_msub, ps_nmadd, ps_nmsub d, a, c, b: the multiplier rounded
+ * as force_25bit_c rounds it (bw_fp_ps_madd), then the single roundings,
+ * then the negation. */
+NR NrPair nr_ps_madd(NrFp* s, NrPair a, NrPair c, NrPair b, bool subtract, bool negative) {
+    if (!(nr_finite_pair(a) && nr_finite_pair(c) && nr_finite_pair(b))) {
+        s->bad = true;
+        return a;
+    }
+    const f64 r0 = nr_fma_single(a.a, nr_25bit(c.a), subtract ? -b.a : b.a);
+    const f64 r1 = nr_fma_single(a.b, nr_25bit(c.b), subtract ? -b.b : b.b);
+    if (r0 != r0 || r1 != r1) {
+        s->bad = true;
+        return a;
+    }
+    f32 s0 = nr_round(s, r0), s1 = nr_round(s, r1);
+    if (negative) {
+        s0 = -s0;
+        s1 = -s1;
+    }
+    nr_fprf(s, nr_class32(s0));
+    return (NrPair){(f64)s0, (f64)s1};
+}
+
+/* ps_res (GXRuntime's ppc_ps_res_op): the estimate table's reciprocals, its
+ * exceptions; the FPRF of the first half as a single. */
+NR NrPair nr_ps_res(NrFp* s, NrPair b) {
+    const f64 x = b.a, y = b.b;
+    if (x == 0.0 || y == 0.0) {
+        nr_fp_exception(s, 0x04000000u); /* ZX */
+        s->fpscr &= ~(NR_FPSCR_FI | NR_FPSCR_FR);
+    }
+    if (isnan(x) || isinf(x) || isnan(y) || isinf(y))
+        s->fpscr &= ~(NR_FPSCR_FI | NR_FPSCR_FR);
+    const u64 bx = nr_bits(x), by = nr_bits(y);
+    const bool snan_x = (bx & 0x7FF0000000000000ull) == 0x7FF0000000000000ull && (bx & 0x000FFFFFFFFFFFFFull) != 0u &&
+                        (bx & 0x0008000000000000ull) == 0u;
+    const bool snan_y = (by & 0x7FF0000000000000ull) == 0x7FF0000000000000ull && (by & 0x000FFFFFFFFFFFFFull) != 0u &&
+                        (by & 0x0008000000000000ull) == 0u;
+    if (snan_x || snan_y)
+        nr_fp_exception(s, NR_FPSCR_VXSNAN);
+    const NrPair r = {ppc_approx_reciprocal(x), ppc_approx_reciprocal(y)};
+    nr_fprf(s, nr_class32((f32)r.a));
+    return r;
+}
+
 /* --- Integer compares: CR0 with XER's SO. --------------------------------- */
 
 NR u32 nr_cr0(u32 cr, u32 xer, bool less, bool greater) {

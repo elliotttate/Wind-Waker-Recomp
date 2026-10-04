@@ -150,6 +150,9 @@ ENTRIES[0x802F072C] = ("J3DGetKeyFrameInterpolationS", "anim", [_ANIM_KEY_S, _AN
 ENTRIES[0x802F0954] = ("J3DAnmTransformKey::calcTransform", "anim",
                        [(0x802ED6E0, 0x802F0954, 0x802F0E20), _ANIM_KEY_S, _ANIM_HERMITE_S, _ANIM_KEY_F,
                         _ANIM_HERMITE], "0e3e908a655916320aaef9b8bf7bcd304406d7f9ad3983ea056905c670cbd549")
+# J3DPSCalcInverseTranspose, the normal matrices' paired-single leaf.
+ENTRIES[0x802DA584] = ("J3DPSCalcInverseTranspose", "anim", [(0x802D96E0, 0x802DA584, 0x802DA64C)],
+                       "15f0f639f4c2003e1d1bfa800ce1c8e75ffeb6268d5ed96240d6ddbb76c7b861")
 # --- end of the fourth set's animation ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
