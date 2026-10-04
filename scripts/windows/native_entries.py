@@ -157,6 +157,8 @@ ENTRIES[0x802DA584] = ("J3DPSCalcInverseTranspose", "anim", [(0x802D96E0, 0x802D
 # --- The fourth set (tests/native_cc_test.c): the collision checker's area
 # division (cmake/composite/native_cc.c). ---
 GROUPS["cc"] = ("native_cc.h", "bluewake_native_cc_enabled", "bluewake_native_cc(ctx, 0x{entry:08X}u)")
+ENTRIES[0x80251D88] = ("cM3dGCyl::SetC", "cc", [(0x802516E0, 0x80251D88, 0x80252020)],
+                       "415fe9d6692cbd65923cc297820c365807abbf82868b47e33d9ac7a25db8846b")
 ENTRIES[0x8024170C] = ("cCcD_DivideArea::CalcDivideInfoOverArea", "cc", [(0x802416E0, 0x8024170C, 0x80241924)],
                        "8a3217398db768a43715377f0b10f65fe4d31ae19d1f7e8725d236a2142281c9")
 # --- end of the fourth set's area division ---
@@ -283,6 +285,27 @@ def main_function(text, chunk):  # noqa: F811 (the base's function, or a mod var
     end = text.find("\n}\n", m.start())
     return text[m.start():end + 3] if end >= 0 else None
 # --- end of the fourth set's mod variants ---
+
+
+# --- The fourth set: OSPanic on cM3dGCyl::SetC's assert paths ---
+# SetC's asserts (a NaN component, or one outside +-1e32) call JUTAssertion
+# and OSPanic (0x80006C4C, which the host reports, so it is on the watch
+# list). The native declines on both, so the translation it stands in for
+# never reaches OSPanic: in that fragment - and only there - it is left out
+# of the check, as the third set leaves it out of fopAcM_findObjectCB's.
+FOURTH_HOST_OWN = {
+    "\nlabel_80251D88:\n": {0x80006C4C},  # cM3dGCyl::SetC
+}
+_addresses_third = addresses
+
+
+def addresses(text):  # noqa: F811 (the checks above, less what FOURTH_HOST_OWN leaves out)
+    found = _addresses_third(text)
+    for start, own in FOURTH_HOST_OWN.items():
+        if text.startswith(start):
+            found -= own
+    return found
+# --- end of the fourth set's exemption ---
 
 
 def chunk_files(root, chunk):

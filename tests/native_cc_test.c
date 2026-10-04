@@ -1,4 +1,4 @@
-/* cmake/composite/native_cc.c against the translation it stands in for.
+/* cmake/composite/native_cc.c against the translations it stands in for.
  *
  * Build and run from the worktree root (x64, in the Visual Studio environment):
  *
@@ -7,13 +7,13 @@
  *     -IE:\Github\Wind-Waker-Recomp\ref\recompcore\Source\Core\Core\PowerPC\StaticRecomp
  *     tests/native_cc_test.c cmake/composite/native_cc.c cmake/composite/direct_calls.c
  *     E:\Github\Wind-Waker-Recomp\build\windows\app\gxruntime_build\gxruntime.lib -o native_cc_test.exe
- *   native_cc_test MODULE.dll [CASES=60000] [BENCH_CALLS=1000000]
+ *   native_cc_test MODULE.dll [CASES_PER_FUNCTION=60000] [BENCH_CALLS=1000000]
  *
  * MODULE.dll is a Windows game module (gGZLE01_recomp.dll) without this
  * native (E:\Github\Wind-Waker-Recomp\build\windows\W-final\gGZLE01_recomp.dll),
  * read, never written.
  *
- * Random areas and boxes: the area's minimum and inverse scaled differences
+ * CalcDivideInfoOverArea: random areas and boxes: the area's minimum and inverse scaled differences
  * and each axis's zero flag, boxes inside, across, before and beyond the
  * area (so every clamp and empty-run path runs), indices beyond the shifts'
  * range, and now and then zeros, denormals, huge values, values that overflow
@@ -28,7 +28,12 @@
  * - or, where the native declines, nothing may have changed. RAM outside the
  * test's pages is read-only in both images.
  *
- * Then a microbenchmark: the translation through the module's dispatcher
+ * cM3dGCyl::SetC: positions of every class (normal, zero, denormal, and
+ * the NaNs and values beyond the bounds the asserts catch, which decline),
+ * the bounds r2 reaches, the centre and the position over each other or the
+ * frame, the same machine state and declining cases.
+ *
+ * Then microbenchmarks: the translation through the module's dispatcher
  * against the native, ns per call. */
 #include "native_cc.h"
 #include "native4_harness.h"
@@ -119,6 +124,61 @@ static Case build(u8* ram, unsigned scenario) {
     return k;
 }
 
+/* cM3dGCyl::SetC: a cylinder and a position; the bounds r2 reaches (the
+ * decomp's -1e32 and 1e32, or others now and then). */
+#define CYLINDER (AREA + 0x400u)
+#define POSITION (AREA + 0x500u)
+#define BOUNDS (AREA + 0x600u)
+
+static Case build_set_c(u8* ram, unsigned scenario) {
+    Case k;
+    memset(&k, 0, sizeof k);
+    CPUState* c = &k.cpu;
+    random_cpu(c, ram);
+    for (u32 i = 0; i < AREA_BYTES; i += 4u)
+        put32(ram, AREA + i, next());
+    const unsigned specials = scenario % 5u == 2u ? 16u : 0u;
+    const u32 pos = POSITION + 4u * below(16u), self = CYLINDER + 4u * below(16u);
+    for (unsigned i = 0; i < 3u; ++i) {
+        u32 bits = value((f32)((unit() - 0.5) * 20000.0), specials);
+        if (below(8u) == 0u)
+            bits = (next() & 0x80000000u) | (below(2u) ? 0u : 1u + below(0x7FFFFFu)); /* a zero or a denormal */
+        if (below(32u) == 0u)
+            bits = (next() & 0x80000000u) | 0x7F7FFFFFu; /* beyond the bounds: the assert */
+        put32(ram, pos + 4u * i, bits);
+    }
+    put32(ram, BOUNDS, scenario % 23u == 7u ? any_single(16u) : bits_of(-1.0e32f));
+    put32(ram, BOUNDS + 4u, scenario % 23u == 9u ? any_single(16u) : bits_of(1.0e32f));
+    c->gpr[2] = BOUNDS + 16368u;
+    u32 sp = STACK - 8u * below(64u);
+    if (scenario % 9u == 4u)
+        sp += 4u;
+    c->gpr[1] = sp;
+    c->gpr[3] = self;
+    c->gpr[4] = pos;
+    c->pc = BLUEWAKE_CC_CYL_SET_C;
+    c->reserve_addr = below(2u) ? sp - 8u * below(5u) : self + 4u * below(3u);
+    k.flush = (c->fpscr & 0x4u) != 0u && below(2u) != 0u;
+    switch (scenario % 47u) {
+    case 1: c->msr &= ~PPC_MSR_FP; k.must_decline = true; break;
+    case 2: c->exception = 1u; k.must_decline = true; break;
+    case 3: k.journal = k.must_decline = true; break;
+    case 4: k.aliases = k.must_decline = true; break;
+    case 5: c->fpscr = (c->fpscr & ~3u) | (1u + below(3u)); k.must_decline = true; break;
+    case 6: c->gpr[1] = 0x80000000u + 4u * below(6u); k.must_decline = true; break;
+    case 7: c->gpr[3] = 0xCC000000u; k.must_decline = true; break;
+    case 8: c->gpr[4] = pos | 0x40000000u; k.must_decline = true; break;
+    case 9: c->gpr[4] = sp - 16u; k.must_decline = true; break;   /* the position on the frame */
+    case 10: c->gpr[3] = pos + 4u; k.must_decline = true; break;  /* the centre over the position */
+    case 11: put32(ram, pos + 4u * below(3u), 0x7FC00000u | next()); k.must_decline = true; break; /* a NaN */
+    case 12: c->downcount = -c->cycle_budget + 1 + (s64)below(120u); break;
+    case 13: c->cycle_deadline_budget = 1 + (s64)below(140u); break;
+    case 14: c->cycle_budget = 0; k.must_decline = true; break;
+    default: break;
+    }
+    return k;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         fprintf(stderr, "usage: native_cc_test MODULE.dll [CASES] [BENCH_CALLS]\n");
@@ -153,6 +213,28 @@ int main(int argc, char** argv) {
            "cell, %u with an axis empty, %u with fctiwz writing nothing last), %u declined unchanged, 0 mismatches\n",
            cases, ran, edges, full, empty, unwritten, declined);
     int status = ran < 30000u && cases >= 60000u;
+
+    unsigned set_ran = 0, set_declined = 0, set_edges = 0, set_kinds[6] = {0};
+    for (unsigned i = 0; i < cases; ++i) {
+        Case k = build_set_c(h.native_ram, i);
+        reset_host();
+        const int same = harness_case(&h, bluewake_native_cc, BLUEWAKE_CC_CYL_SET_C, "cM3dGCyl::SetC", i, &k.cpu,
+                                      k.must_decline, k.journal, k.aliases, k.flush);
+        if (!same) {
+            set_declined++;
+            continue;
+        }
+        set_ran++;
+        set_edges += i % 47u == 12u || i % 47u == 13u;
+        for (unsigned j = 0; j < 3u; ++j) {
+            const u32 w = get32(h.native_ram, k.cpu.gpr[4] + 4u * j);
+            set_kinds[(w & 0x7F800000u) == 0u ? ((w & 0x7FFFFFu) == 0u ? 3u : 5u) : 4u]++;
+        }
+    }
+    printf("80251D88 cM3dGCyl::SetC: %u cases, %u identical (%u at the budget or deadline edge; components: %u "
+           "normal, %u zero, %u denormal), %u declined unchanged, 0 mismatches\n",
+           cases, set_ran, set_edges, set_kinds[4], set_kinds[3], set_kinds[5], set_declined);
+    status |= set_ran < 30000u && cases >= 60000u;
 
     if (bench_calls != 0u) {
         seed = 0x6A09E667u;
@@ -208,6 +290,54 @@ int main(int argc, char** argv) {
         }
         printf("8024170C CalcDivideInfoOverArea: translation %.1f ns/call through the dispatcher, native %.1f ns/call\n",
                best_t, best_n);
+
+        seed = 0xBB67AE85u;
+        k = build_set_c(h.native_ram, 0u);
+        base = k.cpu;
+        for (unsigned i = 0; i < 3u; ++i)
+            put32(h.native_ram, base.gpr[4] + 4u * i, bits_of(100.0f * (f32)(i + 1u)));
+        put32(h.native_ram, BOUNDS, bits_of(-1.0e32f));
+        put32(h.native_ram, BOUNDS + 4u, bits_of(1.0e32f));
+        base.exception = 0;
+        base.fpscr = 0;
+        base.msr = PPC_MSR_FP;
+        base.reserve_valid = false;
+        base.downcount = 0;
+        base.cycle_deadline_budget = 0;
+        base.cycle_budget = (s64)bench_calls * 400 + 1000;
+        copy_regions(h.reference_ram, h.native_ram);
+        best_t = best_n = 1e30;
+        for (unsigned round = 0; round < 5; ++round) {
+            *g = base;
+            g->ram = h.reference_ram;
+            h.mod->on_state_loaded(g);
+            double t0 = now_ns();
+            for (unsigned i = 0; i < bench_calls; ++i) {
+                g->gpr[1] = base.gpr[1];
+                g->gpr[3] = base.gpr[3];
+                g->gpr[4] = base.gpr[4];
+                g->lr = RETURN_ADDRESS;
+                g->pc = BLUEWAKE_CC_CYL_SET_C;
+                h.mod->dispatch(g, BLUEWAKE_CC_CYL_SET_C);
+            }
+            const double t = (now_ns() - t0) / bench_calls;
+            CPUState native = base;
+            t0 = now_ns();
+            for (unsigned i = 0; i < bench_calls; ++i) {
+                native.gpr[3] = base.gpr[3];
+                native.gpr[4] = base.gpr[4];
+                native.lr = RETURN_ADDRESS;
+                if (!bluewake_native_cc(&native, BLUEWAKE_CC_CYL_SET_C)) {
+                    fprintf(stderr, "the benchmark's native declined\n");
+                    return 1;
+                }
+            }
+            const double n = (now_ns() - t0) / bench_calls;
+            if (t < best_t) best_t = t;
+            if (n < best_n) best_n = n;
+        }
+        printf("80251D88 cM3dGCyl::SetC: translation %.1f ns/call through the dispatcher, native %.1f ns/call\n", best_t,
+               best_n);
     }
     return status;
 }

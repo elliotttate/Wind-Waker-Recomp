@@ -34,10 +34,11 @@
 #include <stdio.h>
 
 int bluewake_native_cc_enabled;
-static unsigned long long s_cc_runs, s_cc_declined;
+static unsigned long long s_cc_runs[2], s_cc_declined[2];
 
 void bluewake_native_cc_report(void) {
-    fprintf(stderr, "[native-cc] divide-over-area=%llu/%llu (native/declined)\n", s_cc_runs, s_cc_declined);
+    fprintf(stderr, "[native-cc] divide-over-area=%llu/%llu cyl-set-c=%llu/%llu (native/declined)\n", s_cc_runs[0],
+            s_cc_declined[0], s_cc_runs[1], s_cc_declined[1]);
 }
 
 #define CC static inline __attribute__((always_inline))
@@ -264,13 +265,144 @@ static int cc_divide(CPUState* cpu) {
     return 1;
 }
 
-int bluewake_native_cc(CPUState* cpu, u32 address) {
-    if (address != BLUEWAKE_CC_DIVIDE_OVER_AREA)
+/* --- cM3dGCyl::SetC (80251D88): r3 the cylinder, r4 the position. ---------
+ *
+ * The decomp's JUT_ASSERT(!isnan) for each component (fpclassify inline,
+ * through the frame) and CHECK_VEC3_RANGE (six fcmpo against r2's bounds),
+ * then the copy. The asserts' failure paths (a NaN, a component outside the
+ * bounds) call JUTAssertion and OSPanic: declined. */
+
+/* fpclassify on a component's word as stfs and lwz leave it: lfs f0; stfs
+ * f0, slot(r1); lwz r4; rlwinm r3; lis r0; cmpw; ... li r0, kind; cmpwi r0,
+ * 1; beq the assert. The kind: 4 normal, 3 zero, 5 denormal, 2 infinite, 1
+ * NaN (declined). */
+CC bool cc_classify(Cc* s, u32 word) {
+    u32* g = s->g;
+    g[4] = word;
+    g[3] = word & 0x7F800000u;
+    g[0] = 0x7F800000u;
+    s->cr = nr_cr0_signed(s->cr, s->xer, (s32)g[3], (s32)g[0]);
+    if (g[3] == 0x7F800000u) {
+        cc_block(s, 2u); /* rlwinm. r0, r4, 0, 9, 31; beq */
+        g[0] = word & 0x007FFFFFu;
+        s->cr = nr_cr0_signed(s->cr, s->xer, (s32)g[0], 0);
+        if (g[0] != 0u)
+            return false; /* a NaN: the assert */
+        cc_block(s, 2u);  /* li r0, 2 */
+        g[0] = 2u;
+    } else {
+        cc_block(s, 1u); /* blt */
+        cc_block(s, 2u); /* cmpwi r3, 0; beq */
+        s->cr = nr_cr0_signed(s->cr, s->xer, (s32)g[3], 0);
+        if (g[3] == 0u) {
+            cc_block(s, 2u); /* rlwinm. r0, r4, 0, 9, 31; beq */
+            g[0] = word & 0x007FFFFFu;
+            s->cr = nr_cr0_signed(s->cr, s->xer, (s32)g[0], 0);
+            cc_block(s, 2u); /* li r0, 3 or 5; b */
+            g[0] = g[0] == 0u ? 3u : 5u;
+        } else {
+            cc_block(s, 1u); /* b */
+            cc_block(s, 1u); /* li r0, 4 */
+            g[0] = 4u;
+        }
+    }
+    cc_block(s, 2u); /* cmpwi r0, 1; bne */
+    s->cr = nr_cr0_signed(s->cr, s->xer, (s32)g[0], 1);
+    return true;
+}
+
+static int cc_set_c(CPUState* cpu) {
+    Cc s;
+    if (!nr_clock_start(cpu, &s.k))
         return 0;
-    const int done = cc_divide(cpu);
+    const u32 sp = cpu->gpr[1], frame = sp - 32u, self = cpu->gpr[3], pos = cpu->gpr[4];
+    const u32 bounds = cpu->gpr[2] - 16368u;
+    /* Stores: the frame [sp - 32, sp + 8) and the cylinder's centre. Reads:
+     * the position and the bounds, clear of both. */
+    if (!nr_ram(cpu, frame, 40u) || !nr_ram(cpu, self, 12u) || !nr_ram(cpu, pos, 12u) || !nr_ram(cpu, bounds, 8u) ||
+        !nr_apart(self, 12u, frame, 40u) || !nr_apart(pos, 12u, frame, 40u) || !nr_apart(pos, 12u, self, 12u) ||
+        !nr_apart(bounds, 8u, frame, 40u) || !nr_apart(bounds, 8u, self, 12u))
+        return 0;
+    for (unsigned i = 0; i < 11u; ++i)
+        s.g[i] = cpu->gpr[i];
+    s.cr = cpu->cr;
+    s.xer = cpu->xer;
+    s.fp = (NrFp){cpu->fpscr, false};
+    s.bad = false;
+    u32 words[3];
+    for (unsigned i = 0; i < 3u; ++i)
+        words[i] = nr_to_single(nr_to_double(nr_word(cpu, pos + 4u * i))); /* lfs f0; stfs f0 */
+    /* 80251D88 (14): the frame, r30 and r31 saved, r30 = r3, r31 = r4; x;
+     * then 80251E3C (7): y; 80251ED4 (7): z. */
+    cc_block(&s, 14u);
+    for (unsigned i = 0; i < 3u; ++i) {
+        if (i != 0u)
+            cc_block(&s, 7u);
+        if (!cc_classify(&s, words[i]))
+            return 0;
+    }
+    /* 80251F6C (5) ... 80251FB4 (1): lower < c < upper for each component. */
+    const f64 lower = nr_single_bits(nr_word(cpu, bounds)), upper = nr_single_bits(nr_word(cpu, bounds + 4u));
+    f64 component = 0.0;
+    static const u32 blocks[6] = {5u, 3u, 3u, 2u, 3u, 2u};
+    for (unsigned i = 0; i < 6u; ++i) {
+        cc_block(&s, blocks[i]);
+        u32 code;
+        if ((i & 1u) == 0u) {
+            component = nr_single_bits(nr_word(cpu, pos + 4u * (i / 2u)));
+            code = nr_fcmp(&s.fp, lower, component); /* fcmpo cr0, f2, f0 */
+        } else {
+            code = nr_fcmp(&s.fp, component, upper); /* fcmpo cr0, f0, f1 */
+        }
+        s.cr = (s.cr & 0x0FFFFFFFu) | (code << 28);
+        if (code != 0x8u)
+            return 0; /* the assert */
+    }
+    cc_block(&s, 1u); /* li r0, 1 */
+    cc_block(&s, 2u); /* rlwinm. r0, r0, 0, 24, 31; bne */
+    s.cr = nr_cr0_signed(s.cr, s.xer, 1, 0);
+    cc_block(&s, 13u); /* the copy, the restores, mtlr, blr */
+    if (s.bad || s.fp.bad)
+        return 0;
+
+    const u32 lr = cpu->lr;
+    const u32 saved30 = cpu->gpr[30], saved31 = cpu->gpr[31];
+    const f64 last = nr_single_bits(nr_word(cpu, pos + 8u));
+    const NrOut o = nr_out(cpu);
+    nr_store32(&o, frame, sp);              /* stwu r1, -32(r1) */
+    nr_store32(&o, sp + 4u, lr);            /* stw r0, 36(r1) */
+    nr_store32(&o, sp - 4u, saved31);       /* stw r31, 28(r1) */
+    nr_store32(&o, sp - 8u, saved30);       /* stw r30, 24(r1) */
+    nr_store32(&o, frame + 16u, words[0]);  /* stfs f0, 16(r1) */
+    nr_store32(&o, frame + 12u, words[1]);  /* stfs f0, 12(r1) */
+    nr_store32(&o, frame + 8u, words[2]);   /* stfs f0, 8(r1) */
+    for (unsigned i = 0; i < 3u; ++i)       /* the copy */
+        nr_store32(&o, self + 4u * i, words[i]);
+    cpu->gpr[0] = lr;
+    cpu->gpr[3] = s.g[3];
+    cpu->gpr[4] = s.g[4];
+    cpu->fpr[0] = cpu->ps1[0] = last;
+    cpu->fpr[1] = cpu->ps1[1] = upper;
+    cpu->fpr[2] = cpu->ps1[2] = lower;
+    cpu->cr = s.cr;
+    cpu->fpscr = s.fp.fpscr;
+    cpu->downcount = s.k.downcount;
+    cpu->cycle_observation_suffix = 2u; /* mtlr r0 */
+    cpu->pc = lr & ~3u;
+    return 1;
+}
+
+int bluewake_native_cc(CPUState* cpu, u32 address) {
+    unsigned which;
+    int done;
+    switch (address) {
+    case BLUEWAKE_CC_DIVIDE_OVER_AREA: which = 0u; done = cc_divide(cpu); break;
+    case BLUEWAKE_CC_CYL_SET_C: which = 1u; done = cc_set_c(cpu); break;
+    default: return 0;
+    }
     if (done)
-        s_cc_runs++;
+        s_cc_runs[which]++;
     else
-        s_cc_declined++;
+        s_cc_declined[which]++;
     return done;
 }
