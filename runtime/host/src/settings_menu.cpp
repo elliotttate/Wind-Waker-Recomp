@@ -20,6 +20,7 @@ extern "C" {
 #include "gxruntime/aurora_backend.h"
 
 #include <SDL3/SDL.h>
+#include <aurora/aurora.h>
 #include <imgui.h>
 
 #include <cmath>
@@ -33,21 +34,14 @@ extern "C" {
 #include <sys/stat.h>
 #include <vector>
 
-extern "C" {
-void aurora_set_frame_buffer_scale(float scale);
-void aurora_set_frame_interpolation(bool enabled);
-void aurora_set_frame_interp_steps(int steps);
-void aurora_set_fps_overlay(bool enabled);
-void aurora_set_forced_anisotropy(unsigned samples);
-}
-
 namespace {
 
 // The settings the menu writes, in the file's order. The rest of the file (keys
 // the menu does not show) is kept as it was.
 const char* const kKeys[] = {
     "BLUEWAKE_ASPECT",          "DOL_AURORA_FULLSCREEN",    "DOL_AURORA_RENDER_SCALE",
-    "DOL_AURORA_FRAME_INTERP",  "DOL_AURORA_FRAME_INTERP_STEPS", "DOL_AURORA_SHOW_FPS", "DOL_AURORA_FORCE_ANISO",
+    "DOL_AURORA_FRAME_INTERP",  "DOL_AURORA_FRAME_INTERP_STEPS", "DOL_AURORA_SHOW_FPS", "DOL_AURORA_FPS_POSITION",
+    "DOL_AURORA_FORCE_ANISO",
     "DOL_AURORA_TEXTURE_PACK",  "BLUEWAKE_MODS",            "BLUEWAKE_OPTIONS",
     "BLUEWAKE_FADE_FRAMES",     "BLUEWAKE_FAST_FORWARD",    "BLUEWAKE_QUICK_DOORS",
     "BLUEWAKE_JUMP_BUTTON",
@@ -294,6 +288,20 @@ void display_tab() {
         set_env("DOL_AURORA_SHOW_FPS", fps ? "1" : "0");
         aurora_set_fps_overlay(fps);
     }
+    // In AuroraFpsOverlayPosition's order; top center unless it names a corner.
+    static const char* const kFpsPositions[] = {"Top Center", "Top Left", "Top Right", "Bottom Left", "Bottom Right"};
+    static const char* const kFpsPositionValues[] = {"top-center", "top-left", "top-right", "bottom-left",
+                                                     "bottom-right"};
+    int position = 0;
+    for (int i = 0; i < 5; ++i)
+        if (env("DOL_AURORA_FPS_POSITION") == kFpsPositionValues[i])
+            position = i;
+    ImGui::BeginDisabled(!fps);
+    if (combo("FPS position", &position, kFpsPositions, 5)) {
+        set_env("DOL_AURORA_FPS_POSITION", kFpsPositionValues[position]);
+        aurora_set_fps_overlay_position(static_cast<AuroraFpsOverlayPosition>(position));
+    }
+    ImGui::EndDisabled();
 
     static const char* const kAniso[] = {"Off (the game's)", "2x", "4x", "8x", "16x"};
     static const unsigned kAnisoValues[] = {1, 2, 4, 8, 16};
