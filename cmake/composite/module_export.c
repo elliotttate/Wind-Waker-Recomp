@@ -16,6 +16,10 @@
 #include "native_mtxcalc.h"
 /* Certified native entries, the third set: the actor search by name. */
 #include "native_search.h"
+/* Certified native entries, the fourth set (native_kankyo.c, native_anim.c, native_cc.c). */
+#include "native_kankyo.h"
+#include "native_anim.h"
+#include "native_cc.h"
 #include <stdlib.h>
 #include <stdio.h>
 static int s_native_math;
@@ -250,6 +254,19 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
             bluewake_native_search_enabled = on;
             if (on)
                 atexit(bluewake_native_search_report);
+            /* The fourth set: the environment's colour blends, J3D's
+             * key-frame animation (calcTransform with its interpolations
+             * and splines) and J3DPSCalcInverseTranspose, and the collision
+             * checker's area division and cylinder centre, with the same
+             * switch. */
+            bluewake_native_kankyo_enabled = on;
+            bluewake_native_anim_enabled = on;
+            bluewake_native_cc_enabled = on;
+            if (on) {
+                atexit(bluewake_native_kankyo_report);
+                atexit(bluewake_native_anim_report);
+                atexit(bluewake_native_cc_report);
+            }
         }
         if (s_native_math) {
             atexit(bluewake_native_skin_report);

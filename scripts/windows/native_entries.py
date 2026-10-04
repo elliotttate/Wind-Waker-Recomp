@@ -120,6 +120,48 @@ for _resume in (0x8004156C, 0x80041578, 0x80041588):
                         [(0x8003D6E0, 0x80041544, 0x800415B4), (0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
                         "bdf91cee67046b81e7b60bb4669129749a912db84cd9fd96028b74a4cac01dd7")
 # --- end of the resumable entries ---
+# --- The fourth set (tests/native_kankyo_test.c): the environment's colour
+# blends (cmake/composite/native_kankyo.c). kankyo_color_ratio_set stands in
+# for the three s16_data_ratio_set calls it makes inside its chunk, so its
+# hash covers that function too. ---
+GROUPS["kankyo"] = ("native_kankyo.h", "bluewake_native_kankyo_enabled",
+                    "bluewake_native_kankyo(ctx, 0x{entry:08X}u)")
+ENTRIES[0x8018F894] = ("s16_data_ratio_set (d_kankyo)", "kankyo", [(0x8018D6E0, 0x8018F894, 0x8018F8E4)],
+                       "a97d798df755a9dfa8d8c76e9387bd63fcb1a3a01ac77dea64257a70f3c02ed2")
+ENTRIES[0x8018F8E4] = ("kankyo_color_ratio_set", "kankyo",
+                       [(0x8018D6E0, 0x8018F8E4, 0x8018F9E8), (0x8018D6E0, 0x8018F894, 0x8018F8E4)],
+                       "97603052f10971cf557a41245d089cb826682dbbbd57ffdc4fc68d9c38f2106b")
+ENTRIES[0x8019803C] = ("s16_data_ratio_set (d_kyeff)", "kankyo", [(0x801956E0, 0x8019803C, 0x8019808C)],
+                       "5d00d5f30faa943ea2066d221c0027d91cf9cdf449c1dd493964417803fc6c82")
+# --- end of the fourth set's colour blends ---
+# --- The fourth set (tests/native_anim_test.c): J3D's key-frame animation
+# (cmake/composite/native_anim.c). Each entry's hash covers the callees its
+# native stands in for: JMAHermiteInterpolation (in its own chunk) under
+# J3DGetKeyFrameInterpolation<f32>, J3DHermiteInterpolationS under
+# J3DGetKeyFrameInterpolationS, and all four under calcTransform. ---
+GROUPS["anim"] = ("native_anim.h", "bluewake_native_anim_enabled", "bluewake_native_anim(ctx, 0x{entry:08X}u)")
+_ANIM_HERMITE = (0x802FD6E0, 0x803012D8, 0x80301350)
+_ANIM_KEY_F = (0x802F16E0, 0x802F2DAC, 0x802F2EF8)
+_ANIM_HERMITE_S = (0x802ED6E0, 0x802F06D8, 0x802F072C)
+_ANIM_KEY_S = (0x802ED6E0, 0x802F072C, 0x802F0954)
+ENTRIES[0x803012D8] = ("JMAHermiteInterpolation", "anim", [_ANIM_HERMITE], "3db6672c3359fdffca724dccbc68927255deb4eb8e325ab50b41a5024002283e")
+ENTRIES[0x802F2DAC] = ("J3DGetKeyFrameInterpolation<f32>", "anim", [_ANIM_KEY_F, _ANIM_HERMITE], "392cbc991dd96ab0eb97fb421508640e977421cdeb4f38dbc174605658c9d53a")
+ENTRIES[0x802F072C] = ("J3DGetKeyFrameInterpolationS", "anim", [_ANIM_KEY_S, _ANIM_HERMITE_S], "1eea0238808243d866100a41ad995a9f50c1fd4df493d3f22335ec9bfa2f5813")
+ENTRIES[0x802F0954] = ("J3DAnmTransformKey::calcTransform", "anim",
+                       [(0x802ED6E0, 0x802F0954, 0x802F0E20), _ANIM_KEY_S, _ANIM_HERMITE_S, _ANIM_KEY_F,
+                        _ANIM_HERMITE], "0e3e908a655916320aaef9b8bf7bcd304406d7f9ad3983ea056905c670cbd549")
+# J3DPSCalcInverseTranspose, the normal matrices' paired-single leaf.
+ENTRIES[0x802DA584] = ("J3DPSCalcInverseTranspose", "anim", [(0x802D96E0, 0x802DA584, 0x802DA64C)],
+                       "15f0f639f4c2003e1d1bfa800ce1c8e75ffeb6268d5ed96240d6ddbb76c7b861")
+# --- end of the fourth set's animation ---
+# --- The fourth set (tests/native_cc_test.c): the collision checker's area
+# division (cmake/composite/native_cc.c). ---
+GROUPS["cc"] = ("native_cc.h", "bluewake_native_cc_enabled", "bluewake_native_cc(ctx, 0x{entry:08X}u)")
+ENTRIES[0x80251D88] = ("cM3dGCyl::SetC", "cc", [(0x802516E0, 0x80251D88, 0x80252020)],
+                       "415fe9d6692cbd65923cc297820c365807abbf82868b47e33d9ac7a25db8846b")
+ENTRIES[0x8024170C] = ("cCcD_DivideArea::CalcDivideInfoOverArea", "cc", [(0x802416E0, 0x8024170C, 0x80241924)],
+                       "8a3217398db768a43715377f0b10f65fe4d31ae19d1f7e8725d236a2142281c9")
+# --- end of the fourth set's area division ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
 J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"
@@ -223,6 +265,47 @@ def addresses(text):  # noqa: F811 (the check above, less what SEARCH_HOST_OWN l
             found -= own
     return found
 # --- end of the third set's exemption ---
+
+
+# --- The fourth set: mods' variants of a chunk ---
+# A mod's variant of a chunk (scripts/mods/build_mod_variants.py) names its
+# function func_XXXXXXXX__mod_NAME. The second and third sets' chunks have no
+# variants; the fourth set's kankyo chunk (8018D6E0) has two (the widescreen
+# mods), whose fragments must hash the same as the base's to be hooked.
+_main_function_of = main_function
+
+
+def main_function(text, chunk):  # noqa: F811 (the base's function, or a mod variant's)
+    found = _main_function_of(text, chunk)
+    if found is not None:
+        return found
+    m = re.search(rf"\nvoid func_{chunk:08X}__mod_\w+\(CPUState\* ctx_param\) {{\n", text)
+    if m is None:
+        return None
+    end = text.find("\n}\n", m.start())
+    return text[m.start():end + 3] if end >= 0 else None
+# --- end of the fourth set's mod variants ---
+
+
+# --- The fourth set: OSPanic on cM3dGCyl::SetC's assert paths ---
+# SetC's asserts (a NaN component, or one outside +-1e32) call JUTAssertion
+# and OSPanic (0x80006C4C, which the host reports, so it is on the watch
+# list). The native declines on both, so the translation it stands in for
+# never reaches OSPanic: in that fragment - and only there - it is left out
+# of the check, as the third set leaves it out of fopAcM_findObjectCB's.
+FOURTH_HOST_OWN = {
+    "\nlabel_80251D88:\n": {0x80006C4C},  # cM3dGCyl::SetC
+}
+_addresses_third = addresses
+
+
+def addresses(text):  # noqa: F811 (the checks above, less what FOURTH_HOST_OWN leaves out)
+    found = _addresses_third(text)
+    for start, own in FOURTH_HOST_OWN.items():
+        if text.startswith(start):
+            found -= own
+    return found
+# --- end of the fourth set's exemption ---
 
 
 def chunk_files(root, chunk):
