@@ -127,6 +127,7 @@ typedef struct Harness {
     HMODULE lib;
     const StaticRecompModuleDesc* mod;
     CPUState* (*guest_cpu)(void);
+    int (*filter)(bool);
     u8* reference_ram;
     u8* native_ram;
     u8* before;
@@ -230,9 +231,12 @@ static int harness_load(Harness* h, const char* path, bool module_natives, const
         fprintf(stderr, "CPU state size %u, expected %u\n", h->mod->cpu_state_size, (unsigned)sizeof(CPUState));
         return 0;
     }
-    static const bool clear = false;
-    static const u32 zero = 0u;
-    if (!direct(true, &clear, &clear, &zero, &zero) || !filter(true)) {
+    /* The module reads the test's own host flags, so a case that makes the
+     * host busy makes it busy for the translation too: it then asks its edge
+     * service at every boundary it crosses, and a native that ran there fails
+     * the comparison. */
+    h->filter = filter;
+    if (!direct(true, &s_sources_dirty, &s_decrementer_pending, &s_pi_cause, &s_pi_mask) || !filter(true)) {
         fprintf(stderr, "the module's direct calls or edge filter are unavailable\n");
         return 0;
     }

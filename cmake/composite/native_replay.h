@@ -50,6 +50,30 @@
 #define NR_FPSCR_NI 0x00000004u
 #define NR_FPSCR_VX_ANY 0x01F80700u /* VXSNAN VXISI VXIDI VXZDZ VXIMZ VXVC VXSOFT VXSQRT VXCVI */
 
+/* --- Bits. ------------------------------------------------------------------- */
+
+/* A value's bits, opaque to the optimiser. Clang turns a bit test on a value
+ * it can see came from a double (an exponent field of zero, the bits less
+ * the sign zero) into a floating-point compare, which the host's
+ * denormals-are-zero mode - the module arms it for the guest's NI - answers
+ * differently: a denormal then tests as zero. The translation's helpers
+ * test the bits, so these keep them integers. */
+NR u64 nr_opaque64(u64 bits) {
+    __asm__("" : "+r"(bits));
+    return bits;
+}
+
+NR u32 nr_opaque32(u32 bits) {
+    __asm__("" : "+r"(bits));
+    return bits;
+}
+
+NR u64 nr_bits(f64 value) {
+    u64 bits;
+    memcpy(&bits, &value, sizeof bits);
+    return nr_opaque64(bits);
+}
+
 /* --- Plain RAM. ----------------------------------------------------------- */
 
 /* `size` bytes at `address` in MEM1 proper, unaliased: what the translation's
@@ -130,6 +154,7 @@ NR u64 nr_to_double(u32 value) {
 
 /* convert_to_single_ftz (types.h), always inline. */
 NR u32 nr_to_single_ftz(u64 x) {
+    x = nr_opaque64(x);
     const u32 exp = (u32)((x >> 52) & 0x7FFu);
     if (exp > 896 || (x & ~0x8000000000000000ull) == 0)
         return (u32)(((x >> 32) & 0xC0000000u) | ((x >> 29) & 0x3FFFFFFFu));
@@ -138,6 +163,7 @@ NR u32 nr_to_single_ftz(u64 x) {
 
 /* convert_to_single (types.h): stfs. */
 NR u32 nr_to_single(u64 x) {
+    x = nr_opaque64(x);
     const u32 exp = (u32)((x >> 52) & 0x7FFu);
     if (exp > 896 || (x & ~0x8000000000000000ull) == 0) {
         return (u32)(((x >> 32) & 0xC0000000u) | ((x >> 29) & 0x3FFFFFFFu));
@@ -156,7 +182,7 @@ NR f64 nr_single_bits(u32 bits) { return f64_value(nr_to_double(bits)); }
 
 /* psq_st (type 0) of one half, and psq_l of it back: what a paired-single
  * save and restore leaves in that half. */
-NR f64 nr_pair_round_trip(f64 value) { return f64_value(nr_to_double(nr_to_single_ftz(f64_bits(value)))); }
+NR f64 nr_pair_round_trip(f64 value) { return f64_value(nr_to_double(nr_to_single_ftz(nr_bits(value)))); }
 
 /* --- The FPSCR. ---------------------------------------------------------- */
 
@@ -166,12 +192,12 @@ typedef struct NrFp {
 } NrFp;
 
 NR bool nr_finite(f64 value) {
-    return (f64_bits(value) & 0x7FF0000000000000ull) != 0x7FF0000000000000ull;
+    return (nr_bits(value) & 0x7FF0000000000000ull) != 0x7FF0000000000000ull;
 }
 
 /* force_25bit_c (bw_fp_25bit), always inline. */
 NR f64 nr_25bit(f64 d) {
-    u64 integral = f64_bits(d);
+    u64 integral = nr_bits(d);
     const u64 exponent = integral & 0x7FF0000000000000ull;
     const u64 fraction = integral & 0x000FFFFFFFFFFFFFull;
     if (exponent == 0 && fraction != 0) {
@@ -189,7 +215,7 @@ NR f64 nr_25bit(f64 d) {
 
 /* force_25_bit (bw_fp_25bit_fma: the fused multiply-add's multiplier), always inline. */
 NR f64 nr_25bit_fma(f64 value) {
-    u64 bits = f64_bits(value);
+    u64 bits = nr_bits(value);
     const u64 fraction = bits & 0x000FFFFFFFFFFFFFull;
     u64 keep_mask = 0xFFFFFFFFF8000000ull;
     u64 round = 0x0000000008000000ull;
@@ -210,7 +236,7 @@ NR f64 nr_25bit_fma(f64 value) {
 /* bw_fp_fma_single: the single fused multiply-add's tie correction, always inline. */
 NR f64 nr_fma_single(f64 a, f64 c_round, f64 addend) {
     f64 result = fma(a, c_round, addend);
-    u64 bits = f64_bits(result);
+    u64 bits = nr_bits(result);
     if ((bits & 0x000000001FFFFFFFull) == 0x0000000010000000ull) {
         const f64 a_prime = addend - result;
         const f64 b_prime = result + a_prime;
@@ -232,6 +258,7 @@ NR f64 nr_fma_single(f64 a, f64 c_round, f64 addend) {
 NR u32 nr_class32(f32 value) {
     u32 bits;
     memcpy(&bits, &value, sizeof bits);
+    bits = nr_opaque32(bits);
     const u32 sign = bits >> 31;
     const u32 exponent = bits & 0x7F800000u;
     const u32 fraction = bits & 0x007FFFFFu;
@@ -263,7 +290,7 @@ NR void nr_fprf(NrFp* s, u32 value) { s->fpscr = (s->fpscr & ~(0x1Fu << 12)) | (
 /* force_single (bw_fp_single), on the local FPSCR's NI. */
 NR f32 nr_round(const NrFp* s, f64 value) {
     if (s->fpscr & NR_FPSCR_NI) {
-        const u64 bits = f64_bits(value);
+        const u64 bits = nr_bits(value);
         if ((bits & 0x7FFFFFFFFFFFFFFFull) < 0x3810000000000000ull) {
             const u32 flushed = (u32)((bits & 0x8000000000000000ull) >> 32);
             f32 zero;
@@ -360,7 +387,7 @@ NR bool nr_fctiwz(NrFp* s, f64 value, u64* output) {
     u32 result;
     bool invalid = false;
     if (value != value) {
-        const u64 bits = f64_bits(value);
+        const u64 bits = nr_bits(value);
         if ((bits & 0x0008000000000000ull) == 0u)
             nr_fp_exception(s, NR_FPSCR_VXSNAN);
         result = 0x80000000u;
@@ -385,7 +412,7 @@ NR bool nr_fctiwz(NrFp* s, f64 value, u64* output) {
     }
     if (invalid && (s->fpscr & NR_FPSCR_VE))
         return false;
-    *output = 0xFFF8000000000000ull | result | ((result == 0u && (f64_bits(value) >> 63) != 0u) ? 0x100000000ull : 0ull);
+    *output = 0xFFF8000000000000ull | result | ((result == 0u && (nr_bits(value) >> 63) != 0u) ? 0x100000000ull : 0ull);
     return true;
 }
 

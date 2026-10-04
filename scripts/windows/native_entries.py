@@ -134,6 +134,23 @@ ENTRIES[0x8018F8E4] = ("kankyo_color_ratio_set", "kankyo",
 ENTRIES[0x8019803C] = ("s16_data_ratio_set (d_kyeff)", "kankyo", [(0x801956E0, 0x8019803C, 0x8019808C)],
                        "5d00d5f30faa943ea2066d221c0027d91cf9cdf449c1dd493964417803fc6c82")
 # --- end of the fourth set's colour blends ---
+# --- The fourth set (tests/native_anim_test.c): J3D's key-frame animation
+# (cmake/composite/native_anim.c). Each entry's hash covers the callees its
+# native stands in for: JMAHermiteInterpolation (in its own chunk) under
+# J3DGetKeyFrameInterpolation<f32>, J3DHermiteInterpolationS under
+# J3DGetKeyFrameInterpolationS, and all four under calcTransform. ---
+GROUPS["anim"] = ("native_anim.h", "bluewake_native_anim_enabled", "bluewake_native_anim(ctx, 0x{entry:08X}u)")
+_ANIM_HERMITE = (0x802FD6E0, 0x803012D8, 0x80301350)
+_ANIM_KEY_F = (0x802F16E0, 0x802F2DAC, 0x802F2EF8)
+_ANIM_HERMITE_S = (0x802ED6E0, 0x802F06D8, 0x802F072C)
+_ANIM_KEY_S = (0x802ED6E0, 0x802F072C, 0x802F0954)
+ENTRIES[0x803012D8] = ("JMAHermiteInterpolation", "anim", [_ANIM_HERMITE], "3db6672c3359fdffca724dccbc68927255deb4eb8e325ab50b41a5024002283e")
+ENTRIES[0x802F2DAC] = ("J3DGetKeyFrameInterpolation<f32>", "anim", [_ANIM_KEY_F, _ANIM_HERMITE], "392cbc991dd96ab0eb97fb421508640e977421cdeb4f38dbc174605658c9d53a")
+ENTRIES[0x802F072C] = ("J3DGetKeyFrameInterpolationS", "anim", [_ANIM_KEY_S, _ANIM_HERMITE_S], "1eea0238808243d866100a41ad995a9f50c1fd4df493d3f22335ec9bfa2f5813")
+ENTRIES[0x802F0954] = ("J3DAnmTransformKey::calcTransform", "anim",
+                       [(0x802ED6E0, 0x802F0954, 0x802F0E20), _ANIM_KEY_S, _ANIM_HERMITE_S, _ANIM_KEY_F,
+                        _ANIM_HERMITE], "0e3e908a655916320aaef9b8bf7bcd304406d7f9ad3983ea056905c670cbd549")
+# --- end of the fourth set's animation ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
 J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"
