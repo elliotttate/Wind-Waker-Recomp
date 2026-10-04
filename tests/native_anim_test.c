@@ -9,6 +9,10 @@
  *     E:\Github\Wind-Waker-Recomp\build\windows\app\gxruntime_build\gxruntime.lib -o native_anim_test.exe
  *   native_anim_test MODULE.dll [CASES_PER_FUNCTION=60000] [BENCH_CALLS=200000] [--module-natives]
  *
+ * Built with -DNATIVE4_HOOKED=1 and the hooked chunks (tests/native4_harness.h
+ * says how), every case the native runs also runs through the hooked chunks,
+ * natives on and off, against the same translation.
+ *
  * MODULE.dll is a Windows game module (gGZLE01_recomp.dll) without these
  * natives (E:\Github\Wind-Waker-Recomp\build\windows\W-final\gGZLE01_recomp.dll),
  * read, never written. Its translation runs as in play: direct calls and its

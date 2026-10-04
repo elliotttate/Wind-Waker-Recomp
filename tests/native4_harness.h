@@ -21,6 +21,7 @@
 #include <windows.h>
 #include <xmmintrin.h>
 
+#ifndef NATIVE4_HOOKED
 /* direct_calls.c, linked in for the edge filter's state the natives read,
  * names these. */
 BwChunkFn bw_find_chunk(u32 address) {
@@ -28,6 +29,7 @@ BwChunkFn bw_find_chunk(u32 address) {
     return NULL;
 }
 BwChunkFn* const bw_chunk_fns = NULL;
+#endif
 
 #define RETURN_ADDRESS 0xFFFFFFFCu
 
@@ -321,6 +323,196 @@ static double now_ns(void) {
     return (double)t.QuadPart * 1e9 / (double)freq.QuadPart;
 }
 
+#ifdef NATIVE4_HOOKED
+/* --- The hooks, end to end (built with -DNATIVE4_HOOKED=1). ---------------
+ *
+ * The test then also links the eight chunks native_entries.py hooks for this
+ * set, compiled as the module compiles them (their sources the player's own,
+ * hooked on a copy, never distributed), with every native the chunks name,
+ * guest_cpu.c and gather_pipe.c:
+ *
+ *   for each chunk in 0099 0101 0144 0148 0182 0187 0188 0191:
+ *     clang -c -O2 -march=x86-64-v3 -ffp-contract=off -fno-slp-vectorize
+ *       -mllvm -large-interval-freq-threshold=10
+ *       -DMODULE_GAME_ID=\"GZLE01\" -DDOLRECOMP_CPU_HEADER=\"core/cpu.h\"
+ *       -DBW_GUEST_MEM1=bw_guest_mem1 -DBW_GUEST_MEM1_SIZE=0x02000000u
+ *       -DBLUEWAKE_EDGE_FILTER=1 -DBLUEWAKE_GATHER_PIPE_BATCH=1
+ *       -Icmake/composite -I%HOOKED% -I...GXRuntime\include -I...StaticRecomp
+ *       %HOOKED%\chunks_dol\chunk_NNNN_text1_XXXXXXXX.c -o chunk_NNNN.o
+ *   clang -O2 -march=x86-64-v3 -ffp-contract=off -DNATIVE4_HOOKED=1
+ *     -DBW_GUEST_MEM1=bw_guest_mem1 -DBW_GUEST_MEM1_SIZE=0x02000000u (the
+ *     test's usual sources and includes) chunk_*.o cmake/composite/native_*.c
+ *     cmake/composite/guest_cpu.c cmake/composite/gather_pipe.c
+ *     ...\gxruntime.lib -o native_X_hooked_test.exe
+ *
+ * (%HOOKED%: composite-src's chunks_dol and generated.h, copied, then
+ * native_entries.py run on the copy.) Every case the native runs is then
+ * also run through the hooked chunks from the function's entry - once with
+ * the natives on (this set's, the earlier sets' and the leaves' behind the
+ * direct calls, as in play), once with them all off - a small chassis loop
+ * going on in the next chunk where one leaves at a boundary; the CPU state
+ * and the writable pages must match the module's translation byte for byte
+ * both times. The chunks' MEM1 (guest_cpu.c) is read-only but the test's
+ * pages, like the images. */
+#include "gather_pipe.h"
+#include "native_anim.h"
+#include "native_bg.h"
+#include "native_cc.h"
+#include "native_fifo.h"
+#include "native_game_math.h"
+#include "native_j3d.h"
+#include "native_kankyo.h"
+#include "native_math.h"
+#include "native_mtxcalc.h"
+#include "native_search.h"
+#include "native_skin.h"
+#include "native_vec.h"
+
+void func_8018D6E0(CPUState*);
+void func_801956E0(CPUState*);
+void func_802416E0(CPUState*);
+void func_802516E0(CPUState*);
+void func_802D96E0(CPUState*);
+void func_802ED6E0(CPUState*);
+void func_802F16E0(CPUState*);
+void func_802FD6E0(CPUState*);
+static const struct {
+    unsigned index;
+    u32 start;
+    BwChunkFn fn;
+} HOOKED_CHUNKS[] = {{99, 0x8018D6E0u, func_8018D6E0},  {101, 0x801956E0u, func_801956E0},
+                     {144, 0x802416E0u, func_802416E0}, {148, 0x802516E0u, func_802516E0},
+                     {182, 0x802D96E0u, func_802D96E0}, {187, 0x802ED6E0u, func_802ED6E0},
+                     {188, 0x802F16E0u, func_802F16E0}, {191, 0x802FD6E0u, func_802FD6E0}};
+
+static void missing_chunk(CPUState* cpu) {
+    fprintf(stderr, "a call into a chunk the test does not link (pc %08X)\n", cpu->pc);
+    exit(1);
+}
+static BwChunkFn s_hooked_table[256];
+BwChunkFn* const bw_chunk_fns = s_hooked_table;
+
+BwChunkFn bw_find_chunk(u32 address) {
+    for (unsigned i = 0; i < sizeof HOOKED_CHUNKS / sizeof HOOKED_CHUNKS[0]; ++i)
+        if (address - HOOKED_CHUNKS[i].start < 0x4000u)
+            return HOOKED_CHUNKS[i].fn;
+    return NULL;
+}
+
+/* The leaves behind the direct calls (module_export.c's form). */
+static int s_hooked_leaves;
+int bw_native_call(CPUState* cpu, u32 address) {
+    return s_hooked_leaves && (bluewake_native_vec(cpu, address) || bluewake_native_math(cpu, address));
+}
+
+extern CPUState bw_guest_cpu;
+extern u8 bw_guest_mem1[];
+void bluewake_composite_set_gather_pipe(BwGatherPipeWrite write);
+static void hooked_pipe(u64 value, u8 size) {
+    (void)value;
+    (void)size;
+    fprintf(stderr, "a gather pipe write in the hooked chunks\n");
+    exit(1);
+}
+
+static u32 s_hooked_entry[16];
+static unsigned long long s_hooked_cases[16], s_hooked_declined[16];
+static void hooked_summary(void) {
+    for (unsigned i = 0; i < 16u && s_hooked_entry[i] != 0u; ++i)
+        printf("%08X: %llu cases also identical through the hooked chunks, natives on and off (%llu of them "
+               "declined here, for the next hook or the translation)\n",
+               s_hooked_entry[i], s_hooked_cases[i], s_hooked_declined[i]);
+    printf("(each native's count below takes in both its direct calls and its calls from the hooks)\n");
+    fflush(stdout);
+    bluewake_native_kankyo_report();
+    bluewake_native_anim_report();
+    bluewake_native_cc_report();
+    bluewake_native_game_math_report(); /* the second set's hooks behind this set's */
+}
+
+static void hooked_natives(int on) {
+    s_hooked_leaves = on;
+    bluewake_native_kankyo_enabled = on;
+    bluewake_native_anim_enabled = on;
+    bluewake_native_cc_enabled = on;
+    bluewake_native_fifo_enabled = on;
+    bluewake_native_bg_enabled = on;
+    bluewake_native_vec_sr_enabled = on;
+    bluewake_native_mtxcalc_enabled = on;
+    bluewake_native_game_math_enabled = on;
+    bluewake_native_j3d_enabled = on;
+    bluewake_native_search_enabled = on;
+    bluewake_native_skin_enabled = on;
+}
+
+static void hooked_setup(void) {
+    static bool ready;
+    if (ready)
+        return;
+    ready = true;
+    for (unsigned i = 0; i < 256u; ++i)
+        s_hooked_table[i] = missing_chunk;
+    for (unsigned i = 0; i < sizeof HOOKED_CHUNKS / sizeof HOOKED_CHUNKS[0]; ++i)
+        s_hooked_table[HOOKED_CHUNKS[i].index] = HOOKED_CHUNKS[i].fn;
+    bluewake_composite_set_gather_pipe(hooked_pipe);
+    atexit(hooked_summary);
+    if (protect_image(bw_guest_mem1) == NULL) {
+        fprintf(stderr, "cannot protect the chunks' MEM1\n");
+        exit(1);
+    }
+}
+
+/* Entries where an earlier set's hook follows this set's (the second set's
+ * key-s and transform-simple): the cases this set's native declines, but not
+ * where it must, run through the hooked chunks too, so that hook (or the
+ * translation) takes them as in play. */
+static bool hooked_followed(u32 entry) {
+    return entry == BLUEWAKE_ANIM_KEY_S || entry == BLUEWAKE_ANIM_TRANSFORM;
+}
+
+/* The hooked chunks from `entry` on `start` (the regions as `before`), with
+ * the natives on and then off, against `reference`. */
+static void hooked_case(const Harness* h, u32 entry, const char* name, unsigned index, const CPUState* start,
+                        const CPUState* reference, bool flush, bool declined) {
+    hooked_setup();
+    for (int on = 1; on >= 0; --on) {
+        copy_regions(bw_guest_mem1, h->before);
+        hooked_natives(on);
+        bw_guest_cpu = *start;
+        bw_guest_cpu.ram = bw_guest_mem1;
+        host_fp_mode(flush);
+        ppc_fpscr_updated(&bw_guest_cpu);
+        bw_guest_cpu.pc = entry;
+        unsigned guard = 0;
+        while ((bw_guest_cpu.pc & ~3u) != RETURN_ADDRESS && guard++ < 4096u) {
+            BwChunkFn fn = bw_find_chunk(bw_guest_cpu.pc);
+            if (fn == NULL) {
+                fprintf(stderr, "case %u (%s): no linked chunk at %08X\n", index, name, bw_guest_cpu.pc);
+                exit(1);
+            }
+            fn(&bw_guest_cpu);
+        }
+        host_fp_mode(false);
+        CPUState got = bw_guest_cpu;
+        got.ram = start->ram;
+        if (memcmp(&got, reference, sizeof got) != 0 || !same_regions(bw_guest_mem1, h->reference_ram)) {
+            fprintf(stderr, "case %u (%s, seed %08X): the hooked chunks, natives %s, differ\n", index, name, seed,
+                    on ? "on" : "off");
+            report_cpu(&got, reference);
+            report_ram(bw_guest_mem1, h->reference_ram);
+            exit(1);
+        }
+    }
+    hooked_natives(0);
+    unsigned slot = 0;
+    while (slot < 15u && s_hooked_entry[slot] != 0u && s_hooked_entry[slot] != entry)
+        slot++;
+    s_hooked_entry[slot] = entry;
+    s_hooked_cases[slot]++;
+    s_hooked_declined[slot] += declined;
+}
+#endif
+
 /* One case: the native on `start` (in the native image, regions saved in
  * `before`), then - where it ran - the translation, and every byte compared.
  * Returns 1 identical, 0 declined unchanged; a mismatch exits. */
@@ -345,6 +537,15 @@ static int harness_case(Harness* h, NativeFn native_fn, u32 entry, const char* n
             report_cpu(&native, &untouched);
             exit(1);
         }
+#ifdef NATIVE4_HOOKED
+        if (!must_decline && !with_journal && !with_aliases && hooked_followed(entry)) {
+            host_fp_mode(flush);
+            const CPUState reference = harness_translate(h, start, entry);
+            host_fp_mode(false);
+            if (s_unexpected_service == 0u && (reference.pc & ~3u) == RETURN_ADDRESS)
+                hooked_case(h, entry, name, index, start, &reference, flush, true);
+        }
+#endif
         return 0;
     }
     if (must_decline) {
@@ -361,6 +562,9 @@ static int harness_case(Harness* h, NativeFn native_fn, u32 entry, const char* n
         report_ram(h->native_ram, h->reference_ram);
         exit(1);
     }
+#ifdef NATIVE4_HOOKED
+    hooked_case(h, entry, name, index, start, &reference, flush, false);
+#endif
     return 1;
 }
 
