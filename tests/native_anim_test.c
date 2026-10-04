@@ -553,6 +553,9 @@ int main(int argc, char** argv) {
             printf("%08X %s, %s: translation %.1f ns/call through the dispatcher, native %.1f ns/call (%lld guest "
                    "cycles a call)\n",
                    entry, NAMES[which], SHAPES[variant], best_t, best_n, (long long)cycles);
+#ifdef NATIVE4_HOOKED
+            hooked_bench(ram, entry, &base, bench_calls, NAMES[which], SHAPES[variant]);
+#endif
         }
     }
     return status;

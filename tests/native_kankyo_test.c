@@ -248,6 +248,9 @@ int main(int argc, char** argv) {
             }
             printf("%08X %s: translation %.1f ns/call through the dispatcher, native %.1f ns/call\n", entry,
                    NAMES[which], best_t, best_n);
+#ifdef NATIVE4_HOOKED
+            hooked_bench(h.native_ram, entry, &base, bench_calls, NAMES[which], NULL);
+#endif
         }
     }
     return status;

@@ -294,6 +294,9 @@ int main(int argc, char** argv) {
         }
         printf("8024170C CalcDivideInfoOverArea: translation %.1f ns/call through the dispatcher, native %.1f ns/call\n",
                best_t, best_n);
+#ifdef NATIVE4_HOOKED
+        hooked_bench(h.native_ram, BLUEWAKE_CC_DIVIDE_OVER_AREA, &base, bench_calls, "CalcDivideInfoOverArea", NULL);
+#endif
 
         seed = 0xBB67AE85u;
         k = build_set_c(h.native_ram, 0u);
@@ -342,6 +345,9 @@ int main(int argc, char** argv) {
         }
         printf("80251D88 cM3dGCyl::SetC: translation %.1f ns/call through the dispatcher, native %.1f ns/call\n", best_t,
                best_n);
+#ifdef NATIVE4_HOOKED
+        hooked_bench(h.native_ram, BLUEWAKE_CC_CYL_SET_C, &base, bench_calls, "cM3dGCyl::SetC", NULL);
+#endif
     }
     return status;
 }

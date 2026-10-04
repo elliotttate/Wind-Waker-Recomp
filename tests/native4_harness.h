@@ -462,6 +462,49 @@ static void hooked_setup(void) {
     }
 }
 
+/* ns per call through the hooked chunks from `entry` on `base` (its pages
+ * as in `ram`): this set's natives off, then on, with the earlier sets' and
+ * the leaves' on in both, as in play. r1, r3 to r7, f1 to f7 and LR are set
+ * again before each call, as the tests' own benchmarks set theirs; the
+ * chunk's entry and return dispatch are in the time, the chassis's own
+ * dispatcher is not (a call from translated code reaches the chunk
+ * directly). */
+static void hooked_bench(const u8* ram, u32 entry, const CPUState* base, unsigned calls, const char* name,
+                         const char* shape) {
+    hooked_setup();
+    copy_regions(bw_guest_mem1, ram);
+    double best[2] = {1e30, 1e30};
+    for (unsigned round = 0; round < 6u; ++round) {
+        const int on = (int)(round & 1u);
+        hooked_natives(1);
+        bluewake_native_kankyo_enabled = bluewake_native_anim_enabled = bluewake_native_cc_enabled = on;
+        bw_guest_cpu = *base;
+        bw_guest_cpu.ram = bw_guest_mem1;
+        bw_guest_cpu.downcount = 0;
+        bw_guest_cpu.cycle_budget = (s64)1 << 40;
+        bw_guest_cpu.cycle_deadline_budget = 0;
+        ppc_fpscr_updated(&bw_guest_cpu);
+        const double t0 = now_ns();
+        for (unsigned i = 0; i < calls; ++i) {
+            CPUState* c = &bw_guest_cpu;
+            c->gpr[1] = base->gpr[1];
+            memcpy(&c->gpr[3], &base->gpr[3], 5u * sizeof(u32));
+            memcpy(&c->fpr[1], &base->fpr[1], 7u * sizeof(f64));
+            c->lr = RETURN_ADDRESS;
+            c->pc = entry;
+            do
+                s_hooked_table[(c->pc - 0x800016E0u) >> 14](c);
+            while ((c->pc & ~3u) != RETURN_ADDRESS);
+        }
+        const double ns = (now_ns() - t0) / calls;
+        if (ns < best[on])
+            best[on] = ns;
+    }
+    hooked_natives(0);
+    printf("%08X %s%s%s: through the hooked chunks %.1f ns/call with this set's natives off, %.1f on (%.2fx)\n",
+           entry, name, shape != NULL ? ", " : "", shape != NULL ? shape : "", best[0], best[1], best[0] / best[1]);
+}
+
 /* Entries where an earlier set's hook follows this set's (the second set's
  * key-s and transform-simple): the cases this set's native declines, but not
  * where it must, run through the hooked chunks too, so that hook (or the
