@@ -700,6 +700,16 @@ int main(int argc, char** argv) {
     // std::this_thread::sleep_for waits, which the C++ library turns into
     // Sleep(1), and Windows' default tick would stretch each to 15.6 ms.
     timeBeginPeriod(1);
+    // Above normal priority, so a program busy in the background takes less from
+    // the game: its thread and the graphics threads it waits for every frame keep
+    // their order among themselves and run ahead of normal-priority work. DeepSea
+    // raises its emulation thread the same way. BLUEWAKE_PRIORITY=0 keeps normal
+    // priority.
+    const char* priority = getenv("BLUEWAKE_PRIORITY");
+    if (priority == NULL || priority[0] != '0') {
+        if (SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS))
+            fprintf(stderr, "[windows] priority above normal\n");
+    }
     // The name the volume mixer shows for the game's audio.
     SDL_SetAppMetadata("BlueWake", "0.1", "dev.bluewake.BlueWake");
     g_hotkey_hook = SetWindowsHookExW(WH_KEYBOARD, hotkey_hook, NULL, GetCurrentThreadId());

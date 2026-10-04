@@ -31,11 +31,21 @@
 // the frame before, and vertex by vertex (the particles of a steady wake shift
 // one place a frame, so that is the wake half a frame later).
 //
+// Cloth. Flags (dCloth_packet_c, which the game's flag actors create) and the
+// boat's sail (daHo_packet_c) move their vertices on the CPU each game frame
+// and draw them as strips through position arrays. Their matrices barely
+// move, so the in-between frame drew the cloth where the next frame has it:
+// it flapped at 30 FPS. Before such a packet draws, the host tags its strips
+// the same way as a wake's (a scope over a count of draws), with the flag
+// that they index their positions; each strip is blended vertex by vertex.
+//
 //   BLUEWAKE_DRAW_TAGS=0   off
 #define BLUEWAKE_PARTICLE_DRAW_FIRST 0x80260BACu // JPADrawExecBillBoard::exec
 #define BLUEWAKE_PARTICLE_DRAW_LAST 0x80264C4Cu  // JPADrawExecCallBack::exec
 #define BLUEWAKE_WAKE_DRAW_FIRST 0x8007E484u     // dPa_waveEcallBack::draw
 #define BLUEWAKE_WAKE_DRAW_LAST 0x8007F3BCu      // dPa_trackEcallBack::draw
+#define BLUEWAKE_CLOTH_DRAW 0x80063728u          // dCloth_packet_c::draw
+#define BLUEWAKE_SAIL_DRAW 0x800E93B8u           // daHo_packet_c::draw (the boat's sail)
 
 // Once the guest is running.
 void bluewake_draw_tags_attach(CPUState* cpu);
@@ -48,7 +58,8 @@ void bluewake_draw_tags_enter(CPUState* cpu, u32 address);
 static inline void bluewake_draw_tags_dispatch(CPUState* cpu, u32 address) {
     if (__builtin_expect(address - BLUEWAKE_PARTICLE_DRAW_FIRST <=
                                  BLUEWAKE_PARTICLE_DRAW_LAST - BLUEWAKE_PARTICLE_DRAW_FIRST ||
-                             address - BLUEWAKE_WAKE_DRAW_FIRST <= BLUEWAKE_WAKE_DRAW_LAST - BLUEWAKE_WAKE_DRAW_FIRST,
+                             address - BLUEWAKE_WAKE_DRAW_FIRST <= BLUEWAKE_WAKE_DRAW_LAST - BLUEWAKE_WAKE_DRAW_FIRST ||
+                             address == BLUEWAKE_CLOTH_DRAW || address == BLUEWAKE_SAIL_DRAW,
                          0) &&
         bluewake_draw_tags_enabled)
         bluewake_draw_tags_enter(cpu, address);

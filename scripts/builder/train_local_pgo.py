@@ -88,6 +88,9 @@ def fingerprint(args, compiler):
     digest.update(Path(__file__).read_bytes())
     digest.update((ROOT / "apple/ios/src/dsp_common_shim.cpp").read_bytes())
     digest.update(subprocess.check_output(["git", "-C", str(ROOT / "ref/recompcore"), "rev-parse", "HEAD"]))
+    # The renderer delta is applied on top of the pinned commit. Its recorded
+    # checksum must also invalidate profiles trained before a runtime change.
+    digest.update((ROOT / "config/recompcore-patches.json").read_bytes())
     with args.disc.open("rb") as disc:
         for chunk in iter(lambda: disc.read(4 * 1024 * 1024), b""):
             digest.update(chunk)
@@ -121,10 +124,11 @@ def main():
     for path in required:
         if not path.is_file():
             parser.error(f"missing {path}; run the builder's source stages first")
-    donor_status = subprocess.check_output(
-        ["git", "-C", str(ROOT / "ref/recompcore"), "status", "--porcelain", "--untracked-files=no"], text=True)
-    if donor_status.strip():
-        parser.error("ref/recompcore has modified tracked source; restore the pinned dependency first")
+    runtime_patch = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/apply_recompcore_patches.py")],
+        capture_output=True, text=True)
+    if runtime_patch.returncode:
+        parser.error(runtime_patch.stderr.strip())
     work = args.out / "pgo-local"
     work.mkdir(parents=True, exist_ok=True)
     logs = work / "logs"

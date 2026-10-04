@@ -1,5 +1,8 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
+  - name: Report a bug or request a feature on BlueWake
+    url: https://github.com/chrissotraidis/bluewake/issues/new/choose
+    about: Wind Waker Recomp is moving to BlueWake. Please open new issues there.
   - name: Community questions
     url: https://discord.gg/xwHfUD2bxW
     about: Ask setup and gameplay questions in the community.

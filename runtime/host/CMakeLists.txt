@@ -4,6 +4,7 @@ project(bluewake_host LANGUAGES C CXX)
 include(CTest)
 
 set(GXRUNTIME_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ref/recompcore/GXRuntime)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/RecompCorePatches.cmake)
 
 option(BLUEWAKE_ENABLE_DSP_ADAPTER
        "Build the optional source-compatible RecompCore DSP adapter" OFF)
@@ -20,6 +21,18 @@ set(BLUEWAKE_DSP_DONOR_BUILD_DIR ""
 
 add_subdirectory(${GXRUNTIME_DIR} gxruntime_build)
 
+if(TARGET GXRuntime::aurora)
+    set(_bluewake_interp_dir ${GXRUNTIME_DIR}/graphics/aurora)
+    add_executable(bluewake_frame_interp_test
+        ${_bluewake_interp_dir}/tests/frame_interp_test.cpp
+        ${_bluewake_interp_dir}/lib/gfx/frame_interp.cpp)
+    target_compile_features(bluewake_frame_interp_test PRIVATE cxx_std_20)
+    target_include_directories(bluewake_frame_interp_test PRIVATE
+        ${_bluewake_interp_dir}/include ${GXRUNTIME_DIR}/graphics/gxcore/include)
+    target_link_libraries(bluewake_frame_interp_test PRIVATE absl::flat_hash_map absl::flat_hash_set)
+    add_test(NAME bluewake_frame_interp_test COMMAND bluewake_frame_interp_test)
+endif()
+
 add_executable(bluewake_host
     src/main.c
     src/aram_dma.c
@@ -31,6 +44,7 @@ add_executable(bluewake_host
     src/delivery_digest.c
     src/edge_intercepts.c
     src/game_options.c
+    src/forest_water.c
     src/fast_load.c
     src/fps_watch.c
     src/jump_button.c
@@ -39,6 +53,7 @@ add_executable(bluewake_host
     src/simulation_mode.c
     src/sprint.c
     src/quick_doors.c
+    src/haptics.c
     src/draw_tags.c
     src/mouse_camera.c
     src/return_census.c
@@ -257,6 +272,16 @@ target_include_directories(bluewake_edge_intercepts_test PRIVATE
 )
 add_test(NAME bluewake_edge_intercepts_test
     COMMAND bluewake_edge_intercepts_test)
+
+add_executable(bluewake_forest_water_test
+    ../../tests/forest_water_test.c
+    src/forest_water.c)
+target_link_libraries(bluewake_forest_water_test PRIVATE gxruntime ${CMAKE_DL_LIBS})
+target_include_directories(bluewake_forest_water_test PRIVATE
+    ${GXRUNTIME_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../ref/recompcore/Source/Core/Core/PowerPC/StaticRecomp)
+add_test(NAME bluewake_forest_water_test COMMAND bluewake_forest_water_test)
 
 add_executable(bluewake_external_memory_test
     ../../tests/external_memory_test.c

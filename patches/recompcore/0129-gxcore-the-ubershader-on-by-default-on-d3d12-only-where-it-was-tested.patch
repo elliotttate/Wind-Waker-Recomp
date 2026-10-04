@@ -1,0 +1,99 @@
+From 44e5c2c2451f713c9e21ed9a4a5f560f3d057ff4 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Fri, 2 Oct 2026 20:46:18 -0400
+Subject: [PATCH] gxcore: the ubershader on by default on D3D12 only, where it
+ was tested
+
+ubershader_mode() reads DOL_AURORA_UBERSHADER for the draw path, the render
+path and the pipeline cache alike; without it the ubershader is on with
+D3D12 and off with the other backends (Metal and Vulkan have not drawn it).
+---
+ .../graphics/aurora/lib/gfx/gxcore_draw.cpp      | 15 +++++----------
+ .../graphics/aurora/lib/gfx/pipeline_cache.cpp   | 16 +++++++++++-----
+ .../graphics/aurora/lib/gfx/pipeline_cache.hpp   |  4 ++++
+ 3 files changed, 20 insertions(+), 15 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index 387ee25a..70f2126f 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -717,10 +717,7 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   // depth. Binding the color pipeline first is harmless; it is rebound below.
+   // A draw whose own are not ready yet is drawn with the ubershader, if it was
+   // recorded with its data (submit_draw_plan), without the depth prepass.
+-  static const bool uberForced = [] {
+-    const char* env = std::getenv("DOL_AURORA_UBERSHADER");
+-    return env != nullptr && env[0] == '2';
+-  }();
++  static const bool uberForced = ubershader_mode() == 2;
+   bool uberDraw = false;
+   if (uberForced && data.uberPipeline != 0) {
+     if (!bind(data.uberPipeline)) {
+@@ -1895,12 +1892,10 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   // state, few, and kept in the pipeline cache like any other. The draw gets
+   // a pixel block with its shader key and a bind group with all eight texmaps,
+   // used only if its own pipeline is still not ready when it is encoded.
+-  // DOL_AURORA_UBERSHADER=0 turns it off; =2 draws every draw with it
+-  // (testing: a frame drawn both ways can be compared).
+-  static const int uberMode = [] {
+-    const char* env = std::getenv("DOL_AURORA_UBERSHADER");
+-    return env == nullptr || env[0] == '\0' ? 1 : std::atoi(env);
+-  }();
++  // On by default on D3D12 (ubershader_mode()); DOL_AURORA_UBERSHADER=0 turns
++  // it off, =2 draws every draw with it (testing: a frame drawn both ways can
++  // be compared).
++  static const int uberMode = ubershader_mode();
+   PipelineRef uberPipeline = 0;
+   Range uberPixelRange{};
+   BindGroupRef uberTextureBindGroup = 0;
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
+index 3e21258a..781d0869 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
+@@ -713,11 +713,7 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+ static absl::flat_hash_set<HashType> g_uberStates;
+ 
+ static void queue_ubershader_state(const gxcore::PipelineConfig& config) {
+-  static const bool enabled = [] {
+-    const char* env = std::getenv("DOL_AURORA_UBERSHADER");
+-    return env == nullptr || env[0] != '0';
+-  }();
+-  if (!enabled || config.depthOnly != 0u)
++  if (ubershader_mode() == 0 || config.depthOnly != 0u)
+     return;
+   gxcore::PipelineConfig uber = config;
+   uber.key.shader = {};
+@@ -1483,6 +1479,16 @@ void end_pipeline_frame() {
+ }
+ 
+ void note_ubershader_draw() { g_uberDraws.fetch_add(1, std::memory_order_relaxed); }
++
++int ubershader_mode() {
++  static const int mode = [] {
++    const char* env = std::getenv("DOL_AURORA_UBERSHADER");
++    if (env != nullptr && env[0] != '\0')
++      return std::atoi(env);
++    return webgpu::g_backendType == wgpu::BackendType::D3D12 ? 1 : 0;
++  }();
++  return mode;
++}
+ void note_draw_left_out(uint32_t draws) { g_leftOutDraws.fetch_add(draws, std::memory_order_relaxed); }
+ 
+ bool pipeline_ready(PipelineRef ref) {
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp
+index dfaafa9d..37807172 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp
+@@ -40,5 +40,9 @@ bool pipeline_ready(PipelineRef ref);
+ // draws).
+ void note_ubershader_draw();
+ void note_draw_left_out(uint32_t draws);
++// The ubershader (gxcore_uber.cpp): 0 off, 1 for the draws whose own pipeline
++// is still compiling, 2 for every draw (testing). DOL_AURORA_UBERSHADER sets
++// it; the default is 1 on D3D12, where it was tested, and 0 elsewhere.
++int ubershader_mode();
+ 
+ } // namespace aurora::gfx
+-- 
+2.45.2.windows.1
+

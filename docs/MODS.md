@@ -29,6 +29,10 @@ memory. Copy the folder of `tex1_…` images (in Hypatia's pack, the `GZL` folde
 `Load/Textures/GZLE01`, turn on *HD Texture Pack* and restart. Subfolders are searched, `_mipN`
 sidecar mipmaps are used, and PNG and DDS files both work. The menu shows how many textures it found.
 
+You can also [import compatible textures from your own Wii U Wind Waker HD
+disc](WWHD_TEXTURES.md). The local importer creates a Dolphin-format pack;
+select it with the same HD texture pack setting.
+
 **Better Wind Waker:** turn on *Better Wind Waker*, pick its settings in **⋯ › Mods › Better Wind Waker
 Settings** and restart. Each of Better Wind Waker's settings is a switch of its own, on or off by Better
 Wind Waker's defaults until you change it: instant text (and holding B to advance), Swift Sail (or Brisk
@@ -39,6 +43,23 @@ off. No patched disc is needed. Swift Sail's new sail texture and icons are Wind
 not included (an HD texture pack can supply them); its name stays "Sail". On the Mac host,
 `BLUEWAKE_MODS=betterww` turns the settings on and `BLUEWAKE_OPTIONS=name,-name,...` changes them
 (`none` first turns them all off); `scripts/mac/run_host.sh` takes `BWW=1` and `OPTIONS=`.
+
+## Forest Water Challenge assistance
+
+On Mac, **Settings › Gameplay › Forest Water Challenge** has two independent
+options, both off by default and separate from Better Wind Waker:
+
+- **Keep watered trees when time runs out:** Forest Water still expires and
+  becomes ordinary water, but watered trees retain their progress. Collect more
+  Forest Water to finish the remaining trees; progress uses the normal save data.
+- **30-minute Forest Water timer:** newly collected Forest Water lasts 30 minutes
+  instead of 20. This does not reset or extend an already running timer.
+
+The switches apply immediately, without restarting. They are saved as
+`BLUEWAKE_FOREST_WATER_KEEP_TREES=1` and `BLUEWAKE_FOREST_WATER_30_MINUTES=1`.
+With both off, the original challenge rules apply. The host adjusts the game's
+fresh-water timer reset, expired-water progress clear and watered-tree wilt check;
+the original timer and bottle expiration logic still execute.
 
 ## Better Wind Waker's settings as game options
 

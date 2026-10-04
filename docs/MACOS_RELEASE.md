@@ -53,7 +53,14 @@ stick zooms. The left bumper jumps and a click of the left stick sprints. The ga
 Click the game to turn the camera with the mouse (left click is A, the wheel zooms); Esc gives the
 mouse back. **Esc** (with the mouse free), **F1** or a controller's Back button opens the options:
 aspect ratio, fullscreen, render resolution, Smooth Motion (Off, 60 or 120), texture filtering,
-HD texture packs and Better Wind Waker's settings.
+HD texture packs, Better Wind Waker's settings and controller vibration (Controls: Enhanced, Classic or Off,
+its strength, and trigger feedback).
+
+**Controller vibration.** The game's own vibration (hits, falls, explosions, bosses, quakes) is felt as the
+game timed it, but shaped by its strength on both motors instead of the GameCube's plain on and off; strong
+hits also kick an Xbox controller's impulse triggers or a DualSense's triggers (the DualSense over USB or
+Bluetooth through SDL's own driver). Nothing is felt while the options are open or the game is in the
+background. The game's own Vibration option still turns it off.
 
 ## Climbing
 

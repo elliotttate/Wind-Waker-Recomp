@@ -1,0 +1,1698 @@
+From db2c87f9e845aad5584c105ab9cc9a4264b3d70e Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Fri, 2 Oct 2026 20:40:23 -0400
+Subject: [PATCH 128/128] gxcore: an ubershader draws what is still compiling
+
+A draw whose pipeline was still compiling was left out of its frame: on a
+new scene that is a few hundred draws a frame for the first frames, with
+whole objects and walls popping in. As Dolphin's ubershaders do, a draw whose
+own pipeline is not ready is now drawn with an ubershader: one WGSL module
+(gxcore_uber.cpp) for any shader key, which it reads from its pixel uniform
+(UberPixelConstants: the pixel constants, the key's bytes) and interprets -
+lighting, texgens, the TEV stages, alpha test, fog - with a pipeline for each
+fixed-function state (gxcore depthOnly 2) and a bind group of all eight
+texmaps. Forced on every draw (DOL_AURORA_UBERSHADER=2) it draws the lava
+rooms' frames identical to the specialized pipelines'.
+
+Its pipelines for the states the cache's pipelines use are queued at start
+(Dolphin's QueueUberSiblingStates). Its two shaders (plain, dual-source)
+take about 650 ms each to compile when Dawn's blob cache does not have them;
+from the cache a pipeline takes a few ms. So one pipeline per shader is made
+before its others, and when depends on whether an earlier run made one (the
+pipeline cache keeps the ubershader pipelines draws asked for): first if so,
+otherwise only once the cache is queued and nothing else is.
+
+Draws left out while their pipelines compiled (a batch now counts its
+draws), booting into save states with the old 213-pipeline seed:
+- a first launch (nothing in Dawn's cache): Gohma's room 5,933 against
+  6,069 without the ubershader, Dragon Roost Cavern's lava room 5,296
+  against 5,297, its bridge 4,613 against 4,848;
+- after playing Outset once: 950 against 4,860, 141 against 3,477 and 215
+  against 3,377 (3,910, 3,336 and 3,162 drawn with the ubershader).
+
+DOL_AURORA_UBERSHADER=0 turns it off. The once-a-second report says how
+many draws were left out and how many the ubershader drew.
+---
+ GXRuntime/graphics/aurora/lib/gfx/common.cpp  |   4 +-
+ .../graphics/aurora/lib/gfx/gxcore_draw.cpp   | 215 ++++-
+ .../graphics/aurora/lib/gfx/gxcore_draw.hpp   |   7 +
+ .../aurora/lib/gfx/pipeline_cache.cpp         | 180 +++-
+ .../aurora/lib/gfx/pipeline_cache.hpp         |   8 +
+ GXRuntime/graphics/gxcore/CMakeLists.txt      |   1 +
+ .../include/gxruntime/gxcore/shader.hpp       |  13 +
+ GXRuntime/graphics/gxcore/src/gxcore_uber.cpp | 904 ++++++++++++++++++
+ 8 files changed, 1295 insertions(+), 37 deletions(-)
+ create mode 100644 GXRuntime/graphics/gxcore/src/gxcore_uber.cpp
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.cpp b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+index 5f9d58bc..a11983b0 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+@@ -1100,8 +1100,8 @@ PipelineRef pipeline_ref(const gxcore::PipelineConfig& config) {
+     uint32_t generation = 0;
+     bool valid = false;
+   };
+-  thread_local Memo memo[2];
+-  Memo& m = memo[config.depthOnly != 0 ? 1 : 0];
++  thread_local Memo memo[3];
++  Memo& m = memo[config.depthOnly < 3u ? config.depthOnly : 0u];
+   const uint32_t generation = pipeline_cache_generation();
+   if (m.valid && m.generation == generation && std::memcmp(&m.config, &config, sizeof config) == 0)
+     return m.ref;
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index a7f6beb6..387ee25a 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -17,6 +17,7 @@
+ #include <absl/container/flat_hash_map.h>
+ 
+ #include <algorithm>
++#include <chrono>
+ #include <atomic>
+ #include <cmath>
+ #include <condition_variable>
+@@ -367,11 +368,14 @@ bool needs_early_depth_emulation(const gxc::PipelineKey& key) {
+ 
+ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+   const gxc::PipelineKey& key = config.key;
+-  const bool depthOnly = config.depthOnly != 0u;
++  // depthOnly 2: the ubershader for this fixed-function state (the key's
++  // shader is empty but for destination alpha), drawing any shader key.
++  const bool uber = config.depthOnly == 2u;
++  const bool depthOnly = config.depthOnly == 1u;
+   CHECK(key.shader.use_dst_alpha == 0 ||
+             webgpu::g_dualSourceBlendingSupported,
+         "GX destination alpha requires WebGPU dual-source blending");
+-  std::string wgsl = gxc::generate_wgsl(key.shader);
++  std::string wgsl = uber ? gxc::generate_uber_wgsl(key.shader.use_dst_alpha != 0) : gxc::generate_wgsl(key.shader);
+   if (depthOnly) {
+     wgsl += "\n@fragment\nfn fs_depth_only() -> @location(0) vec4f {\n"
+             "    return vec4f(0.0);\n}\n";
+@@ -393,15 +397,15 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+   // Multi-texmap: the texture group's layout matches the set of texmaps the WGSL
+   // declares (derived identically from the shader key), so pipeline and bind
+   // group agree. Untextured draws never use the texture group (layoutCount below).
+-  const uint32_t tex_mask = textured ? gxc::used_texmap_mask(key.shader) : 1u;
++  const uint32_t tex_mask = uber ? 0xFFu : textured ? gxc::used_texmap_mask(key.shader) : 1u;
+   std::array<wgpu::BindGroupLayout, 4> bindGroupLayouts{
+       g_staticBindGroupLayout,
+       g_uniformBindGroupLayout,
+-      tev ? g_uniformBindGroupLayout : texture_bind_group_layout(tex_mask),
++      tev || uber ? g_uniformBindGroupLayout : texture_bind_group_layout(tex_mask),
+       texture_bind_group_layout(tex_mask),
+   };
+   const size_t layoutCount =
+-      depthOnly ? 2 : tev ? (textured ? 4 : 3) : (textured ? 3 : 2);
++      uber ? 4 : depthOnly ? 2 : tev ? (textured ? 4 : 3) : (textured ? 3 : 2);
+   const wgpu::PipelineLayoutDescriptor layoutDescriptor{
+       .label = "GXCore Pipeline Layout",
+       .bindGroupLayoutCount = layoutCount,
+@@ -474,44 +478,44 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+   // vertex FORMAT carries that attribute. A lit/emboss draw whose format omits
+   // it reads the cached fallback from the uniform instead (I_CACHED_NORMAL), so
+   // the shader does not declare the input and the layout must not provide it.
+-  if ((key.shader.lit_valid != 0 || has_emboss || has_normal_source) &&
+-      key.shader.has_vertex_normal != 0) {
++  if (uber || ((key.shader.lit_valid != 0 || has_emboss || has_normal_source) &&
++                key.shader.has_vertex_normal != 0)) {
+     attributes.push_back(wgpu::VertexAttribute{
+         .format = wgpu::VertexFormat::Float32x3,
+         .offset = gxc::kVertexNormalOffset,
+         .shaderLocation = 8,
+     });
+   }
+-  if (key.shader.has_tex_mtx_idx != 0) {
++  if (uber || key.shader.has_tex_mtx_idx != 0) {
+     attributes.push_back(wgpu::VertexAttribute{
+         .format = wgpu::VertexFormat::Uint32,
+         .offset = gxc::kVertexTexMtxIdxOffset,
+         .shaderLocation = 9,
+     });
+   }
+-  if (has_emboss && key.shader.has_vertex_binormal != 0) {
++  if (uber || (has_emboss && key.shader.has_vertex_binormal != 0)) {
+     attributes.push_back(wgpu::VertexAttribute{
+         .format = wgpu::VertexFormat::Float32x3,
+         .offset = gxc::kVertexBinormalOffset,
+         .shaderLocation = 10,
+     });
+   }
+-  if (has_emboss && key.shader.has_vertex_tangent != 0) {
++  if (uber || (has_emboss && key.shader.has_vertex_tangent != 0)) {
+     attributes.push_back(wgpu::VertexAttribute{
+         .format = wgpu::VertexFormat::Float32x3,
+         .offset = gxc::kVertexTangentOffset,
+         .shaderLocation = 11,
+     });
+   }
+-  if ((key.shader.uv_mask & (1u << 4u)) != 0u) {
++  if (uber || (key.shader.uv_mask & (1u << 4u)) != 0u) {
+     attributes.push_back(wgpu::VertexAttribute{
+         .format = wgpu::VertexFormat::Float32x2,
+         .offset = gxc::kVertexUvOffset + 32u,
+         .shaderLocation = 12,
+     });
+   }
+-  if (key.shader.has_tex_mtx_idx != 0 &&
+-      (key.shader.tex_mtx_idx_mask & 0xF0u) != 0u) {
++  if (uber || (key.shader.has_tex_mtx_idx != 0 &&
++                (key.shader.tex_mtx_idx_mask & 0xF0u) != 0u)) {
+     attributes.push_back(wgpu::VertexAttribute{
+         .format = wgpu::VertexFormat::Uint32,
+         .offset = gxc::kVertexTexMtxIdxHiOffset,
+@@ -525,7 +529,8 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+       .attributes = attributes.data(),
+   };
+ 
+-  const bool emulateEarlyDepth = needs_early_depth_emulation(key);
++  // The ubershader draws without early-depth emulation (a frame or two).
++  const bool emulateEarlyDepth = !uber && needs_early_depth_emulation(key);
+   const bool depthCompare = key.depth_test != 0;
+   const wgpu::DepthStencilState depthStencil{
+       .format = g_graphicsConfig.depthFormat,
+@@ -645,7 +650,17 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+           },
+       .fragment = &fragmentState,
+   };
+-  return g_device.CreateRenderPipeline(&descriptor);
++  if (!uber)
++    return g_device.CreateRenderPipeline(&descriptor);
++  // An ubershader pipeline takes most of a second when its shader is not in
++  // Dawn's blob cache yet (pipeline_cache.cpp makes one first): say so.
++  const auto start = std::chrono::steady_clock::now();
++  auto made = g_device.CreateRenderPipeline(&descriptor);
++  const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
++  if (ms >= 100.0)
++    std::fprintf(stderr, "[pipelines] the ubershader compiled in %.0f ms (%s)\n", ms,
++                 key.shader.use_dst_alpha != 0 ? "dual-source blending" : "plain");
++  return made;
+ }
+ 
+ // What render() last bound in the pass being encoded, so a draw sets only
+@@ -700,11 +715,27 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   };
+   // Ensure both asynchronous pipelines are ready before the prepass writes any
+   // depth. Binding the color pipeline first is harmless; it is rebound below.
+-  if (!bind(data.pipeline)) {
+-    return;
++  // A draw whose own are not ready yet is drawn with the ubershader, if it was
++  // recorded with its data (submit_draw_plan), without the depth prepass.
++  static const bool uberForced = [] {
++    const char* env = std::getenv("DOL_AURORA_UBERSHADER");
++    return env != nullptr && env[0] == '2';
++  }();
++  bool uberDraw = false;
++  if (uberForced && data.uberPipeline != 0) {
++    if (!bind(data.uberPipeline)) {
++      note_draw_left_out(data.batchSize);
++      return;
++    }
++    uberDraw = true;
++  } else if (!bind(data.pipeline) || (data.depthPipeline != 0 && !bind(data.depthPipeline))) {
++    if (data.uberPipeline == 0 || !bind(data.uberPipeline)) {
++      note_draw_left_out(data.batchSize);
++      return;
++    }
++    uberDraw = true;
++    note_ubershader_draw();
+   }
+-  if (data.depthPipeline != 0 && !bind(data.depthPipeline))
+-    return;
+   // The in-between frame being encoded: its step's block and vertices (a
+   // traced frame's own, matched while recording, are one step's).
+   const bool interpolated = frame_interp::encoding_interpolated();
+@@ -819,6 +850,22 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+       pass.DrawIndexed(part.indexCount, 1, part.firstIndex, baseVertex);
+     }
+   };
++  if (uberDraw) {
++    // group 2: the pixel constants and the shader key; group 3: all eight texmaps.
++    const uint32_t psOffset = data.uberPixelRange.offset;
++    if (g_uniformBindGroup.Get() != g_pass.group2 || psOffset != g_pass.offset2) {
++      pass.SetBindGroup(2, g_uniformBindGroup, 1, &psOffset);
++      g_pass.group2 = g_uniformBindGroup.Get();
++      g_pass.offset2 = psOffset;
++    }
++    const auto& group = find_bind_group(data.uberTextureBindGroup);
++    if (group.Get() != g_pass.group3) {
++      pass.SetBindGroup(3, group);
++      g_pass.group3 = group.Get();
++    }
++    draw(false);
++    return;
++  }
+   if (data.depthPipeline != 0) {
+     draw(false);
+     if (!bind(data.pipeline))
+@@ -995,6 +1042,37 @@ static UniformCache g_vertexUniformCache;
+ static uint64_t g_pushedConstantsId = 0;
+ static UniformCache g_interpUniformCache;
+ static UniformCache g_pixelUniformCache;
++static UniformCache g_uberPixelUniformCache;
++
++// The ubershader's texture for a texmap slot no TEV stage samples: one white
++// texel, made once per device (the ubershader's bind group has all eight).
++static const wgpu::TextureView& empty_texmap_view() {
++  static std::mutex mutex;
++  std::lock_guard lock{mutex};
++  static wgpu::Device owner;
++  static wgpu::Texture texture;
++  static wgpu::TextureView view;
++  if (owner.Get() != g_device.Get()) {
++    owner = g_device;
++    const wgpu::TextureDescriptor descriptor{
++        .label = "GXCore ubershader empty texmap",
++        .usage = wgpu::TextureUsage::TextureBinding | wgpu::TextureUsage::CopyDst,
++        .dimension = wgpu::TextureDimension::e2D,
++        .size = {1, 1, 1},
++        .format = wgpu::TextureFormat::RGBA8Unorm,
++        .mipLevelCount = 1,
++        .sampleCount = 1,
++    };
++    texture = g_device.CreateTexture(&descriptor);
++    view = texture.CreateView();
++    static constexpr uint8_t kWhite[4] = {255, 255, 255, 255};
++    const wgpu::TexelCopyTextureInfo dst{.texture = texture};
++    const wgpu::TexelCopyBufferLayout layout{.bytesPerRow = 4, .rowsPerImage = 1};
++    const wgpu::Extent3D size{1, 1, 1};
++    webgpu::g_queue.WriteTexture(&dst, kWhite, sizeof kWhite, &layout, &size);
++  }
++  return view;
++}
+ 
+ // The block the cache last took: `staged` where it was staged, or the copy.
+ static const uint8_t* cached_bytes(const UniformCache& cache, const uint8_t* staged) {
+@@ -1773,11 +1851,11 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+                  plan.match_direct_position ? 1 : 0, plan.draw_tag, plan.draw_tag_age, plan.draw_scope, plan.draw_scope_part,
+                  tracedPositions != nullptr ? 1 : 0);
+   }
+-  if (!staging_has_capacity(vertBytes + gxc::kVertexStrideBytes, indexBytes, sizeof(plan.constants),
+-                            pixelUniformBytes)) {
++  // (Room too for a pixel block of the ubershader's, should the draw need one.)
++  const size_t pixelRoom = pixelUniformBytes + sizeof(gxc::UberPixelConstants);
++  if (!staging_has_capacity(vertBytes + gxc::kVertexStrideBytes, indexBytes, sizeof(plan.constants), pixelRoom)) {
+     if (!segment_frame() ||
+-        !staging_has_capacity(vertBytes + gxc::kVertexStrideBytes, indexBytes, sizeof(plan.constants),
+-                              pixelUniformBytes)) {
++        !staging_has_capacity(vertBytes + gxc::kVertexStrideBytes, indexBytes, sizeof(plan.constants), pixelRoom)) {
+       Log.error("GXCore draw exceeds an empty Aurora staging segment");
+       return false;
+     }
+@@ -1811,6 +1889,91 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   }
+   const bool ownVertices = plan.draw_tag != 0 || plan.draw_scope_part != 0;
+ 
++  // The ubershader (gxcore_uber.cpp): a draw whose own pipeline is still
++  // compiling is drawn with it, with the same result, rather than left out of
++  // the frame (Dolphin's ubershaders). Its pipelines are one per fixed-function
++  // state, few, and kept in the pipeline cache like any other. The draw gets
++  // a pixel block with its shader key and a bind group with all eight texmaps,
++  // used only if its own pipeline is still not ready when it is encoded.
++  // DOL_AURORA_UBERSHADER=0 turns it off; =2 draws every draw with it
++  // (testing: a frame drawn both ways can be compared).
++  static const int uberMode = [] {
++    const char* env = std::getenv("DOL_AURORA_UBERSHADER");
++    return env == nullptr || env[0] == '\0' ? 1 : std::atoi(env);
++  }();
++  PipelineRef uberPipeline = 0;
++  Range uberPixelRange{};
++  BindGroupRef uberTextureBindGroup = 0;
++  if (uberMode != 0 && (uberMode == 2 || !pipeline_ready(pipeline) ||
++                        (depthPipeline != 0 && !pipeline_ready(depthPipeline)))) {
++    // All eight texmap slots: on the single-texmap path the draw's texture in
++    // every one (as its own shader samples slot 0 whatever the stage's texmap
++    // says), else each used texmap where it is bound; the rest empty.
++    const wgpu::TextureView& empty = empty_texmap_view();
++    const auto emptySampler = sampler_ref(sampler_descriptor(gxc::PlanSampler{}));
++    std::array<WGPUTextureView, 8> views{};
++    std::array<wgpu::Sampler, 8> samplers{};
++    views.fill(empty.Get());
++    samplers.fill(emptySampler);
++    std::array<TextureHandle, 8> held{};
++    bool complete = true;
++    if (plan.pipeline.shader.textured != 0) {
++      if (plan.texmap_mask == 0u) {
++        if (plan.has_texture)
++          held[0] = resolve_texture_handle(plan.tex_address, plan.tex_size, plan.tex_format, plan.tex_width,
++                                           plan.tex_height, plan.tex_data, plan.tex_available, plan.has_tlut,
++                                           plan.tlut_address, plan.tlut_format, plan.tlut_entries, plan.tlut_data,
++                                           plan.tlut_available);
++        complete = static_cast<bool>(held[0]);
++        if (complete) {
++          views.fill(held[0]->sampleTextureView.Get());
++          samplers.fill(sampler_ref(sampler_descriptor(plan.samplers[plan.tex_slot & 7u])));
++        }
++      } else {
++        for (uint32_t t = 0; t < 8u && complete; ++t) {
++          if ((plan.texmap_mask & (1u << t)) == 0u)
++            continue;
++          const gxc::PlanTexture& pt = plan.textures[t];
++          if (pt.valid)
++            held[t] = resolve_texture_handle(pt.address, pt.size, pt.format, pt.width, pt.height, pt.data,
++                                             pt.available, pt.has_tlut, pt.tlut_address, pt.tlut_format,
++                                             pt.tlut_entries, pt.tlut_data, pt.tlut_available);
++          complete = static_cast<bool>(held[t]);
++          if (complete) {
++            views[t] = held[t]->sampleTextureView.Get();
++            samplers[t] = sampler_ref(sampler_descriptor(plan.samplers[t]));
++          }
++        }
++      }
++    }
++    if (complete) {
++      std::array<WGPUBindGroupEntry, 16> entries{};
++      for (uint32_t t = 0; t < 8u; ++t) {
++        entries[2u * t] = WGPUBindGroupEntry{.binding = 2u * t, .textureView = views[t]};
++        entries[2u * t + 1u] = WGPUBindGroupEntry{.binding = 2u * t + 1u, .sampler = samplers[t].Get()};
++      }
++      const WGPUBindGroupDescriptor descriptor{
++          .label = {"GXCore Ubershader Texture Bind Group", WGPU_STRLEN},
++          .layout = texture_bind_group_layout(0xFFu).Get(),
++          .entryCount = entries.size(),
++          .entries = entries.data(),
++      };
++      uberTextureBindGroup = bind_group_ref(descriptor);
++      PipelineConfig uberConfig = colorConfig;
++      uberConfig.key.shader = gxc::ShaderKey{};
++      uberConfig.key.shader.use_dst_alpha = plan.pipeline.shader.use_dst_alpha;
++      uberConfig.depthOnly = 2u;
++      uberPipeline = pipeline_ref(uberConfig);
++      static gxc::UberPixelConstants block; // one recording thread at a time
++      std::memcpy(&block.psc, &plan.pixel_constants, sizeof block.psc);
++      std::memset(block.key, 0, sizeof block.key);
++      std::memcpy(block.key, &plan.pipeline.shader, sizeof plan.pipeline.shader);
++      block.extra[0] = gxc::texmap_popcount(gxc::used_texmap_mask(plan.pipeline.shader)) > 1u ? 1u : 0u;
++      uberPixelRange = push_uniform_dedup(g_uberPixelUniformCache, reinterpret_cast<const uint8_t*>(&block),
++                                          sizeof block);
++    }
++  }
++
+   // Batching: a draw of the state of the pass's last command (pipeline,
+   // constants, pixel constants, textures), with nothing between them, whose
+   // vertices and indices follow its, extends it, its indices counted from the
+@@ -1827,7 +1990,8 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   uint32_t firstVertex = 0;
+   if (batching && !matchHere) {
+     DrawData* last = last_recorded_draw();
+-    if (last != nullptr && last->pipeline == pipeline && last->depthPipeline == depthPipeline &&
++    if (last != nullptr && uberPipeline == 0 && last->uberPipeline == 0 && last->pipeline == pipeline &&
++        last->depthPipeline == depthPipeline &&
+         last->uniformRange.offset == uniformRange.offset && last->tev == tev &&
+         (!tev || last->pixelUniformRange.offset == pixelUniformRange.offset) &&
+         last->textureBindGroup == textureBindGroup && last->ownVertices == ownVertices &&
+@@ -1894,6 +2058,9 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+       .textureBindGroup = textureBindGroup,
+       .tev = tev,
+       .ownVertices = ownVertices,
++      .uberPipeline = uberPipeline,
++      .uberPixelRange = uberPixelRange,
++      .uberTextureBindGroup = uberTextureBindGroup,
+   });
+   return true;
+ }
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp
+index 242f9724..cab04c28 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp
+@@ -50,6 +50,13 @@ struct DrawData {
+   bool tev = false; // TEV path: PS uniform at group 2, texture at group 3
+   // A tagged particle's, whose in-between vertices are its own (interpVertRange).
+   bool ownVertices = false;
++  // The ubershader's pipeline for this draw's fixed-function state, its
++  // pixel block (the pixel constants and the shader key) and a bind group with
++  // all eight texmaps, when the draw's own pipeline was still compiling as it
++  // was recorded: render() draws it with them if its own is not ready yet.
++  PipelineRef uberPipeline = 0;
++  Range uberPixelRange;
++  BindGroupRef uberTextureBindGroup = 0;
+   // Consecutive draws of one state whose vertices and indices follow on are
+   // one draw (submit_draw_plan); an in-between frame whose blocks for them
+   // differ draws them one by one: their parts are batch_draw(batch + i), their
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
+index e36ecbc7..3e21258a 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.cpp
+@@ -13,6 +13,7 @@
+ #include "../webgpu/gpu.hpp"
+ 
+ #include <algorithm>
++#include <array>
+ #include <atomic>
+ #include <chrono>
+ #include <condition_variable>
+@@ -49,6 +50,9 @@ struct PendingPipeline {
+   PipelineRef hash;
+   uint32_t firstFrameUsed = UINT32_MAX;
+   NewPipelineCallback create;
++  // Which of the ubershader's two shaders (gxcore depthOnly 2; 1 with dual-
++  // source blending) the pipeline uses, or -1 for any other pipeline.
++  int8_t uberShader = -1;
+ };
+ 
+ struct PipelineCacheWrite {
+@@ -88,6 +92,8 @@ static std::atomic_bool g_pipelineThreadEnd = false;
+ // and shaders already compiled in another blend, depth or cull state. Said
+ // once a second while it happens (report_skipped_draws).
+ static std::atomic<uint64_t> g_skippedDraws{0};
++static std::atomic<uint64_t> g_uberDraws{0};
++static std::atomic<uint64_t> g_leftOutDraws{0};
+ static std::atomic<uint32_t> g_newShaders{0};
+ static std::atomic<uint32_t> g_newStates{0};
+ // When the cache started loading, how many it queued, and whether the time
+@@ -442,6 +448,86 @@ static PendingPipeline* touch_pending_pipeline(PipelineRef hash, PipelinePriorit
+   return nullptr;
+ }
+ 
++// The ubershader's two shaders take most of a second each to compile the
++// first time (DXC, with nothing in Dawn's blob cache yet), and every state's
++// pipeline compiles the same shader; from the blob cache a pipeline takes a few
++// ms. So one pipeline with a shader is made before its others (they wait,
++// queued), and when to make it depends on whether an earlier run did: the
++// pipeline cache keeps the ubershader pipelines draws asked for. If it has one
++// with the shader, the shader's first pipeline is made before anything else
++// (the ubershader then draws whatever shader in its state is still compiling);
++// if not, only once the cache's pipelines are all queued and nothing else is,
++// one shader at a time, so the compile takes no thread from the draws'
++// pipelines while a scene loads.
++// 0: no pipeline with the shader yet, 1: one compiling, 2: one made.
++static std::array<uint8_t, 2> g_uberShaderState{};
++static std::array<bool, 2> g_uberShaderKnown{};
++static bool g_cacheQueued = false;
++
++enum class TakePass {
++  KnownUbershader, // the first pipeline with a shader an earlier run compiled
++  Ready,           // any other pipeline, the draws' queue first
++  NewUbershader,   // the first pipeline with a shader not compiled before
++};
++
++static bool take_in_pass(const PendingPipeline& pending, TakePass pass) {
++  if (pending.uberShader < 0)
++    return pass == TakePass::Ready;
++  switch (g_uberShaderState[pending.uberShader]) {
++  case 2:
++    return pass == TakePass::Ready;
++  case 1:
++    return false;
++  default:
++    if (g_uberShaderKnown[pending.uberShader])
++      return pass == TakePass::KnownUbershader;
++    return pass == TakePass::NewUbershader && g_cacheQueued && g_uberShaderState[0] != 1 &&
++           g_uberShaderState[1] != 1;
++  }
++}
++
++static bool next_pipeline_ready() {
++  const auto takeable = [](const PendingPipeline& pending) {
++    return take_in_pass(pending, TakePass::KnownUbershader) || take_in_pass(pending, TakePass::Ready) ||
++           take_in_pass(pending, TakePass::NewUbershader);
++  };
++  return std::any_of(g_pipelineQueue.begin(), g_pipelineQueue.end(), takeable) ||
++         std::any_of(g_backgroundPipelineQueue.begin(), g_backgroundPipelineQueue.end(), takeable);
++}
++
++// The queued pipeline a compile thread makes next (the caller holds
++// g_pipelineMutex and has checked next_pipeline_ready).
++static PendingPipeline take_next_pipeline() {
++  for (const TakePass pass : {TakePass::KnownUbershader, TakePass::Ready, TakePass::NewUbershader}) {
++    for (auto* queue : {&g_pipelineQueue, &g_backgroundPipelineQueue}) {
++      const auto it = std::find_if(queue->begin(), queue->end(),
++                                   [=](const PendingPipeline& pending) { return take_in_pass(pending, pass); });
++      if (it == queue->end())
++        continue;
++      PendingPipeline pending = std::move(*it);
++      queue->erase(it);
++      if (pending.uberShader >= 0 && g_uberShaderState[pending.uberShader] == 0) {
++        g_uberShaderState[pending.uberShader] = 1;
++      }
++      return pending;
++    }
++  }
++  std::abort(); // next_pipeline_ready said there was one
++}
++
++template <typename PipelineConfig>
++static int8_t ubershader_of(const PipelineConfig&) {
++  return -1;
++}
++
++#ifdef AURORA_ENABLE_GXCORE
++static int8_t ubershader_of(const gxcore::PipelineConfig& config) {
++  if (config.depthOnly != 2u)
++    return -1;
++  return config.key.shader.use_dst_alpha != 0 ? 1 : 0;
++}
++#endif
++
+ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
+   auto priorityIt = find_pending_pipeline(g_pipelineQueue, hash);
+   if (priorityIt != g_pipelineQueue.end()) {
+@@ -562,6 +648,7 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+           .hash = hash,
+           .firstFrameUsed = firstFrameUsed,
+           .create = std::move(cb),
++          .uberShader = ubershader_of(config),
+       };
+       switch (priority) {
+       case PipelinePriority::Background:
+@@ -616,6 +703,33 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+   return hash;
+ }
+ 
++#ifdef AURORA_ENABLE_GXCORE
++// The ubershader's pipelines (gxcore depthOnly 2: one per fixed-function
++// state, drawing any shader key), queued in the background at start for every
++// state the cache's pipelines use, so a shader not seen before in one of them
++// is drawn from its first frame. Dolphin queues its uber pipelines for the
++// states already seen the same way (ShaderCache::QueueUberSiblingStates). The
++// specialized pipeline follows; the ubershader stands in until it is ready.
++static absl::flat_hash_set<HashType> g_uberStates;
++
++static void queue_ubershader_state(const gxcore::PipelineConfig& config) {
++  static const bool enabled = [] {
++    const char* env = std::getenv("DOL_AURORA_UBERSHADER");
++    return env == nullptr || env[0] != '0';
++  }();
++  if (!enabled || config.depthOnly != 0u)
++    return;
++  gxcore::PipelineConfig uber = config;
++  uber.key.shader = {};
++  uber.key.shader.use_dst_alpha = config.key.shader.use_dst_alpha;
++  uber.depthOnly = 2u;
++  if (!g_uberStates.insert(xxh3_hash(uber)).second)
++    return;
++  find_pipeline_impl(ShaderType::GXCore, uber, [=] { return gxcore::create_pipeline(uber); },
++                     PipelinePriority::Background, 0u);
++}
++#endif
++
+ static void pipeline_cache_abort() {
+   g_pipelineCacheBroken = true;
+   if (g_pipelineCacheLoadStmt != nullptr) {
+@@ -1046,21 +1160,18 @@ static void pipeline_worker() {
+       if (g_hasPipelineThread) {
+         // Another compile thread may have taken what was queued, so wait on
+         // the queues themselves.
+-        g_pipelineQueueCv.wait(lock, [] {
+-          return !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty() || g_pipelineThreadEnd;
+-        });
+-      } else if (g_pipelineQueue.empty() && g_backgroundPipelineQueue.empty()) {
++        g_pipelineQueueCv.wait(lock, [] { return next_pipeline_ready() || g_pipelineThreadEnd; });
++      } else if (!next_pipeline_ready()) {
+         return;
+       }
+       if (g_pipelineThreadEnd) {
+         break;
+       }
+-      auto& source = !g_pipelineQueue.empty() ? g_pipelineQueue : g_backgroundPipelineQueue;
+-      pending = std::move(source.front());
+-      source.pop_front();
++      pending = take_next_pipeline();
+     }
+     auto result = pending.create();
+     bool cacheLoaded = false;
++    bool uberShaderMade = false;
+     {
+       std::lock_guard lock{g_pipelineMutex};
+       g_pipelines.try_emplace(pending.hash, CachedPipeline{
+@@ -1072,6 +1183,14 @@ static void pipeline_worker() {
+         g_cacheLoadReported = true;
+         cacheLoaded = true;
+       }
++      if (pending.uberShader >= 0 && g_uberShaderState[pending.uberShader] != 2) {
++        g_uberShaderState[pending.uberShader] = 2;
++        uberShaderMade = true;
++      }
++    }
++    if (uberShaderMade) {
++      // The pipelines left queued behind it can be made now.
++      g_pipelineQueueCv.notify_all();
+     }
+     if (!g_hasPipelineThread) {
+       ++g_pipelinesPerFrame;
+@@ -1120,10 +1239,21 @@ static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersio
+       continue;
+     }
+ 
++#ifdef AURORA_ENABLE_GXCORE
++    if constexpr (std::is_same_v<PipelineConfig, gxcore::PipelineConfig>) {
++      // An ubershader pipeline a draw asked for in an earlier run: its shader
++      // is in Dawn's blob cache.
++      if (const int8_t uber = ubershader_of(config); uber >= 0) {
++        std::scoped_lock guard{g_pipelineMutex};
++        g_uberShaderKnown[uber] = true;
++      }
++    }
++#endif
+     find_pipeline_impl(type, config, [=] { return create(config); }, PipelinePriority::Background, firstFrameUsed);
+ #ifdef AURORA_ENABLE_GXCORE
+     if constexpr (std::is_same_v<PipelineConfig, gxcore::PipelineConfig>) {
+       note_gxcore_shader(config, false);
++      queue_ubershader_state(config);
+     }
+ #endif
+     ++acceptedRows;
+@@ -1257,6 +1387,11 @@ void initialize_pipeline_cache() {
+     g_cacheLoadCount = loadedCount;
+     g_cacheLoadReported = g_pendingPipelines.empty();
+   }
++  {
++    std::lock_guard lock{g_pipelineMutex};
++    g_cacheQueued = true;
++  }
++  g_pipelineQueueCv.notify_all();
+   if (!g_pipelineCacheBroken && loadedCount > 0) {
+     g_gpuCachePrunePending = true;
+   }
+@@ -1288,6 +1423,12 @@ void shutdown_pipeline_cache() {
+   g_pipelineQueue.clear();
+   g_backgroundPipelineQueue.clear();
+   g_pendingPipelines.clear();
++  g_uberShaderState = {};
++  g_uberShaderKnown = {};
++  g_cacheQueued = false;
++#ifdef AURORA_ENABLE_GXCORE
++  g_uberStates.clear();
++#endif
+ 
+   queuedPipelines = 0;
+   createdPipelines = 0;
+@@ -1298,15 +1439,19 @@ void shutdown_pipeline_cache() {
+ static void report_skipped_draws() {
+   static auto last = std::chrono::steady_clock::now();
+   static uint64_t lastSkipped = 0;
++  static uint64_t lastUber = 0;
++  static uint64_t lastLeftOut = 0;
+   const auto now = std::chrono::steady_clock::now();
+   if (now - last < std::chrono::seconds(1)) {
+     return;
+   }
+   last = now;
+   const uint64_t skipped = g_skippedDraws.load(std::memory_order_relaxed);
+-  if (skipped == lastSkipped) {
++  const uint64_t leftOut = g_leftOutDraws.load(std::memory_order_relaxed);
++  if (skipped == lastSkipped && leftOut == lastLeftOut) {
+     return;
+   }
++  const uint64_t uber = g_uberDraws.load(std::memory_order_relaxed);
+   const uint32_t newShaders = g_newShaders.exchange(0, std::memory_order_relaxed);
+   const uint32_t newStates = g_newStates.exchange(0, std::memory_order_relaxed);
+   size_t queued = 0;
+@@ -1315,10 +1460,13 @@ static void report_skipped_draws() {
+     queued = g_pendingPipelines.size();
+   }
+   std::fprintf(stderr,
+-               "[pipelines] %llu draws skipped while their pipelines compiled (%u new shaders, %u known shaders in a "
+-               "new state; %zu still compiling)\n",
+-               static_cast<unsigned long long>(skipped - lastSkipped), newShaders, newStates, queued);
++               "[pipelines] %llu draws left out while their pipelines compiled, %llu drawn with the ubershader "
++               "(%u new shaders, %u known shaders in a new state; %zu still compiling)\n",
++               static_cast<unsigned long long>(leftOut - lastLeftOut), static_cast<unsigned long long>(uber - lastUber),
++               newShaders, newStates, queued);
+   lastSkipped = skipped;
++  lastUber = uber;
++  lastLeftOut = leftOut;
+ }
+ 
+ void begin_pipeline_frame() {
+@@ -1334,6 +1482,16 @@ void end_pipeline_frame() {
+   }
+ }
+ 
++void note_ubershader_draw() { g_uberDraws.fetch_add(1, std::memory_order_relaxed); }
++void note_draw_left_out(uint32_t draws) { g_leftOutDraws.fetch_add(draws, std::memory_order_relaxed); }
++
++bool pipeline_ready(PipelineRef ref) {
++  if (__atomic_load_n(&g_stats.queuedPipelines, __ATOMIC_RELAXED) == 0u)
++    return true;
++  std::lock_guard guard{g_pipelineMutex};
++  return g_pipelines.contains(ref);
++}
++
+ bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+   std::lock_guard guard{g_pipelineMutex};
+   const auto it = g_pipelines.find(ref);
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp
+index ab473b35..dfaafa9d 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/pipeline_cache.hpp
+@@ -32,5 +32,13 @@ template <typename Config>
+ PipelineRef find_pipeline(ShaderType type, const Config& config, NewPipelineCallback&& cb);
+ 
+ bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline);
++// Whether a pipeline find_pipeline() returned is compiled (cheap when none is
++// compiling).
++bool pipeline_ready(PipelineRef ref);
++// A gxcore draw whose own pipeline was not ready: drawn with the ubershader,
++// or left out of its frame (for the once-a-second report; a batch counts its
++// draws).
++void note_ubershader_draw();
++void note_draw_left_out(uint32_t draws);
+ 
+ } // namespace aurora::gfx
+diff --git a/GXRuntime/graphics/gxcore/CMakeLists.txt b/GXRuntime/graphics/gxcore/CMakeLists.txt
+index 2ccb6e10..84fde680 100644
+--- a/GXRuntime/graphics/gxcore/CMakeLists.txt
++++ b/GXRuntime/graphics/gxcore/CMakeLists.txt
+@@ -1,6 +1,7 @@
+ add_library(gxruntime_gxcore STATIC
+     src/gxcore.cpp
+     src/gxcore_shader.cpp
++    src/gxcore_uber.cpp
+     src/texture_decode.cpp
+ )
+ add_library(GXRuntime::gxcore ALIAS gxruntime_gxcore)
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+index 61507461..745c0c09 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+@@ -608,4 +608,17 @@ struct EfbCopyCommand {
+ std::string generate_wgsl(const ShaderKey& key);
+ bool channel_lit_path(const ShaderKey& k, unsigned j);
+ 
++// The ubershader (gxcore_uber.cpp): one module for any key, which it reads
++// from the pixel uniform (UberPixelConstants), for a draw whose own pipeline
++// is still compiling. dual_source: the destination-alpha form.
++inline constexpr std::uint32_t kUberKeyWords =
++    static_cast<std::uint32_t>((sizeof(ShaderKey) + 15u) / 16u);
++struct UberPixelConstants {
++  PixelShaderConstants psc{};
++  std::uint32_t key[kUberKeyWords * 4u]{}; // the ShaderKey's bytes
++  std::uint32_t extra[4]{};                // [0]: more than one texmap sampled
++};
++static_assert(sizeof(PixelShaderConstants) % 16u == 0u);
++std::string generate_uber_wgsl(bool dual_source);
++
+ } // namespace gxruntime::gxcore
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore_uber.cpp b/GXRuntime/graphics/gxcore/src/gxcore_uber.cpp
+new file mode 100644
+index 00000000..7bf54ab6
+--- /dev/null
++++ b/GXRuntime/graphics/gxcore/src/gxcore_uber.cpp
+@@ -0,0 +1,904 @@
++// SPDX-License-Identifier: GPL-3.0-or-later
++// The ubershader: one WGSL module that draws any gxcore shader key, reading
++// the key at run time (Dolphin's ubershaders, UberShaderVertex/Pixel). A draw
++// whose specialized pipeline is still compiling is drawn with it instead of
++// being left out of the frame. Each part below is the specialized generator's
++// (gxcore_shader.cpp) with its choices made per draw: the same operations in
++// the same order, so it computes what the specialized shader would; where it
++// does not (Z textures, early depth), a draw is a frame or two from its own
++// pipeline.
++#include "gxruntime/gxcore/shader.hpp"
++
++#include <cstddef>
++#include <cstdio>
++#include <string>
++
++namespace gxruntime::gxcore {
++namespace {
++
++void define(std::string& out, const char* name, std::size_t value) {
++  char line[96];
++  std::snprintf(line, sizeof line, "const %s: u32 = %zuu;\n", name, value);
++  out += line;
++}
++
++// The key's layout, for kb(): byte offsets of each field.
++void emit_key_layout(std::string& out) {
++#define K(field) define(out, "K_" #field, offsetof(ShaderKey, field))
++  K(num_tex_gens);
++  K(has_pos_mtx_idx);
++  K(has_tex_mtx_idx);
++  K(has_color0);
++  K(has_color1);
++  K(uv_mask);
++  K(textured);
++  K(tev_valid);
++  K(num_tev_stages);
++  K(num_ind_stages);
++  K(alpha_comp0);
++  K(alpha_comp1);
++  K(alpha_logic);
++  K(lit_valid);
++  K(num_color_chans);
++  K(fog_fsel);
++  K(fog_proj);
++  K(fog_range);
++  K(tex_mtx_idx_mask);
++  K(chan_captured_mask);
++  K(has_vertex_normal);
++  K(has_vertex_binormal);
++  K(has_vertex_tangent);
++  K(dst_alpha);
++  K(litchan);
++  K(tex_gens);
++  K(ind_stages);
++  K(tev_stages);
++#undef K
++#define L(field) define(out, "LC_" #field, offsetof(LightChanKey, field))
++  define(out, "LC_SIZE", sizeof(LightChanKey));
++  L(enablelighting);
++  L(matsource);
++  L(ambsource);
++  L(diffusefunc);
++  L(attnfunc);
++  L(light_mask);
++#undef L
++#define T(field) define(out, "TG_" #field, offsetof(TexGenKey, field))
++  define(out, "TG_SIZE", sizeof(TexGenKey));
++  T(texgentype);
++  T(sourcerow);
++  T(inputform);
++  T(projection);
++  T(embosssourceshift);
++  T(embosslightshift);
++#undef T
++#define I(field) define(out, "IS_" #field, offsetof(IndirectStageKey, field))
++  define(out, "IS_SIZE", sizeof(IndirectStageKey));
++  I(texmap);
++  I(texcoord);
++  I(scale_s);
++  I(scale_t);
++#undef I
++#define S(field) define(out, "TS_" #field, offsetof(TevStageKey, field))
++  define(out, "TS_SIZE", sizeof(TevStageKey));
++  S(cc_a);
++  S(cc_b);
++  S(cc_c);
++  S(cc_d);
++  S(cc_bias);
++  S(cc_op);
++  S(cc_clamp);
++  S(cc_scale);
++  S(cc_dest);
++  S(ac_a);
++  S(ac_b);
++  S(ac_c);
++  S(ac_d);
++  S(ac_bias);
++  S(ac_op);
++  S(ac_clamp);
++  S(ac_scale);
++  S(ac_dest);
++  S(ksel_kc);
++  S(ksel_ka);
++  S(ras_swap);
++  S(tex_swap);
++  S(tevorders_texcoord);
++  S(tevorders_texmap);
++  S(tevorders_colorchan);
++  S(tevorders_enable);
++  S(ind_stage);
++  S(ind_format);
++  S(ind_bias);
++  S(ind_bump_alpha);
++  S(ind_matrix_index);
++  S(ind_matrix_id);
++  S(ind_wrap_s);
++  S(ind_wrap_t);
++  S(ind_add_prev);
++#undef S
++  define(out, "MAX_TEXGENS", kMaxTexGens);
++  define(out, "MAX_TEV", kMaxTevStages);
++  define(out, "KEY_WORDS", kUberKeyWords);
++}
++
++// Everything but the key layout: bindings, helpers, the stages.
++constexpr const char* kBody = R"WGSL(
++struct Light {
++    color: vec4i,
++    cosatt: vec4f,
++    distatt: vec4f,
++    pos: vec4f,
++    dir: vec4f,
++};
++struct VertexShaderConstants {
++    posnormalmatrix: array<vec4f, 6>,
++    projection: array<vec4f, 4>,
++    texmatrices: array<vec4f, 24>,
++    transformmatrices: array<vec4f, 64>,
++    lights: array<Light, 8>,
++    materials: array<vec4i, 4>,
++    cached_normal: vec4f,
++    cached_tangent: vec4f,
++    cached_binormal: vec4f,
++    normalmatrices: array<vec4f, 32>,
++};
++@group(1) @binding(0) var<uniform> vsc: VertexShaderConstants;
++// The pixel constants, then the draw's shader key and what the CPU derived
++// from it (extra.x: more than one texmap, sampled where each is bound).
++struct PixelShaderConstants {
++    colors: array<vec4i, 4>,
++    kcolors: array<vec4i, 4>,
++    alpha_ref: vec4i,
++    fogcolor: vec4i,
++    fogi: vec4i,
++    fogf: vec4f,
++    fogrange: array<vec4f, 3>,
++    zbias: vec4i,
++    texdims: array<vec4i, 8>,
++    indtexmtx: array<vec4i, 6>,
++    key: array<vec4u, KEY_WORDS>,
++    extra: vec4u,
++};
++@group(2) @binding(0) var<uniform> psc: PixelShaderConstants;
++@group(3) @binding(0) var tex0: texture_2d<f32>;
++@group(3) @binding(1) var samp0: sampler;
++@group(3) @binding(2) var tex1: texture_2d<f32>;
++@group(3) @binding(3) var samp1: sampler;
++@group(3) @binding(4) var tex2: texture_2d<f32>;
++@group(3) @binding(5) var samp2: sampler;
++@group(3) @binding(6) var tex3: texture_2d<f32>;
++@group(3) @binding(7) var samp3: sampler;
++@group(3) @binding(8) var tex4: texture_2d<f32>;
++@group(3) @binding(9) var samp4: sampler;
++@group(3) @binding(10) var tex5: texture_2d<f32>;
++@group(3) @binding(11) var samp5: sampler;
++@group(3) @binding(12) var tex6: texture_2d<f32>;
++@group(3) @binding(13) var samp6: sampler;
++@group(3) @binding(14) var tex7: texture_2d<f32>;
++@group(3) @binding(15) var samp7: sampler;
++
++// One byte of the key.
++fn kb(off: u32) -> u32 {
++    let w = psc.key[off >> 4u][(off >> 2u) & 3u];
++    return (w >> ((off & 3u) * 8u)) & 0xFFu;
++}
++
++fn texmap_sample(unit: u32, uv: vec2f) -> vec4f {
++    switch unit {
++        case 0u: { return textureSample(tex0, samp0, uv); }
++        case 1u: { return textureSample(tex1, samp1, uv); }
++        case 2u: { return textureSample(tex2, samp2, uv); }
++        case 3u: { return textureSample(tex3, samp3, uv); }
++        case 4u: { return textureSample(tex4, samp4, uv); }
++        case 5u: { return textureSample(tex5, samp5, uv); }
++        case 6u: { return textureSample(tex6, samp6, uv); }
++        default: { return textureSample(tex7, samp7, uv); }
++    }
++}
++
++fn texmap_dims(unit: u32) -> vec2u {
++    switch unit {
++        case 0u: { return textureDimensions(tex0); }
++        case 1u: { return textureDimensions(tex1); }
++        case 2u: { return textureDimensions(tex2); }
++        case 3u: { return textureDimensions(tex3); }
++        case 4u: { return textureDimensions(tex4); }
++        case 5u: { return textureDimensions(tex5); }
++        case 6u: { return textureDimensions(tex6); }
++        default: { return textureDimensions(tex7); }
++    }
++}
++
++fn gx_texdims(logical: vec2i, actual: vec2u) -> vec2f {
++    if (logical.x > 0 && logical.y > 0) { return vec2f(logical); }
++    return vec2f(actual);
++}
++
++struct VertexIn {
++    @location(0) rawpos: vec3f,
++    @location(1) posmtx: u32,
++    @location(2) rawcolor0: vec4f,
++    @location(3) rawcolor1: vec4f,
++    @location(4) rawtex0: vec2f,
++    @location(5) rawtex1: vec2f,
++    @location(6) rawtex2: vec2f,
++    @location(7) rawtex3: vec2f,
++    @location(8) rawnormal: vec3f,
++    @location(9) texmtxidx: u32,
++    @location(10) rawbinormal: vec3f,
++    @location(11) rawtangent: vec3f,
++    @location(12) rawtex4: vec2f,
++    @location(13) texmtxidx_hi: u32,
++};
++struct VertexOut {
++    @builtin(position) pos: vec4f,
++    @location(0) color0: vec4f,
++    @location(1) color1: vec4f,
++    @location(2) uv0: vec3f,
++    @location(3) uv1: vec3f,
++    @location(4) uv2: vec3f,
++    @location(5) uv3: vec3f,
++    @location(6) uv4: vec3f,
++};
++
++fn rawtex(in: VertexIn, n: u32) -> vec2f {
++    switch n {
++        case 0u: { return in.rawtex0; }
++        case 1u: { return in.rawtex1; }
++        case 2u: { return in.rawtex2; }
++        case 3u: { return in.rawtex3; }
++        default: { return in.rawtex4; }
++    }
++}
++
++// The channel takes the full lighting path (channel_lit_path).
++fn chan_lit(j: u32) -> bool {
++    if (((kb(K_chan_captured_mask) >> j) & 1u) == 0u) { return false; }
++    let col = K_litchan + j * LC_SIZE;
++    let alp = K_litchan + (j + 2u) * LC_SIZE;
++    return kb(col + LC_enablelighting) != 0u || kb(alp + LC_enablelighting) != 0u ||
++           kb(col + LC_matsource) == 0u || kb(alp + LC_matsource) == 0u;
++}
++
++// One light's term (emit_light): its direction and attenuation.
++fn light_term(i: u32, ch: u32, pos: vec3f, _normal: vec3f) -> f32 {
++    let attnfn = kb(ch + LC_attnfunc);
++    let diff = kb(ch + LC_diffusefunc);
++    var ldir: vec3f;
++    var attn: f32;
++    if (attnfn == 0u || attnfn == 2u) {
++        ldir = normalize(vsc.lights[i].pos.xyz - pos);
++        attn = 1.0;
++        if (length(ldir) == 0.0) { ldir = _normal; }
++    } else if (attnfn == 1u) {
++        ldir = normalize(vsc.lights[i].pos.xyz - pos);
++        attn = select(0.0, max(0.0, dot(_normal, vsc.lights[i].dir.xyz)), dot(_normal, ldir) >= 0.0);
++        let cosAttn = vsc.lights[i].cosatt.xyz;
++        var distAttn: vec3f;
++        if (diff == 0u) { distAttn = vsc.lights[i].distatt.xyz; } else { distAttn = normalize(vsc.lights[i].distatt.xyz); }
++        attn = max(0.0, dot(cosAttn, vec3f(1.0, attn, attn*attn))) / dot(distAttn, vec3f(1.0, attn, attn*attn));
++    } else {
++        ldir = vsc.lights[i].pos.xyz - pos;
++        let dist2 = dot(ldir, ldir);
++        let dist = sqrt(dist2);
++        ldir = ldir / dist;
++        attn = max(0.0, dot(ldir, vsc.lights[i].dir.xyz));
++        attn = max(0.0, vsc.lights[i].cosatt.x + vsc.lights[i].cosatt.y*attn + vsc.lights[i].cosatt.z*attn*attn) /
++               dot(vsc.lights[i].distatt.xyz, vec3f(1.0, dist, dist2));
++    }
++    if (diff == 1u) { return attn * (dot(ldir, _normal)); }
++    if (diff == 2u) { return attn * max(0.0, dot(ldir, _normal)); }
++    return attn;
++}
++
++// calc_lighting_chn{j} (emit_lighting_chan).
++fn calc_lighting(j: u32, base_color: vec4f, pos: vec3f, _normal: vec3f) -> vec4f {
++    let col = K_litchan + j * LC_SIZE;
++    let alp = K_litchan + (j + 2u) * LC_SIZE;
++    var lacc: vec4i;
++    var mat: vec4i;
++    if (kb(col + LC_matsource) == 1u) { mat = vec4i(round(base_color * 255.0)); }
++    else { mat = vsc.materials[j + 2u]; }
++    if (kb(col + LC_enablelighting) != 0u) {
++        if (kb(col + LC_ambsource) == 1u) { lacc = vec4i(round(base_color * 255.0)); }
++        else { lacc = vsc.materials[j]; }
++    } else {
++        lacc = vec4i(255, 255, 255, 255);
++    }
++    if (kb(alp + LC_matsource) != kb(col + LC_matsource)) {
++        if (kb(alp + LC_matsource) == 1u) { mat.w = i32(round(base_color.w * 255.0)); }
++        else { mat.w = vsc.materials[j + 2u].w; }
++    }
++    if (kb(alp + LC_enablelighting) != 0u) {
++        if (kb(alp + LC_ambsource) == 1u) { lacc.w = i32(round(base_color.w * 255.0)); }
++        else { lacc.w = vsc.materials[j].w; }
++    } else {
++        lacc.w = 255;
++    }
++    if (kb(col + LC_enablelighting) != 0u) {
++        let mask = kb(col + LC_light_mask);
++        for (var i = 0u; i < 8u; i++) {
++            if (((mask >> i) & 1u) != 0u) {
++                let t = light_term(i, col, pos, _normal);
++                lacc = lacc + vec4i(vec3i(round(t * vec3f(vsc.lights[i].color.rgb))), 0);
++            }
++        }
++    }
++    if (kb(alp + LC_enablelighting) != 0u) {
++        let mask = kb(alp + LC_light_mask);
++        for (var i = 0u; i < 8u; i++) {
++            if (((mask >> i) & 1u) != 0u) {
++                let t = light_term(i, alp, pos, _normal);
++                lacc.a = lacc.a + i32(round(t * f32(vsc.lights[i].color.a)));
++            }
++        }
++    }
++    lacc = clamp(lacc, vec4<i32>(0), vec4<i32>(255));
++    return vec4f((mat * (lacc + (lacc >> vec4u(7)))) >> vec4u(8)) / 255.0;
++}
++
++@vertex
++fn vs_main(in: VertexIn) -> VertexOut {
++    var o: VertexOut;
++    let has_posidx = kb(K_has_pos_mtx_idx) != 0u;
++    let lit = kb(K_lit_valid) != 0u;
++    let ntg = min(kb(K_num_tex_gens), MAX_TEXGENS);
++    var has_emboss = false;
++    for (var i = 0u; i < ntg; i++) {
++        if (kb(K_tex_gens + i * TG_SIZE + TG_texgentype) == 1u) { has_emboss = true; }
++    }
++    let needs_normal_bank = has_posidx && (lit || has_emboss);
++    var posidx = 0;
++    var normidx = 0;
++    var p0: vec4f;
++    var p1: vec4f;
++    var p2: vec4f;
++    if (has_posidx) {
++        posidx = i32(in.posmtx);
++        p0 = vsc.transformmatrices[posidx];
++        p1 = vsc.transformmatrices[posidx + 1];
++        p2 = vsc.transformmatrices[posidx + 2];
++        normidx = posidx & 31;
++    } else {
++        p0 = vsc.posnormalmatrix[0];
++        p1 = vsc.posnormalmatrix[1];
++        p2 = vsc.posnormalmatrix[2];
++    }
++    let pos4 = vec4f(in.rawpos, 1.0);
++    let viewpos = vec4f(dot(p0, pos4), dot(p1, pos4), dot(p2, pos4), 1.0);
++    var clip = vec4f(dot(vsc.projection[0], viewpos), dot(vsc.projection[1], viewpos),
++                     dot(vsc.projection[2], viewpos), dot(vsc.projection[3], viewpos));
++    clip.z = -clip.z;
++    o.pos = clip;
++
++    let hc0 = kb(K_has_color0) != 0u;
++    let hc1 = kb(K_has_color1) != 0u;
++    var vc0 = vec4f(1.0);
++    if (hc0) { vc0 = in.rawcolor0; } else if (hc1) { vc0 = in.rawcolor1; }
++    var vc1 = vec4f(1.0);
++    if (hc0 && hc1) { vc1 = in.rawcolor1; }
++    let has_normal = kb(K_has_vertex_normal) != 0u;
++    var normal_in = vsc.cached_normal.xyz;
++    if (has_normal) { normal_in = in.rawnormal; }
++    var tangent_in = vsc.cached_tangent.xyz;
++    if (kb(K_has_vertex_tangent) != 0u) { tangent_in = in.rawtangent; }
++    var binormal_in = vsc.cached_binormal.xyz;
++    if (kb(K_has_vertex_binormal) != 0u) { binormal_in = in.rawbinormal; }
++    let lit0 = chan_lit(0u);
++    let lit1 = chan_lit(1u);
++    var _normal = vec3f(0.0, 0.0, 1.0);
++    if ((lit0 || lit1) && lit) {
++        if (needs_normal_bank) {
++            _normal = normalize(vec3f(dot(vsc.normalmatrices[normidx].xyz, normal_in),
++                                      dot(vsc.normalmatrices[normidx + 1].xyz, normal_in),
++                                      dot(vsc.normalmatrices[normidx + 2].xyz, normal_in)));
++        } else {
++            _normal = normalize(vec3f(dot(vsc.posnormalmatrix[3].xyz, normal_in),
++                                      dot(vsc.posnormalmatrix[4].xyz, normal_in),
++                                      dot(vsc.posnormalmatrix[5].xyz, normal_in)));
++        }
++    }
++    if (lit0) { o.color0 = calc_lighting(0u, vc0, viewpos.xyz, _normal); } else { o.color0 = vc0; }
++    if (lit1) { o.color1 = calc_lighting(1u, vc1, viewpos.xyz, _normal); } else { o.color1 = vc1; }
++    let nchans = kb(K_num_color_chans);
++    if (nchans == 0u) { o.color0 = vec4f(0.0); }
++    if (nchans <= 1u) { o.color1 = vec4f(0.0); }
++
++    var uvs: array<vec3f, 5>;
++    let uv_mask = kb(K_uv_mask);
++    let has_tmi = kb(K_has_tex_mtx_idx) != 0u;
++    let tmi_mask = kb(K_tex_mtx_idx_mask);
++    for (var i = 0u; i < ntg; i++) {
++        let tg = K_tex_gens + i * TG_SIZE;
++        var coord = vec4f(0.0, 0.0, 1.0, 1.0);
++        let row = kb(tg + TG_sourcerow);
++        if (row == 0u) {
++            coord = vec4f(in.rawpos, 1.0);
++        } else if (row == 1u) {
++            if (has_normal) { coord = vec4f(in.rawnormal, 1.0); }
++        } else if (row >= 5u && row < 5u + MAX_TEXGENS) {
++            let texnum = row - 5u;
++            if (((uv_mask >> texnum) & 1u) != 0u) {
++                let r = rawtex(in, texnum);
++                coord = vec4f(r.x, r.y, 1.0, 1.0);
++            }
++        }
++        if (kb(tg + TG_inputform) == 0u) { coord.z = 1.0; }
++        let ty = kb(tg + TG_texgentype);
++        if (ty == 0u) {
++            let proj = kb(tg + TG_projection) != 0u;
++            var uv: vec3f;
++            if (has_tmi && ((tmi_mask >> i) & 1u) != 0u) {
++                var ti: u32;
++                if (i < 4u) { ti = (in.texmtxidx >> (8u * i)) & 0xFFu; }
++                else { ti = (in.texmtxidx_hi >> (8u * (i - 4u))) & 0xFFu; }
++                let m0 = vsc.transformmatrices[ti];
++                let m1 = vsc.transformmatrices[ti + 1u];
++                let m2 = vsc.transformmatrices[ti + 2u];
++                if (proj) { uv = vec3f(dot(coord, m0), dot(coord, m1), dot(coord, m2)); }
++                else { uv = vec3f(dot(coord, m0), dot(coord, m1), 1.0); }
++            } else if (proj) {
++                uv = vec3f(dot(coord, vsc.texmatrices[3u * i]), dot(coord, vsc.texmatrices[3u * i + 1u]),
++                           dot(coord, vsc.texmatrices[3u * i + 2u]));
++            } else {
++                uv = vec3f(dot(coord, vsc.texmatrices[3u * i]), dot(coord, vsc.texmatrices[3u * i + 1u]), 1.0);
++            }
++            if (uv.z == 0.0) { uv = vec3f(clamp(uv.xy * 0.5, vec2f(-1.0), vec2f(1.0)), uv.z); }
++            uvs[i] = uv;
++        } else if (ty == 2u) {
++            uvs[i] = vec3f(o.color0.x, o.color0.y, 1.0);
++        } else if (ty == 3u) {
++            uvs[i] = vec3f(o.color1.x, o.color1.y, 1.0);
++        } else {
++            var tn: vec3f;
++            var bn: vec3f;
++            if (needs_normal_bank) {
++                tn = vec3f(dot(vsc.normalmatrices[normidx].xyz, tangent_in),
++                           dot(vsc.normalmatrices[normidx + 1].xyz, tangent_in),
++                           dot(vsc.normalmatrices[normidx + 2].xyz, tangent_in));
++                bn = vec3f(dot(vsc.normalmatrices[normidx].xyz, binormal_in),
++                           dot(vsc.normalmatrices[normidx + 1].xyz, binormal_in),
++                           dot(vsc.normalmatrices[normidx + 2].xyz, binormal_in));
++            } else {
++                tn = vec3f(dot(vsc.posnormalmatrix[3].xyz, tangent_in), dot(vsc.posnormalmatrix[4].xyz, tangent_in),
++                           dot(vsc.posnormalmatrix[5].xyz, tangent_in));
++                bn = vec3f(dot(vsc.posnormalmatrix[3].xyz, binormal_in), dot(vsc.posnormalmatrix[4].xyz, binormal_in),
++                           dot(vsc.posnormalmatrix[5].xyz, binormal_in));
++            }
++            let ld = normalize(vsc.lights[kb(tg + TG_embosslightshift)].pos.xyz - viewpos.xyz);
++            uvs[i] = uvs[min(kb(tg + TG_embosssourceshift), 4u)] + vec3f(dot(ld, tn), dot(ld, bn), 0.0);
++        }
++    }
++    o.uv0 = uvs[0];
++    o.uv1 = uvs[1];
++    o.uv2 = uvs[2];
++    o.uv3 = uvs[3];
++    o.uv4 = uvs[4];
++    return o;
++}
++
++fn uv_of(in: VertexOut, n: u32) -> vec3f {
++    switch n {
++        case 0u: { return in.uv0; }
++        case 1u: { return in.uv1; }
++        case 2u: { return in.uv2; }
++        case 3u: { return in.uv3; }
++        default: { return in.uv4; }
++    }
++}
++
++fn swz(v: vec4i, off: u32) -> vec4i {
++    return vec4i(v[kb(off) & 3u], v[kb(off + 1u) & 3u], v[kb(off + 2u) & 3u], v[kb(off + 3u) & 3u]);
++}
++
++fn konst_frac(sel: u32) -> i32 {
++    var f = array<i32, 8>(255, 223, 191, 159, 128, 96, 64, 32);
++    return f[sel & 7u];
++}
++
++fn konst_c(sel: u32) -> vec3i {
++    if (sel < 8u) { return vec3i(konst_frac(sel)); }
++    if (sel < 12u) { return vec3i(0); }
++    let k = psc.kcolors[sel & 3u];
++    if (sel < 16u) { return k.rgb; }
++    return vec3i(k[((sel - 16u) >> 2u) & 3u]);
++}
++
++fn konst_a(sel: u32) -> i32 {
++    if (sel < 8u) { return konst_frac(sel); }
++    if (sel < 16u) { return 0; }
++    return psc.kcolors[sel & 3u][((sel - 16u) >> 2u) & 3u];
++}
++
++// The TEV registers, prev c0 c1 c2, and a stage's inputs (kTevCInput, kTevAInput).
++fn cin(arg: u32, r: array<vec4i, 4>, tex: vec4i, ras: vec4i, konst: vec4i) -> vec3i {
++    switch arg {
++        case 0u: { return r[0].rgb; }
++        case 1u: { return vec3i(r[0].a); }
++        case 2u: { return r[1].rgb; }
++        case 3u: { return vec3i(r[1].a); }
++        case 4u: { return r[2].rgb; }
++        case 5u: { return vec3i(r[2].a); }
++        case 6u: { return r[3].rgb; }
++        case 7u: { return vec3i(r[3].a); }
++        case 8u: { return tex.rgb; }
++        case 9u: { return vec3i(tex.a); }
++        case 10u: { return ras.rgb; }
++        case 11u: { return vec3i(ras.a); }
++        case 12u: { return vec3i(255, 255, 255); }
++        case 13u: { return vec3i(128, 128, 128); }
++        case 14u: { return konst.rgb; }
++        default: { return vec3i(0, 0, 0); }
++    }
++}
++
++fn ain(arg: u32, r: array<vec4i, 4>, tex: vec4i, ras: vec4i, konst: vec4i) -> i32 {
++    switch arg {
++        case 0u: { return r[0].a; }
++        case 1u: { return r[1].a; }
++        case 2u: { return r[2].a; }
++        case 3u: { return r[3].a; }
++        case 4u: { return tex.a; }
++        case 5u: { return ras.a; }
++        case 6u: { return konst.a; }
++        default: { return 0; }
++    }
++}
++
++// tev_regular, for rgb and for alpha.
++fn tev_regular3(a: vec3i, b: vec3i, c: vec3i, d: vec3i, bias: u32, op: u32, scale: u32) -> vec3i {
++    let div2 = scale == 3u;
++    var sh = 0u;
++    if (scale == 1u) { sh = 1u; } else if (scale == 2u) { sh = 2u; }
++    var lerp = (a << vec3u(8u)) + (b - a) * (c + (c >> vec3u(7u)));
++    if (!div2) {
++        if (sh != 0u) { lerp = lerp << vec3u(sh); }
++        lerp = lerp + vec3i(select(128, 127, op == 1u));
++    }
++    lerp = lerp >> vec3u(8u);
++    var dterm = d;
++    if (bias == 1u) { dterm = dterm + vec3i(128); } else if (bias == 2u) { dterm = dterm - vec3i(128); }
++    if (!div2 && sh != 0u) { dterm = dterm << vec3u(sh); }
++    var res = dterm + lerp;
++    if (op == 1u) { res = dterm - lerp; }
++    if (div2) { res = res >> vec3u(1u); }
++    return res;
++}
++
++fn tev_regular1(a: i32, b: i32, c: i32, d: i32, bias: u32, op: u32, scale: u32) -> i32 {
++    let div2 = scale == 3u;
++    var sh = 0u;
++    if (scale == 1u) { sh = 1u; } else if (scale == 2u) { sh = 2u; }
++    var lerp = (a << 8u) + (b - a) * (c + (c >> 7u));
++    if (!div2) {
++        if (sh != 0u) { lerp = lerp << sh; }
++        lerp = lerp + select(128, 127, op == 1u);
++    }
++    lerp = lerp >> 8u;
++    var dterm = d;
++    if (bias == 1u) { dterm = dterm + 128; } else if (bias == 2u) { dterm = dterm - 128; }
++    if (!div2 && sh != 0u) { dterm = dterm << sh; }
++    var res = dterm + lerp;
++    if (op == 1u) { res = dterm - lerp; }
++    if (div2) { res = res >> 1u; }
++    return res;
++}
++
++// tev_compare's condition for the R8, GR16 and BGR24 modes.
++fn tev_cond(a: vec4i, b: vec4i, comparison: u32, mode: u32) -> bool {
++    var va = a.r;
++    var vb = b.r;
++    if (mode == 1u) { va = a.r + a.g * 256; vb = b.r + b.g * 256; }
++    else if (mode == 2u) { va = a.r + a.g * 256 + a.b * 65536; vb = b.r + b.g * 256 + b.b * 65536; }
++    if (comparison == 1u) { return va == vb; }
++    return va > vb;
++}
++
++fn tev_compare3(a: vec4i, b: vec4i, c: vec4i, d: vec4i, comparison: u32, mode: u32) -> vec3i {
++    if (mode == 3u) {
++        if (comparison == 1u) {
++            return d.rgb + (vec3i(1, 1, 1) - sign(abs(a.rgb - b.rgb))) * c.rgb;
++        }
++        return d.rgb + max(sign(a.rgb - b.rgb), vec3i(0, 0, 0)) * c.rgb;
++    }
++    return d.rgb + select(vec3i(0, 0, 0), c.rgb, tev_cond(a, b, comparison, mode));
++}
++
++fn tev_compare1(a: vec4i, b: vec4i, c: vec4i, d: vec4i, comparison: u32, mode: u32) -> i32 {
++    var cond: bool;
++    if (mode == 3u) {
++        if (comparison == 1u) { cond = a.a == b.a; } else { cond = a.a > b.a; }
++    } else {
++        cond = tev_cond(a, b, comparison, mode);
++    }
++    return d.a + select(0, c.a, cond);
++}
++
++fn alpha_cond(comp: u32, a: i32, r: i32) -> bool {
++    switch comp {
++        case 0u: { return false; }
++        case 1u: { return a < r; }
++        case 2u: { return a == r; }
++        case 3u: { return a <= r; }
++        case 4u: { return a > r; }
++        case 5u: { return a != r; }
++        case 6u: { return a >= r; }
++        default: { return true; }
++    }
++}
++
++fn ind_wrap(coord: i32, wrap: u32) -> i32 {
++    if (wrap == 0u) { return coord; }
++    if (wrap >= 6u) { return 0; }
++    let period = (256u >> (wrap - 1u)) << 7u;
++    return coord & i32(period - 1u);
++}
++
++// The TEV (emit_tev_fragment): prev after the last stage, before the alpha test.
++fn tev(in: VertexOut) -> vec4i {
++    let ntg = min(kb(K_num_tex_gens), MAX_TEXGENS);
++    let nind = kb(K_num_ind_stages);
++    let indirect_enabled = nind != 0u;
++    let textured = kb(K_textured) != 0u;
++    let multi = psc.extra.x != 0u;
++    var r = array<vec4i, 4>(psc.colors[0], psc.colors[1], psc.colors[2], psc.colors[3]);
++    var rastemp = vec4i(0, 0, 0, 0);
++    var rawtextemp = vec4i(0, 0, 0, 0);
++    var textemp = vec4i(0, 0, 0, 0);
++    var konsttemp = vec4i(0, 0, 0, 0);
++    var alphabump = 0;
++    var tevcoord = vec2i(0, 0);
++    let col0i = vec4i(round(in.color0 * 255.0));
++    let col1i = vec4i(round(in.color1 * 255.0));
++    var fixpoint: array<vec2i, 5>;
++    for (var i = 0u; i < ntg; i++) {
++        let uv = uv_of(in, i);
++        if (kb(K_tex_gens + i * TG_SIZE + TG_projection) != 0u) {
++            fixpoint[i] = vec2i((uv.xy / max(uv.z, 1e-6)) * vec2f(psc.texdims[i].zw * 128));
++        } else {
++            fixpoint[i] = vec2i(uv.xy * vec2f(psc.texdims[i].zw * 128));
++        }
++    }
++    let nstages = min(kb(K_num_tev_stages), MAX_TEV);
++    var last_cc_dest = 0u;
++    var last_ac_dest = 0u;
++    for (var n = 0u; n < nstages; n++) {
++        let s = K_tev_stages + n * TS_SIZE;
++        let cc_a = kb(s + TS_cc_a);
++        let cc_b = kb(s + TS_cc_b);
++        let cc_c = kb(s + TS_cc_c);
++        let cc_d = kb(s + TS_cc_d);
++        let ac_a = kb(s + TS_ac_a);
++        let ac_b = kb(s + TS_ac_b);
++        let ac_c = kb(s + TS_ac_c);
++        let ac_d = kb(s + TS_ac_d);
++        let colorchan = kb(s + TS_tevorders_colorchan);
++        let uses_ras = cc_a == 10u || cc_b == 10u || cc_c == 10u || cc_d == 10u ||
++                       cc_a == 11u || cc_b == 11u || cc_c == 11u || cc_d == 11u ||
++                       ac_a == 5u || ac_b == 5u || ac_c == 5u || ac_d == 5u;
++        let uses_bump_ras = indirect_enabled && uses_ras && (colorchan == 5u || colorchan == 6u);
++        if (uses_ras && !uses_bump_ras) {
++            var src = vec4i(0, 0, 0, 0);
++            if (colorchan == 0u) { src = col0i; } else if (colorchan == 1u) { src = col1i; }
++            rastemp = swz(src, s + TS_ras_swap);
++        }
++        var texcoord = kb(s + TS_tevorders_texcoord);
++        if (texcoord >= ntg) { texcoord = 0u; }
++        let texunit = select(0u, kb(s + TS_tevorders_texmap) & 7u, multi);
++        let direct_sample = kb(s + TS_tevorders_enable) != 0u && ntg > 0u && textured;
++        var stage_dims = vec2i(0, 0);
++        var base_coord = vec2i(0, 0);
++        var stage_uv = vec2f(0.0, 0.0);
++        if (direct_sample && indirect_enabled) {
++            stage_dims = vec2i(gx_texdims(psc.texdims[texunit].xy, texmap_dims(texunit)));
++            base_coord = fixpoint[texcoord];
++            stage_uv = vec2f(base_coord) / (vec2f(stage_dims) * 128.0);
++        }
++        let ind_stage = kb(s + TS_ind_stage);
++        let ind_matrix_index = kb(s + TS_ind_matrix_index);
++        let ind_bump_alpha = kb(s + TS_ind_bump_alpha);
++        let ind_format = kb(s + TS_ind_format) & 3u;
++        let sample_indirect = ind_stage < nind && (ind_matrix_index != 0u || ind_bump_alpha != 0u);
++        var ind_trans = vec2i(0, 0);
++        if (sample_indirect) {
++            let ind = K_ind_stages + ind_stage * IS_SIZE;
++            var indcoord = kb(ind + IS_texcoord);
++            if (indcoord >= ntg) { indcoord = 0u; }
++            let indunit = select(0u, kb(ind + IS_texmap) & 7u, multi);
++            let ind_coord_scaled = fixpoint[indcoord] >> vec2u(kb(ind + IS_scale_s), kb(ind + IS_scale_t));
++            let ind_uv = vec2f(ind_coord_scaled) / (gx_texdims(psc.texdims[indunit].xy, texmap_dims(indunit)) * 128.0);
++            let ind_raw = vec3i(round(texmap_sample(indunit, ind_uv).abg * 255.0));
++            if (ind_bump_alpha != 0u) {
++                var alpha_shift = array<u32, 4>(0u, 5u, 4u, 3u);
++                alphabump = (ind_raw[(ind_bump_alpha - 1u) & 3u] << alpha_shift[ind_format]) & 248;
++            }
++            if (ind_matrix_index != 0u && direct_sample) {
++                var format_shift = array<u32, 4>(0u, 3u, 4u, 5u);
++                var ind_coord = ind_raw >> vec3u(format_shift[ind_format]);
++                let bias = select(1, -128, ind_format == 0u);
++                let ind_bias = kb(s + TS_ind_bias);
++                if ((ind_bias & 1u) != 0u) { ind_coord.x += bias; }
++                if ((ind_bias & 2u) != 0u) { ind_coord.y += bias; }
++                if ((ind_bias & 4u) != 0u) { ind_coord.z += bias; }
++                let matrix = min(2u * (ind_matrix_index - 1u), 4u);
++                let id = kb(s + TS_ind_matrix_id);
++                if (id == 0u) {
++                    let m0 = psc.indtexmtx[matrix];
++                    let m1 = psc.indtexmtx[matrix + 1u];
++                    ind_trans = vec2i(m0.x * ind_coord.x + m0.y * ind_coord.y + m0.z * ind_coord.z,
++                                      m1.x * ind_coord.x + m1.y * ind_coord.y + m1.z * ind_coord.z) >> vec2u(3u);
++                } else if (id == 1u) {
++                    ind_trans = (base_coord * vec2i(ind_coord.x)) >> vec2u(8u);
++                } else if (id == 2u) {
++                    ind_trans = (base_coord * vec2i(ind_coord.y)) >> vec2u(8u);
++                } else {
++                    ind_trans = vec2i(0, 0);
++                }
++                if (psc.indtexmtx[matrix].w >= 0) { ind_trans = ind_trans >> vec2u(u32(psc.indtexmtx[matrix].w)); }
++                else { ind_trans = ind_trans << vec2u(u32(-psc.indtexmtx[matrix].w)); }
++            }
++        }
++        if (direct_sample && indirect_enabled) {
++            let wrapped = vec2i(ind_wrap(base_coord.x, kb(s + TS_ind_wrap_s)), ind_wrap(base_coord.y, kb(s + TS_ind_wrap_t)));
++            var translation = vec2i(0, 0);
++            if (sample_indirect && ind_matrix_index != 0u) { translation = ind_trans; }
++            if (kb(s + TS_ind_add_prev) != 0u) { tevcoord += wrapped + translation; }
++            else { tevcoord = wrapped + translation; }
++            tevcoord = (tevcoord << vec2u(8u)) >> vec2u(8u);
++            stage_uv = vec2f(tevcoord) / (vec2f(stage_dims) * 128.0);
++        }
++        if (direct_sample) {
++            if (indirect_enabled) {
++                rawtextemp = vec4i(round(texmap_sample(texunit, stage_uv) * 255.0));
++            } else {
++                let uv = vec2f(fixpoint[texcoord]) / (gx_texdims(psc.texdims[texunit].xy, texmap_dims(texunit)) * 128.0);
++                rawtextemp = vec4i(round(texmap_sample(texunit, uv) * 255.0));
++            }
++            textemp = swz(rawtextemp, s + TS_tex_swap);
++        } else if (ntg == 0u) {
++            textemp = vec4i(0, 0, 0, 0);
++        } else {
++            textemp = vec4i(255, 255, 255, 255);
++        }
++        if (uses_bump_ras) {
++            var bump = alphabump;
++            if (colorchan != 5u) { bump = alphabump | (alphabump >> 5u); }
++            rastemp = swz(vec4i(bump, bump, bump, bump), s + TS_ras_swap);
++        }
++        if (cc_a == 14u || cc_b == 14u || cc_c == 14u || cc_d == 14u ||
++            ac_a == 6u || ac_b == 6u || ac_c == 6u || ac_d == 6u) {
++            konsttemp = vec4i(konst_c(kb(s + TS_ksel_kc)), konst_a(kb(s + TS_ksel_ka)));
++        }
++        let tevin_a = vec4i(cin(cc_a, r, textemp, rastemp, konsttemp), ain(ac_a, r, textemp, rastemp, konsttemp)) & vec4i(255, 255, 255, 255);
++        let tevin_b = vec4i(cin(cc_b, r, textemp, rastemp, konsttemp), ain(ac_b, r, textemp, rastemp, konsttemp)) & vec4i(255, 255, 255, 255);
++        let tevin_c = vec4i(cin(cc_c, r, textemp, rastemp, konsttemp), ain(ac_c, r, textemp, rastemp, konsttemp)) & vec4i(255, 255, 255, 255);
++        let tevin_d = vec4i(cin(cc_d, r, textemp, rastemp, konsttemp), ain(ac_d, r, textemp, rastemp, konsttemp));
++        // Color combine.
++        var crgb: vec3i;
++        if (kb(s + TS_cc_bias) == 3u) {
++            crgb = tev_compare3(tevin_a, tevin_b, tevin_c, tevin_d, kb(s + TS_cc_op), kb(s + TS_cc_scale));
++        } else {
++            crgb = tev_regular3(tevin_a.rgb, tevin_b.rgb, tevin_c.rgb, tevin_d.rgb, kb(s + TS_cc_bias),
++                                kb(s + TS_cc_op), kb(s + TS_cc_scale));
++        }
++        let cdest = kb(s + TS_cc_dest) & 3u;
++        if (kb(s + TS_cc_clamp) != 0u) { crgb = clamp(crgb, vec3<i32>(0), vec3<i32>(255)); }
++        else { crgb = clamp(crgb, vec3<i32>(-1024), vec3<i32>(1023)); }
++        r[cdest] = vec4i(crgb, r[cdest].a);
++        // Alpha combine.
++        var aexp: i32;
++        if (kb(s + TS_ac_bias) == 3u) {
++            aexp = tev_compare1(tevin_a, tevin_b, tevin_c, tevin_d, kb(s + TS_ac_op), kb(s + TS_ac_scale));
++        } else {
++            aexp = tev_regular1(tevin_a.a, tevin_b.a, tevin_c.a, tevin_d.a, kb(s + TS_ac_bias), kb(s + TS_ac_op),
++                                kb(s + TS_ac_scale));
++        }
++        let adest = kb(s + TS_ac_dest) & 3u;
++        if (kb(s + TS_ac_clamp) != 0u) { aexp = clamp(aexp, i32(0), i32(255)); }
++        else { aexp = clamp(aexp, i32(-1024), i32(1023)); }
++        r[adest] = vec4i(r[adest].rgb, aexp);
++        last_cc_dest = cdest;
++        last_ac_dest = adest;
++    }
++    var prev = r[0];
++    if (last_cc_dest != 0u) { prev = vec4i(r[last_cc_dest].rgb, prev.a); }
++    if (last_ac_dest != 0u) { prev = vec4i(prev.rgb, r[last_ac_dest].a); }
++    return prev;
++}
++
++// emit_fog, on prev.rgb.
++fn fog(prev: vec4i, in: VertexOut) -> vec4i {
++    let fsel = kb(K_fog_fsel);
++    if (fsel == 0u) { return prev; }
++    var zCoord = i32((1.0 - in.pos.z) * 16777216.0);
++    zCoord = clamp(zCoord, i32(0), i32(16777215));
++    var ze: f32;
++    if (kb(K_fog_proj) == 0u) {
++        ze = (psc.fogf.x * 16777216.0) / f32(psc.fogi.y - (zCoord >> u32(psc.fogi.w)));
++    } else {
++        ze = psc.fogf.x * f32(zCoord) / 16777216.0;
++    }
++    if (kb(K_fog_range) != 0u) {
++        let offset = (2.0 * (in.pos.x / psc.fogf.w)) - 1.0 - psc.fogf.z;
++        let floatindex = clamp(9.0 - abs(offset) * 9.0, 0.0, 9.0);
++        let indexlower = u32(floatindex);
++        let indexupper = indexlower + 1u;
++        let klower = psc.fogrange[indexlower >> 2u][indexlower & 3u];
++        let kupper = psc.fogrange[indexupper >> 2u][indexupper & 3u];
++        let k = mix(klower, kupper, fract(floatindex));
++        let x_adjust = sqrt(offset * offset + k * k) / k;
++        ze = ze * x_adjust;
++    }
++    var fogv = clamp(ze - psc.fogf.y, 0.0, 1.0);
++    if (fsel == 4u) { fogv = 1.0 - exp2(-8.0 * fogv); }
++    else if (fsel == 5u) { fogv = 1.0 - exp2(-8.0 * fogv * fogv); }
++    else if (fsel == 6u) { fogv = exp2(-8.0 * (1.0 - fogv)); }
++    else if (fsel == 7u) { fogv = 1.0 - fogv; fogv = exp2(-8.0 * fogv * fogv); }
++    let ifog = i32(round(fogv * 256.0));
++    return vec4i((prev.rgb * (256 - ifog) + psc.fogcolor.rgb * ifog) >> vec3u(8u), prev.a);
++}
++
++// The fragment's colour, in 0..1: the TEV, the alpha test and fog; or the
++// passthrough of a key without TEV (vertex colour, or the first texture).
++fn shade(in: VertexOut) -> vec4f {
++    if (kb(K_tev_valid) == 0u) {
++        var prev = in.color0;
++        if (kb(K_textured) != 0u) {
++            var uv = in.uv0.xy;
++            if (kb(K_num_tex_gens) > 0u && kb(K_tex_gens + TG_projection) != 0u) { uv = in.uv0.xy / max(in.uv0.z, 1e-6); }
++            prev = textureSample(tex0, samp0, uv);
++        }
++        return prev;
++    }
++    var prev = tev(in);
++    let ok0 = alpha_cond(kb(K_alpha_comp0), prev.a, psc.alpha_ref.x);
++    let ok1 = alpha_cond(kb(K_alpha_comp1), prev.a, psc.alpha_ref.y);
++    let logic = kb(K_alpha_logic);
++    var passed: bool;
++    if (logic == 0u) { passed = ok0 && ok1; }
++    else if (logic == 1u) { passed = ok0 || ok1; }
++    else if (logic == 2u) { passed = ok0 != ok1; }
++    else { passed = ok0 == ok1; }
++    if (!passed) { discard; }
++    prev = fog(prev, in);
++    return vec4f(prev) / 255.0;
++}
++)WGSL";
++
++constexpr const char* kPlainOut = R"WGSL(
++@fragment
++fn fs_main(in: VertexOut) -> @location(0) vec4f {
++    return shade(in);
++}
++)WGSL";
++
++// Destination alpha (dual-source blending): the constant alpha written
++// instead, and the colour's alpha as the second source.
++constexpr const char* kDualOut = R"WGSL(
++struct FragmentOut {
++    @location(0) @blend_src(0) color: vec4f,
++    @location(0) @blend_src(1) blend: vec4f,
++};
++@fragment
++fn fs_main(in: VertexOut) -> FragmentOut {
++    let c = shade(in);
++    return FragmentOut(vec4f(c.rgb, f32(kb(K_dst_alpha)) / 255.0), vec4f(0.0, 0.0, 0.0, c.a));
++}
++)WGSL";
++
++} // namespace
++
++std::string generate_uber_wgsl(bool dual_source) {
++  std::string out;
++  out.reserve(32768);
++  if (dual_source)
++    out += "enable dual_source_blending;\n\n";
++  out += "// gxcore ubershader (any key, read from the pixel uniform)\n";
++  emit_key_layout(out);
++  out += kBody;
++  out += dual_source ? kDualOut : kPlainOut;
++  return out;
++}
++
++} // namespace gxruntime::gxcore
+-- 
+2.45.2.windows.1
+

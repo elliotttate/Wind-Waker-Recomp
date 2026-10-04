@@ -112,16 +112,16 @@
     {
       "id": "recompcore",
       "url": "https://github.com/elliotttate/RecompCore",
-      "sha": "b4e4d037c7c18f984ef12e2bc3ac67c2bed28e93",
+      "sha": "e6559e05cc39f2e66ee3360214a1758c5fcf32a4",
       "branch": "windows-release",
       "license": "GPL-3.0",
       "role": "static-recomp runtime (GXRuntime), vendored Aurora renderer at GXRuntime/graphics/aurora, Dolphin DSP donor sources, and the DolRecomp translator as the DolRecomp submodule; the product source for the iPad build (scripts/ios/build_device.sh)",
-      "verified": "2026-10-01",
+      "verified": "2026-10-03",
       "upstream": {
         "url": "https://github.com/ExpansionPak/RecompCore",
         "base_sha": "5c3611e2bcb03d1578274c956bc3d7b913527ec2"
       },
-      "fork_contents": "the 80 BlueWake commits after the upstream base, including the former unpublished head 3476998bdb5b57a21a9b51daf6aaf5bbdf463f7d and the patches/recompcore series through 0097 (0085-0091 in commit 0f642d4, the iPad device session of 2026-09-26; 0092, HD texture packs and the aspect override, in 7952fa2; 0093, background decoding of HD textures, in 594807d), plus the previously uncommitted GXRuntime core cpu.h/cpu.c and DSPIntTables sources, with .gitmodules pointing DolRecomp at chrissotraidis/DolRecomp branch bluewake (chrissotraidis/RecompCore 2d60636); this fork's copy adds patches/recompcore 0098-0120 and the save states' two (the Mac line's 0111 and 0112) and points DolRecomp at elliotttate/DolRecomp, and this pin adds 0121, the window position passed through the Aurora backend config (RecompCore#2, fetched from its pull request ref until it merges)",
+      "fork_contents": "the 80 BlueWake commits after the upstream base, including the former unpublished head 3476998bdb5b57a21a9b51daf6aaf5bbdf463f7d and the patches/recompcore series through 0097 (0085-0091 in commit 0f642d4, the iPad device session of 2026-09-26; 0092, HD texture packs and the aspect override, in 7952fa2; 0093, background decoding of HD textures, in 594807d), plus the previously uncommitted GXRuntime core cpu.h/cpu.c and DSPIntTables sources, with .gitmodules pointing DolRecomp at chrissotraidis/DolRecomp branch bluewake (chrissotraidis/RecompCore 2d60636); this fork's copy adds patches/recompcore 0098-0133 and the save states' two (the Mac line's 0111 and 0112), and points DolRecomp at elliotttate/DolRecomp",
       "superseded_local_patch": {
         "base_sha": "5c3611e2bcb03d1578274c956bc3d7b913527ec2",
         "head_sha": "3476998bdb5b57a21a9b51daf6aaf5bbdf463f7d",

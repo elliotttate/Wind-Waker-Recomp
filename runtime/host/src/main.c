@@ -21,6 +21,7 @@
 #include "card_runtime.h"
 #include "edge_intercepts.h"
 #include "game_options.h"
+#include "forest_water.h"
 #include "fast_load.h"
 #include "fps_watch.h"
 #include "jump_button.h"
@@ -28,6 +29,7 @@
 #include "simulation_mode.h"
 #include "sprint.h"
 #include "quick_doors.h"
+#include "haptics.h"
 #include "draw_tags.h"
 #include "mouse_camera.h"
 #include "callback_delivery.h"
@@ -1770,6 +1772,7 @@ static bool host_chassis_edge_service(void* user, CPUState* cpu, u32 address) {
     bluewake_climb_dispatch(cpu, address);
     bluewake_quick_doors_dispatch(cpu, address);
     bluewake_draw_tags_dispatch(cpu, address);
+    bluewake_forest_water_dispatch(cpu, address);
     if (bluewake_jump_button_dispatch(cpu, address))
         return true;
     if (__builtin_expect(cpu == NULL || g_turn_census_enabled ||
@@ -4286,9 +4289,14 @@ static void host_mmio_write(CPUState* ctx, u32 address, u64 value, u8 size) {
             static u8 s_motor[4];
             const u32 channel = (address - DOL_SI_BASE) / 0x0Cu;
             const u8 motor = (u8)((u32)value & 3u);
-            if (((u32)value >> 24) == 0x40u && motor != s_motor[channel]) {
+            // The command is bits 16-23 (PADControlMotor: (0x40 << 16) |
+            // AnalogMode | motor); a check of the top byte never matched.
+            if ((((u32)value >> 16) & 0xFFu) == 0x40u && motor != s_motor[channel]) {
                 s_motor[channel] = motor;
-                dol_platform_pad_control_motor(channel, motor);
+                // Enhanced haptics render the game's vibration from what it
+                // asked for (haptics.c) instead of these on-off bits.
+                if (bluewake_haptics_forward_motor())
+                    dol_platform_pad_control_motor(channel, motor);
                 if (g_input_log_enabled)
                     fprintf(stderr, "[rumble] channel=%u motor=%u retrace=%llu\n", channel,
                             (unsigned)motor, (unsigned long long)g_host_retrace_count);
@@ -4807,6 +4815,7 @@ static void host_sync_vi_cycles(CPUState* cpu) {
         bluewake_fps_watch_retrace();
         bluewake_fast_load_retrace(bluewake_host_thread_cpu_us());
         bluewake_quick_doors_retrace();
+        bluewake_haptics_retrace();
         if (g_wall_pace_enabled && !bluewake_fast_load_fast_forward())
             host_wall_pace(g_host_retrace_count);
         if (g_perf_log_enabled)
@@ -7376,6 +7385,9 @@ int main(int argc, char** argv) {
     }
     host_mods_enable(lib, &cpu);
     bluewake_game_options_enable(lib, &cpu, g_options_mod);
+    bluewake_forest_water_set_ftree_text(
+        host_rel_section_linked_start(mod, 317u, 1u));
+    bluewake_forest_water_reload();
     bluewake_mouse_camera_attach(&cpu);
     bluewake_climb_attach(&cpu);
     bluewake_jump_button_attach(&cpu);
@@ -7384,6 +7396,7 @@ int main(int argc, char** argv) {
     bluewake_fast_load_attach(&cpu);
     bluewake_quick_doors_attach(&cpu);
     bluewake_draw_tags_attach(&cpu);
+    bluewake_haptics_attach(&cpu);
 
     unsigned long long blocks = 0;
     const char* stop_reason = NULL;
@@ -7797,6 +7810,7 @@ int main(int argc, char** argv) {
         if (dol_platform_should_quit()) { stop_reason = "quit"; break; }
         bluewake_card_runtime_service_callback(&cpu);
         bluewake_card_runtime_dispatch(&cpu);
+        bluewake_forest_water_dispatch(&cpu, cpu.pc);
         if (g_host_retrace_count != scene_milestone_last_retrace) {
             scene_milestone_last_retrace = g_host_retrace_count;
             const u32 open_scene = host_find_scene_by_proc_name(&cpu, 0x000Eu);

@@ -1,3 +1,323 @@
+## 2026-10-03 The Mac side's updates on Windows: water and HUD smoothing, HD packs without shimmer, Forest Water, the Wind Waker HD importer
+
+**The merge** (main e4e1401 into windows-release, a9df903): the Wind Waker HD texture importer, Forest Water
+options, the Mac's runtime delta (patches/recompcore/0170: water, lava, HUD) and its patch step. Windows
+builds from a pinned RecompCore commit that carries its changes, so the lock names no working-tree patch;
+scripts/apply_recompcore_patches.py then only checks that ref/recompcore is that commit, unmodified.
+
+**RecompCore 201e909** (patch 0131): 0170 without its lava part (this fork's 0120 already), merged with
+0125's cloth strips and 0126's blended colours. Indexed meshes the game deforms on the CPU (the sea's grid,
+with its direct UVs) are blended vertex by vertex, and 2D sprites are matched by their bounds.
+frame_interp_test passes with both sides' cases. In Smooth Motion dumps of the Outset route the 31 real
+frames are identical to ef3e17f's; the in-between frames differ where the HUD's matching changed: the
+pulsing heart was drawn doubled (one copy offset above) and is now one heart between its two sizes.
+
+**HD packs shimmered and flickered as the camera turned** (RecompCore 7310b79, patch 0132). Most of the
+game's textures have no mips, so their sampler clamps to level 0; a replacement several times their size,
+with its own mip chain (the WWHD importer writes one to 1x1), was drawn from level 0 alone. Now a
+replacement's levels are all sampled, as in Dolphin (a custom texture's max LOD is 255), blended linearly
+where the game asked for no mip filter. Tested with private packs made from the disc (all 4,641 model and
+BTI textures decoded, upscaled 4x/2x, with mip chains; scratchpad make_test_pack.py, never shipped): with a
+fine grid in every texture, the old renderer drew moire on the cliffs, beach, pier and HUD buttons that
+crawled with the camera, the new one averages it out at a distance. Thin alpha features such as the sea's
+foam now show as soft streaks at a distance, as in Dolphin with a mipped pack. No Wind Waker HD disc was
+available here, so a real WWHD import has not been tried on Windows.
+
+**The water path's cost** (RecompCore e6559e0, patch 0133). 0131 gave every small indexed mesh without
+position matrix indices its own vertex range (so no batching) and a copy of its vertices for the helper;
+nearly all are static models. Now a hash of each position array's bytes, once a game frame, says which
+meshes the game wrote; only those (and draws with direct UVs or positions) take the per-vertex path. The
+guest's dirty epochs (cache flushes) were tried first and miss small meshes written without a flush (the
+Forsaken Fortress's flag). Dumps against 201e909: Outset 62 of 62 and the sea by the Fortress 42 of 42
+identical. All cores, Smooth Motion at 60, paced, two runs each, CPU per game frame (ms):
+
+| Place | GX worker ef3e17f / 201e909 / e6559e0 | Render worker ef3e17f / 201e909 / e6559e0 |
+| --- | --- | --- |
+| Outset (`sea:44`) | 8.1 / 9.1-9.4 / 8.1-8.3 | 3.3-3.9 / 4.0-4.4 / 3.2-3.8 |
+| Forest Haven (`sea:41`) | 15.9-16.4 / 18.6-18.9 / 16.6-16.8 | 4.6-5.1 / 7.1 / 4.3-4.7 |
+| Dragon Roost Island (`sea:13`) | 13.1-13.6 / 14.8-14.9 / 13.5 | 4.4-4.8 / 5.6-5.9 / 4.2-4.4 |
+| Hyrule (`Hyrule`) | 11.1-11.4 / 13.1 / 11.1-11.3 | 3.8-4.4 / 6.1-6.4 / 3.6-4.4 |
+| Hyrule Castle's room (`Hyroom`) | 13.4-13.7 / 15.5-16.0 / 13.7-13.8 | 3.8-4.0 / 6.3-6.4 / 4.3-4.6 |
+
+(On eight E-cores the comparison is not meaningful at Forest Haven: the pacer turns the in-between frames
+off and on as the game falls below 30, so runs mix both states.)
+
+**Also in this build:** Forest Water's two helps (the Mac's forest_water.c) in the Windows settings (Mods)
+and settings.ini, its REL hook named so the builder's direct calls keep it; the WWHD importer on Windows
+(scripts/setup_wwhd_tools.ps1, %APPDATA%\BlueWake defaults, `--install` writes `hd_textures=1` and
+`texture_pack=`, which the app now honours; tests/wwhd_import_test.py passes on Windows); and the
+resumable search natives (game-natives-3b, docs/status/NATIVE_SEARCH_WINDOWS_2026-10-03.md: native entries
+15/15 certified). The game module's play is exact against the previous build: Link's position at all 621
+probes of the Outset route identical.
+
+## 2026-10-03 The game by warp: where it is slow, and the GX worker's transform copies
+
+**The survey.** The 2026-10-02 build (module be22aba4) on four of the i9's E-cores (`0x000F0000`), uncapped,
+Smooth Motion off, at 47 places by test warp from the Outset save, about 12 s of Link running and turning at
+each (scratchpad survey.ps1 / survey.py over tour_run.ps1). Interiors and most dungeon rooms reach 60 game
+frames a second (the frame cap), so they are not CPU-bound here. The slow places are the big outdoor ones:
+
+| Place | Game FPS | Game thread CPU per game frame | GX worker CPU per game frame |
+| --- | --- | --- | --- |
+| Forest Haven (`sea:41`) | 29.5 | 20.9 ms | 24.9 ms |
+| Dragon Roost Island (`sea:13`) | 31.3 | 24.5 ms | 20.6 ms |
+| The sea by the Forsaken Fortress (`sea:1`) | 32.6 | 22.8 ms | 17.5 ms |
+| Hyrule Castle's room (`Hyroom`) | 33.3 | 16.9 ms | 22.8 ms |
+| The Earth Temple's boss (`M_DaiB`) | 38.3 | 13.9 ms | 18.8 ms |
+| Outset (`sea:44`) | 39.2 | 21.5 ms | 13.5 ms |
+| Hyrule (`Hyrule`) | 41.9 | 10.4 ms | 17.9 ms |
+
+In half of them the GX worker, not the game thread, is the limit.
+
+**Where the time goes.** The game thread (guest call stacks, guest_stack_sampler.py) is spread thin at most
+places: drawing (J3D draw buffers 14-20 percent inclusive), particles (7-10), animation (5-8), the attention
+system's weights (6), collision, the audio engine's channel updates (5-7). One hot spot: at Dragon Roost
+Island, `daTag_Island_c::demoProcCom_ikada` calls `fopAcM_searchFromName` every frame, which walks every
+actor and, for each, `strcmp`s the same name through the stage's object-name table (`dStage_searchName`):
+7.4 percent of the game thread (`strcmp` alone 6.4), and about 3 percent at Forest Haven. The GX worker
+(thread sampler) is flat: building draw plans, packets, and about a fifth of its working time in memory
+copies, of which the largest was each draw's transform state.
+
+**The transform copies** (RecompCore ef3e17f, patch 0130). Each draw's 2.3 KB of transform state was copied
+three times (into the draw queue, the packet, the sink's draw); about 95 percent of draws repeat the draw
+before's transform, which the transform version (0127) identifies. Now each copy is skipped when its version
+is the one already there. `DOL_GX_TRANSFORM_VERIFY=1` copies anyway and counts differences.
+- Verify mode over twelve places: 54 million draws, 95 percent kept, 0 differences.
+- Synchronous captures of the Outset route 19 of 19 identical; in Gohma's room Link's position identical at
+  every probe and Smooth Motion dumps (game frames 300-330, real and in-between) 62 of 62 identical.
+  (Gohma's room's retrace-triggered captures are not a test of this: they are asynchronous readbacks, and a
+  faster renderer captures a different game frame.)
+- Four E-cores, the heaviest places, two runs each against the same build without it: the GX worker's CPU
+  per game frame at Forest Haven 25.5-26.3 ms before, 22.3-22.7 after; Hyrule Castle's room 22.0-22.4 and
+  19.0-20.6; Dragon Roost Island 20.4-21.6 and 18.5-18.8; Hyrule 18.1-19.3 and 15.2-15.5; the sea by the
+  Fortress 16.6-18.2 and 14.8-15.4. Game frames a second up 6 to 16 percent at those places.
+
+**Tried and dropped** (exact, but no clear gain):
+- Not recording every command's FIFO bytes on the live path (nothing there reads them): about 2 percent less
+  GX worker time overall but consistently slower at the Earth Temple's boss.
+- The derived-state cache keyed on the transform version instead of comparing the XF registers (36 million
+  hits verified against a fresh derivation, 0 differences), with each vertex's unwritten slots zeroed instead
+  of the whole buffer: no faster, slightly slower at most places.
+
+**The search natives** (docs/status/NATIVE_SEARCH_2026-10-03.md, merged at 8eb0572): `strcmp`,
+`dStage_searchName` and `cTgIt_JudgeFilter` with `fopAcM_findObjectCB`, certified against the translation
+(0 mismatches) and hooked (`native entries: 12/12 certified`). In play they change nothing the game does (Dragon
+Roost Island, synchronous: Link's position the same at 158 of 158 probes, natives on and off) but they do not
+yet save time there (game thread 23.0-23.3 ms per game frame with the 2026-10-02 module, 23.4-23.8 with
+these): a search for daTag_Island's names needs about 6,000 guest cycles and the game thread's budget before
+its next event is usually 80 to 4,800, so the native declines and the translation runs. The headless training
+had longer slices (the stage-name native ran in 99.7 percent of its calls there). Next: natives that run as
+far as the budget allows and resume at the loop head.
+
+**The GX worker in two stages** (RecompCore branch `gx-two-stage`, not pinned): the plans handed to a second
+thread that puts them into Aurora. Exact (Smooth Motion dumps 62 of 62 at Outset and Gohma's room) but not
+faster: on eight E-cores 7 to 15 percent slower with the plan arrays swapped across (the builder reallocated
+them), about even with them copied. Putting a plan into Aurora is mostly copying its data into staging, and
+the hand-off is a copy of the same size. Also measured flat and dropped: the texture handle taken by
+reference instead of copied per draw.
+
+## 2026-10-02 What we took from DeepSea: pipelines, Smooth Motion, the GX worker, training, natives, build time
+
+The borrow list in DEEPSEA_COMPARISON_2026-10-02.md, item by item, measured on the i9-13900KF + RTX 5090.
+RecompCore 44e5c2c (patches/recompcore 0121-0129, branch `windows-release`; 0121, Dawn's device lock, was
+written in another session for a crash after a save state loads, and the pipeline threads depend on it).
+
+**Priority and the slow-game detector.** The process runs above normal priority (a6f8ea9;
+`BLUEWAKE_PRIORITY=0` opts out): with the game on four E-cores and 8 threads spinning beside it, it kept
+full speed with and without, so this is insurance. Smooth Motion's slow-game test is now the median of the
+last 60 frame gaps, gaps of 150 ms or more left out, two slow medians in a row (0122): six held hitches of
+120-200 ms (`BLUEWAKE_TEST_STALL`) no longer drop the in-between frames; two E-cores, really too slow,
+still do.
+
+**Shader stutter.**
+- Pipelines compile on a quarter of the logical CPUs, 1-4 (0123, with the device lock): the 213-pipeline
+  seed compiled in 1.06-1.25 s instead of 3.7-4.4; booting into Gohma's room, draws skipped 3,259 against
+  15,930-20,192.
+- The bundled seed is 513 pipelines from a tour of 49 places (04e0e1b): booting into the three save states
+  asks for no pipeline it lacks.
+- Settings, Display, "Compile shaders before playing" (238a829) holds the game at its first present behind a
+  progress panel until the queued pipelines are made.
+- The ubershader (0128-0129): a draw whose pipeline is still compiling is drawn by one WGSL module that
+  reads its shader key from a uniform (gxcore_uber.cpp), with a pipeline per fixed-function state; forced
+  on every draw it draws the lava rooms' frames identical to the specialized pipelines'. Its two shaders
+  take about 650 ms each to compile when Dawn's blob cache lacks them, so one pipeline per shader is made
+  first, and only when nothing else is queued unless an earlier run made one. Draws left out (counting a
+  batch's draws), the old seed: a first launch, Gohma's room 5,933 against 6,069 without, the lava room
+  5,296 against 5,297, the bridge 4,613 against 4,848; after playing Outset once, 950 against 4,860, 141
+  against 3,477 and 215 against 3,377. On by default with D3D12 only (`DOL_AURORA_UBERSHADER=0/1/2`);
+  Metal and Vulkan have not drawn it.
+
+**Smooth Motion coverage.**
+- Colours blend in the in-between frames (0126): light, material and ambient colours, TEV colour and
+  konst registers, fog colour. Real frames unchanged (31 of 31); the in-between frames' fading wind streaks
+  now halfway; no measurable cost.
+- Cloth (0125 with 40953dd): a dCloth packet's strips (flags) and the boat's sail are tagged as a draw
+  scope over indexed draws and blended vertex by vertex. Takes a module that watches 0x80063728 and
+  0x800E93B8 (built from 40953dd on). Checked with the new module: the three flags on the ship at sea
+  room 14 are drawn as 8 tagged strips of 10 vertices each, matched and blended with their positions
+  captured every frame; real frames identical with the tags on and off. Not seen on screen yet (the flags
+  were behind the deck's roof in the views tried).
+
+**The GX worker.**
+- The decode finds a draw's attribute arrays once and multiplies by 1/2^frac (0124; 285 million
+  components compared bit for bit).
+- A draw's 2.8 KB vertex constants are kept when the transform state's version is the draw before's
+  (0127): GX worker CPU per game frame 16.4-17.0 ms against 18.8-19.2, four E-cores, unpaced.
+- The compact vertex (132 to about 108 bytes with unorm8x4 colours) was not done: a profile of the GX
+  worker (four E-cores, Smooth Motion 60) has it idle 64 percent of the time, and vertex writes and copies
+  are a few percent of the rest; the saving would be under 2 percent of its working time, against
+  changing the vertex layout in gxcore, the ubershader, frame interpolation and the tests.
+
+**Training, the app, build time** (135a62d).
+- The training's plain playback goes on from Outset to ten places by test warp: 425 of 813 translated
+  functions ran, against 288 (TRAINING_VERSION 4).
+- The app is compiled with its own profile (windows/pgo/app.profdata, scripts/windows/train_app_profile.py)
+  and ThinLTO: GX worker CPU per game frame 13.8-14.3 ms against 16.6-17.2, game thread 22.4-23.2 against
+  23.9-24.3.
+- `--tiered` compiles the chunks the training never ran (367) at -O1 without GVN's memory dependence:
+  the module compiled in 14-16 minutes instead of about 39 (the 0.4.0 build: 35). The cold chunks were already
+  compiled for size by the profile; Gohma's room (which no training visits) below shows no loss.
+
+**Natives** (the second set, docs/status/NATIVE_ENTRIES_2026-10-02.md, merged from `game-natives-2`):
+J3DFifoLoadPosMtxImm, NrmMtxImm and NrmMtxImm3x3, PSMTXMultVecSR, the Basic, Softimage and Maya
+calcTransform, dBgW::ChkGrpThrough and cBgS_Chk::ChkSameActorPid, each certified against its translation
+(60,000 cases each, 0 mismatches) and hooked only where the translation hashes to the tested one
+(`native entries: 9/9 certified`). In play they almost never decline: over the training's two playbacks
+(the opening, Outset and the tour; the instrumented module's counts) calcTransform ran natively in 97.4
+percent of 5.4 million calls, the FIFO matrix loads in 99.7 percent of 20.7 million, the two collision
+checks in 99.3 percent of 163 million, PSMTXMultVecSR in 91 percent of 318,000. Synchronous captures
+(`DOL_GX_FIFO_WORKER=0`) with them on and off (`BLUEWAKE_NATIVE_ENTRIES=0`) and with 0.4.0's module: the
+Outset route 19 of 19 identical, Gohma's room from its save state 26 of 26. (The module's reports at exit run - the
+profile counts them - but their lines no longer reach the log, 0.4.0's included; the last run whose log has
+them is from 2026-10-01. The counts here are the profile's.)
+
+**All of it, against 0.4.0** (the builder at 1fcf9e3 with `--tiered`: module be22aba4, the app with
+RecompCore 44e5c2c, its profile and ThinLTO). Four E-cores (`0x000F0000`), unpaced, Smooth Motion off,
+three runs each, interleaved:
+
+| | game FPS | GX worker CPU per game frame | game thread CPU per game frame |
+| --- | --- | --- | --- |
+| Outset route, 0.4.0 | 37.2-37.7 | 19.8-20.0 ms | 23.8-24.2 ms |
+| Outset, new app, 0.4.0's module | 36.6-41.9 | 12.9-14.5 ms | 21.5-22.5 ms |
+| Outset, new app and module | 44.2-44.9 | 12.2-12.5 ms | 20.5-20.6 ms |
+| Gohma's room, 0.4.0 (the one run of three that started) | 48.7 | 15.6 ms | 16.4 ms |
+| Gohma's room, new app, 0.4.0's module | 48.0-52.8 | 12.3-12.7 ms | 15.6 ms |
+| Gohma's room, new app and module | 48.1-54.4 | 12.2-12.4 ms | 15.4-16.0 ms |
+
+Booting into Gohma's room on those four cores, 0.4.0 stopped right after the load in 4 of 6 runs (the
+device lock's crash); the new app in 0 of 12. In Gohma's room, which no training visits, the tiered module
+is as fast as 0.4.0's fully optimized one. One of the builder's two instrumented training playbacks stopped
+at retrace 38,482 of 38,500 and was run again (the builder retries once); not seen in any other run.
+
+## 2026-10-02 A crash after a save state loads: Dawn used from several threads without its lock
+
+**What was wrong.** About one boot in ten straight into a save state (`BLUEWAKE_LOAD_STATE`) crashed in the
+first frames after the load: an access violation reading 0x40 inside webgpu_dawn.dll, under the GX worker's
+`wgpuDeviceCreateBindGroup` (gxcore `submit_draw_plan`'s single-texture bind group), and exit 0xC0000374
+(heap corruption). Aurora calls Dawn from three threads: the GX worker makes textures, samplers and bind
+groups; the render worker records, submits and frees each frame's (an EFB copy that is scaled or converted
+makes a bind group with a sampler every frame, freed with the frame); the main thread presents, and when a
+state loads it frees the whole texture cache. The device was created without Dawn's
+`ImplicitDeviceSynchronization` feature, so Dawn took no lock, and its D3D12 backend is not safe that way:
+the sampler descriptors of every bind group live in one `absl::flat_hash_set` (`SamplerHeapCache`, an entry
+inserted with the first bind group of a sampler set and erased with the last), and texture memory is freed
+through plain queues (`ResourceAllocatorManager`). A lookup that reads a slot in the middle of a rehash gets a
+null entry, and an entry's sampler list ends at offset 0x40. After a load every texture is new, so the GX
+worker makes hundreds of bind groups and textures in exactly the frames the render worker's copy bind groups
+come and go. None of the suspects in Aurora's own code was it: texture views are made with their textures,
+samplers and the bind group layout come from caches that hold them, and the GX worker's last-bind memo only
+matches within one frame, while the bind group it names is cached and so holds the view (a window resize,
+which empties that cache, is the one exception; no resize happens in these runs).
+
+**The change** (RecompCore 31401e5, patch 0121): the device asks for `ImplicitDeviceSynchronization`
+where the adapter offers it (Dawn does on every backend). Object creation, queue work, presents and an
+object's last release then take the device's mutex; encoding, pipeline and shader-module creation and
+texture views do not, and Dawn runs callbacks with the mutex released (it asserts so), so the map callbacks'
+own locks cannot deadlock against it. The log says `Device lock (implicit device synchronization): on`;
+`DOL_AURORA_DEVICE_LOCK=0` turns it off for comparison.
+
+**Checked** (i9 + RTX 5090, the 0.3.0 module, two runs at a time, each with a fresh data folder):
+- Booting into `build/windows/test-saves/gohma-lava.bwstate` held to two logical CPUs (affinity 0x3, which
+  makes the race likely): before, 3 of 24 runs crashed (0xC0000374, 2-5 s in, at the first frames after the
+  load); the new app with the lock off, 2 of 32; with it on, 0 of 80. Unheld: before, 1 of 40; lock off,
+  0 of 40; lock on, 0 of 60.
+- Under cdb (`-hd`: the debug heap hid it in 40 runs) one baseline run stopped in the GX worker's
+  `CreateTexture` (`new_dynamic_texture_2d`), in `free` of a heap block whose header held the text
+  "Dawn_Int": the heap was already corrupt, the same race seen from another call.
+- A two-thread program doing what the GX and render workers do (sampler bind groups made and freed on both,
+  release toggles): without the lock 3 of 3 ten-second runs crashed or hung; with it, 3 of 3 ran clean.
+- Speed: the GX worker calls Dawn only when it uploads a texture (263 times on the whole Outset route), and
+  the game thread calls nothing that takes the lock, so in steady play only the render worker takes it.
+  The same app with the lock off and on, interleaved, on four of the i9's E-cores (Outset route, unpaced,
+  `smooth_motion=0`, six runs each): game FPS standing 36.8 off and 35.6 on, running 36.8 and 36.2 (single
+  runs 34-39 either way, with another BlueWake being played on the PC meanwhile); game-thread CPU per game
+  frame 23.4 and 23.4 ms standing, 24.3 and 24.5 running. Smooth Motion 60, paced: 30 game and 60 shown FPS
+  both ways.
+
+The Mac line (RecompCore `bluewake`) creates its device the same way and needs the same commit.
+
+## 2026-10-02 Windows 0.4.0: the lava's colour and controller vibration
+
+Published as v0.4.0 (tag at main d102695) with the Mac's 0.2.0 build: Windows from windows-release 7ca0cb9,
+RecompCore 7c62903 (the lava fix below and the haptics work above). The builder reused 0.3.0's optimization
+profile (ffd6459b: the parts of RecompCore compiled into the module did not change) and recompiled the
+module in 35 minutes; module 48a97a5d, x64 zip 24dc9703, source zip dc8c57c8.
+
+**Checked** (the release's binaries):
+- The lava in Dragon Roost Cavern's big lava room draws orange with glowing domes and the dark crust.
+- Outset's synchronous captures (`DOL_GX_FIFO_WORKER=0`): 19 of 19 identical to 0.3.0's.
+- Speed, 4 E-cores (`0x000F0000`), unpaced, interpolation off, three runs each: game-thread CPU per game
+  frame 23.0-25.0 ms against 0.3.0's 22.5-24.3, the same within the noise; game frames a second ranged
+  33-38 for both, moved by whatever else the PC ran (one pair of runs came out 32.9/34.2 against
+  34.5/34.0).
+- The zip as a player gets it: first launch from the `.rvz`, full speed with frame interpolation (59.9
+  shown, 30 game), a save state saved and loaded, closed with exit code 0. States made with 0.3.0's module
+  load.
+
+`build\windows\BlueWake` is now 0.4.0; the hard-linked test copies made from it (BlueWake-rc and the
+others) changed with it, since the builder copies over its files in place. `build\windows\Rel030` is 0.3.0
+(from its zip, with the disc files linked in) for comparisons.
+
+## 2026-10-01 Controller haptics: the game's vibration shaped, the triggers, and a rumble that never reached a controller
+
+**The rumble never reached a controller.** The host forwards the motor bits the pad library writes to
+SI<n>OUTBUF (runtime/host/src/main.c), and tested the command in the top byte (`value >> 24 == 0x40`).
+PADControlMotor writes `(0x40 << 16) | AnalogMode | command`, so the 0x40 is bits 16-23 and the test never
+matched: on every platform the game's rumble (Classic below, and the iOS app's) was never sent. With the
+command read from bits 16-23 a shock's on-off bits arrive as the game plays them (shock 5: on at retrace
+1000, off at 1008, on at 1010, off at 1014, stopped at 1018).
+
+**Haptics** (runtime/host/src/haptics.c; Windows and the Mac). The game asks for vibration through
+dVibration_c (the play info's mVibration, 0x803CA5A8, checked against its vtable 0x8037D460 once the game
+has built it): StartShock picks one of 26 motor patterns (3 to 23 game frames: a ladder from a light tap to a
+heavy blow at 1 to 8, solid bursts, three spaced taps, a double hit, thuds that fade) and StartQuake one of
+12 looping ones (12 to 62 percent of frames on) until StopQuake; the motor only had on and off, one bit a game
+frame (JUTGamePad::CRumble::update, called from the pad read). Called directly by about 70 actors, those
+functions are not dispatch boundaries the host can rely on, so the object is read each retrace instead
+(its motor shock and quake: pattern index, bits, length, frame; the frame count and state). Enhanced (the
+default) renders a shock on both motors following its bits, with a fast release (each pulse a pulse, not a
+click), at a strength from its pattern (0.5 for two frames on to 1.0 for eight), the light motor sharper on a
+pulse's first frame; a quake as a continuous rumble on the heavy motor as strong as the pattern is dense,
+textured by its bits; strong shocks and heavy quakes drive the triggers too: an Xbox controller's impulse
+triggers (SDL_RumbleGamepadTriggers where SDL reports trigger rumble) or a DualSense's trigger vibration
+(SDL_SendGamepadEffect: effect 0x26 across the whole travel, strength 1-8, 45 Hz; 0x05 clears it). The game's
+Vibration option and its pause clear the patterns and are honoured as they are; nothing is sent while a menu
+is open, with the window in the background, or after 150 ms without a game frame; rumble commands expire in
+120 ms, and a DualSense trigger effect is cleared by a timer on SDL's thread 250 ms after the last command.
+Classic forwards the game's on-off bits as before (now that they arrive); Off sends nothing. Settings:
+Controls (Windows' F1 menu and the Mac's options), `BLUEWAKE_HAPTICS=enhanced|classic|off`,
+`BLUEWAKE_HAPTICS_STRENGTH` (80), `BLUEWAKE_HAPTICS_TRIGGERS`.
+
+**Checked** (Windows, with `BLUEWAKE_HAPTICS_TEST`, which sets the motor half of the object as StartShock and
+StartQuake do, and `BLUEWAKE_HAPTICS_VIRTUAL`, an SDL virtual Xbox controller or DualSense that logs what it is
+sent): the game's Run plays the injected patterns (its frame counts 0 to the length, then clears; the rumble
+flags 0xF0000000); shock 5 (`11110110`) arrives as two pulses, heavy 0.68 and light 0.61 then 0.34 at 80
+percent, the triggers 0.44; shock 11's three taps as three pulses; quake 4 as a steady rumble that fades out
+over 100 ms when stopped; the DualSense gets 0x26 effects at strength 4 easing to 1, then 0x05, and its
+watchdog cleared the triggers only in two real stalls of 187 and 786 ms. Enhanced sends none of the game's raw
+on-off commands (17 motor changes, 0 forwarded). Not yet felt on a physical controller.
+
+
 ## 2026-10-01 Lava in its colour: the dual-texture post transform
 
 **What was wrong.** On Windows the lava in Dragon Roost Cavern and Gohma's room (`M_DragB`) drew white with
@@ -25,9 +345,19 @@ only post matrix in the game that is not the identity (every other caller passes
 
 **Checked** (the 0.3.0 module with the new app):
 - `gxcore_tests` pass, with a new test of the fold for three- and two-row texgens.
-- Gohma's room: the lava draws orange with its dark crust where 0.3.0 drew it white, in real and in-between
-  frames (Smooth Motion 60). A save state there is `build/windows/test-saves/gohma-lava.bwstate`
-  (`BLUEWAKE_LOAD_STATE=...`); `BLUEWAKE_TEST_WARP=900:M_DragB:0:0` from the Outset save reaches it too.
+- Dragon Roost Cavern's big lava room (`M_NewD2` room 2): the lava glows yellow and orange where its domes
+  rise, with the dark crust over it, where 0.3.0 drew it white. The look: the floor quad draws only the
+  crust (alpha test above half on `mag_kuro`, an IA4 of blobs), tinted by the pulsing glow; under it the
+  domes (`dMagma_ballPath_c`, rising and sinking about every 11 s) take the ramp (`mag_col`, CMPR 32x32,
+  clamped in T: brown-orange at floor level through orange and yellow to white about 50 units up).
+- Gohma's room: orange with its dark crust, real and in-between frames (Smooth Motion 60). Its domes
+  (`dMagma_ballBoss_c`) sit 60-110 units under the surface in the opening cutscene and rise only near
+  Gohma, so it shows no bright patches there; judge the lava in room 2.
+- Save states (`BLUEWAKE_LOAD_STATE=...`, or copied into the data folder's `states` for F8), all with the
+  0.3.0 game module, in `build/windows/test-saves`: `drc-lava-bridge.bwstate` (Link on the rope bridge
+  above room 2's lava), `drc-lava-room.bwstate` (room 2's entrance, behind its barricade) and
+  `gohma-lava.bwstate`. `BLUEWAKE_TEST_WARP=900:M_DragB:0:0` or `900:M_NewD2:2:1` from the Outset save
+  reaches them too; `BLUEWAKE_TEST_PLACE` counts retraces from the process start, not the loaded state's.
 - Nothing else moved: Outset's synchronous captures (`DOL_GX_FIFO_WORKER=0`) 19 of 19 identical to the
   release's, and the Smooth Motion dumps 62 of 62 identical to the release's on the same path. Two runs
   that day took the other path at the title screen's presses (one with the release app itself), so a

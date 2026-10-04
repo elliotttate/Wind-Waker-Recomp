@@ -14,7 +14,10 @@ if(NOT WIN32)
 endif()
 
 get_filename_component(BLUEWAKE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
-set(GXRUNTIME_DIR ${BLUEWAKE_REPO_ROOT}/ref/recompcore/GXRuntime)
+# RecompCore's checkout: ref/recompcore, or another (a worktree) for a build
+# beside the usual one.
+set(BLUEWAKE_RECOMPCORE ${BLUEWAKE_REPO_ROOT}/ref/recompcore CACHE PATH "The RecompCore checkout to build with")
+set(GXRUNTIME_DIR ${BLUEWAKE_RECOMPCORE}/GXRuntime)
 set(BLUEWAKE_HOST_SRC ${BLUEWAKE_REPO_ROOT}/runtime/host/src)
 set(BLUEWAKE_COMPAT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/compat)
 
@@ -68,8 +71,10 @@ set(BLUEWAKE_HOST_SOURCES
     ${BLUEWAKE_HOST_SRC}/simulation_mode.c
     ${BLUEWAKE_HOST_SRC}/sprint.c
     ${BLUEWAKE_HOST_SRC}/quick_doors.c
+    ${BLUEWAKE_HOST_SRC}/haptics.c
     ${BLUEWAKE_HOST_SRC}/fps_watch.c
     ${BLUEWAKE_HOST_SRC}/draw_tags.c
+    ${BLUEWAKE_HOST_SRC}/forest_water.c
     ${BLUEWAKE_HOST_SRC}/mouse_camera.c
     ${BLUEWAKE_HOST_SRC}/save_state.c)
 
@@ -98,7 +103,7 @@ target_include_directories(BlueWake PRIVATE
     ${BLUEWAKE_COMPAT_INCLUDES}
     ${GXRUNTIME_DIR}/include
     ${BLUEWAKE_REPO_ROOT}/apple/ios/src
-    ${BLUEWAKE_REPO_ROOT}/ref/recompcore/Source/Core/Core/PowerPC/StaticRecomp)
+    ${BLUEWAKE_RECOMPCORE}/Source/Core/Core/PowerPC/StaticRecomp)
 target_compile_options(BlueWake PRIVATE
     $<$<COMPILE_LANGUAGE:C,CXX>:${BLUEWAKE_COMPAT_FORCE_INCLUDE}>)
 target_compile_definitions(BlueWake PRIVATE
@@ -120,7 +125,7 @@ endif()
 # The donor DSP (Dolphin's DSP interpreter and its high-level Zelda ucode, from
 # RecompCore) compiled from source, with only the Common services it needs
 # (apple/ios/src/dsp_common_shim.cpp), as on iOS.
-set(_donor ${BLUEWAKE_REPO_ROOT}/ref/recompcore)
+set(_donor ${BLUEWAKE_RECOMPCORE})
 set(_dsp ${_donor}/Source/Core/Core/DSP)
 add_library(bluewake_dsp_donor STATIC
     ${_dsp}/DSPAccelerator.cpp ${_dsp}/DSPAnalyzer.cpp ${_dsp}/DSPAssembler.cpp
@@ -187,9 +192,14 @@ target_link_libraries(bluewake_disc_extract PRIVATE bluewake_posix_compat bcrypt
 # The app folder: the executable, its runtime DLLs (SDL3, Dawn and the DXC
 # shader compiler Dawn loads for Direct3D 12) and Aurora's bundled pipeline
 # cache. The builder adds the game module and the prepared game files.
+# The Windows seed (windows/resources) is the Mac's 213 pipelines and those a
+# tour of the game asked for (towns, islands, dungeons and their bosses,
+# interiors, the sea): 513, compiled on several threads at start, so a place's
+# first visit draws everything from its first frame. Its rows are pipeline
+# state keys, not game data.
 include(${GXRUNTIME_DIR}/graphics/aurora/cmake/AuroraCopyRuntimeDLLs.cmake)
 aurora_copy_runtime_dlls(BlueWake)
-set(BLUEWAKE_PIPELINE_SEED "${BLUEWAKE_REPO_ROOT}/apple/ios/resources/initial_pipeline_cache.db")
+set(BLUEWAKE_PIPELINE_SEED "${BLUEWAKE_REPO_ROOT}/windows/resources/initial_pipeline_cache.db")
 add_custom_command(TARGET BlueWake POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${BLUEWAKE_PIPELINE_SEED}" $<TARGET_FILE_DIR:BlueWake>

@@ -1,0 +1,93 @@
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+index 5aec99d06d00ffd76f2ed28004a187292f421c5e..380735403e7153f174fa4fa84ce90ea38d4350ff 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/frame_interp.cpp
+@@ -1271,6 +1271,15 @@ void set_enabled(bool enabled) noexcept { g_enabled.store(enabled, std::memory_o
+ static uint64_t draw_key_of(const gxc::DrawPlan& plan) noexcept {
+   if (plan.match_payload == nullptr || plan.match_payload_size == 0)
+     return 0;
++  // Screen-space sprites have no stable object identity. A countdown digit
++  // can reuse the rupee counter's texture, and a beating heart can add or
++  // remove a copy: matching by texture and occurrence sends them flying
++  // between unrelated UI slots. Repeat the current HUD whole in every
++  // in-between frame. Keep depth-tested orthographic shadow geometry and
++  // perspective particles/models eligible for their existing interpolation.
++  if (plan.match_direct_position && plan.constants.projection[3][2] == 0.f &&
++      !plan.pipeline.depth_test && !plan.pipeline.depth_update)
++    return 0;
+   if (plan.match_direct_position && plan.draw_scope_part != 0) {
+     // One of the draws a wake's emitter makes (its fans and strips), by its
+     // place among them: its vertices are the wake's particles in order (see
+diff --git a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+index 334aa62dc35b12c65c9760b14954de41444e411e..6c9b5fb49e55cf4461cb122c225eed59e97e201c 100644
+--- a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
++++ b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+@@ -99,7 +99,11 @@ static bool halfway(const Result& result, const Camera& before, const Camera& no
+ // A draw submitted as gxcore_draw.cpp does: its inputs captured from the plan.
+ static const gxc::VertexShaderConstants* blend_plan(const gxc::DrawPlan& plan, const gxc::VertexShaderConstants& c) {
+   static fi::DrawInput input;
+-  fi::capture_draw(plan, input);
++  // Production captures the same constants it then blends. Most synthetic
++  // plans above describe only geometry, so supply their transform here too.
++  auto submitted = plan;
++  submitted.constants = c;
++  fi::capture_draw(submitted, input);
+   return fi::blend_draw(input, c);
+ }
+ 
+@@ -109,6 +113,55 @@ int main() {
+   fi::set_enabled(true);
+   const uint64_t kShip = 11, kTree = 22, kHud = 33;
+ 
++  // The countdown and rupee counter reuse a glyph texture, while the last
++  // heart adds/removes animated copies. Screen-space draws must never pair
++  // those sprites, even when their texture, shape and payload are identical.
++  // All 120 Hz in-betweens repeat the real HUD's constants and vertices.
++  {
++    gxc::DrawPlan hud;
++    const uint8_t payload[96]{};
++    hud.match_payload = payload;
++    hud.match_payload_size = sizeof(payload);
++    hud.match_primitive = 0x80;
++    hud.match_direct_position = true;
++    hud.vertex_count = 4;
++    hud.tex_address = 0x00EA78A0;
++    hud.vertices.resize(4 * gxc::kVertexFloats);
++    hud.constants = draw_at(412.f, 412.f, 0.f);
++    std::memset(hud.constants.projection, 0, sizeof(hud.constants.projection));
++    hud.constants.projection[0][0] = 2.f / 640.f;
++    hud.constants.projection[1][1] = -2.f / 480.f;
++    hud.constants.projection[3][3] = 1.f;
++    // A stale particle tag must not turn a HUD quad into a moving particle.
++    hud.draw_tag = 123;
++    fi::set_steps(3);
++    for (int frame = 0; frame < 3; ++frame) {
++      for (float x : {412.f, 643.f, 605.f, 639.f}) {
++        hud.constants.posnormalmatrix[0][3] = x;
++        CHECK(fi::draw_key(hud) == 0);
++        CHECK(blend_plan(hud, hud.constants) == nullptr);
++        for (int step = 0; step < 3; ++step) {
++          CHECK(fi::blended_positions(step) == nullptr);
++          CHECK(fi::blended_texcoords(step) == nullptr);
++        }
++      }
++      fi::end_game_frame();
++    }
++    // Orthographic geometry written into a depth buffer (shadow maps) and
++    // world-space direct sprites still participate in interpolation.
++    hud.pipeline.depth_test = 1;
++    CHECK(fi::draw_key(hud) != 0);
++    hud.pipeline.depth_test = 0;
++    hud.pipeline.depth_update = 1;
++    CHECK(fi::draw_key(hud) != 0);
++    hud.pipeline.depth_update = 0;
++    hud.constants.projection[3][2] = -1.f;
++    CHECK(fi::draw_key(hud) != 0);
++    fi::set_steps(1);
++    fi::end_game_frame();
++    fi::end_game_frame();
++  }
++
+   // Frame 1: the ship, two trees, the HUD.
+   CHECK(fi::blend_draw(kShip, 0, draw_at(0, 0, -500)) == nullptr); // no previous frame yet
+   fi::blend_draw(kTree, 0, draw_at(-200, 0, -800));
