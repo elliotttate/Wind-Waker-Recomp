@@ -184,6 +184,23 @@ static void finish_session_log(void) {
     CloseHandle(g_log_thread);
     g_log_thread = NULL;
     fclose(g_log_file);
+    // Those exit handlers (the natives' counts) run after every other thread
+    // has ended, the pump too: give them where the output went before the
+    // session log (the parent's redirect or terminal), else the end of the
+    // session log, instead of NUL.
+    int late = -1;
+    if (g_console != INVALID_HANDLE_VALUE) {
+        late = _open_osfhandle((intptr_t)g_console, _O_WRONLY | _O_BINARY);
+        if (late >= 0)
+            g_console = INVALID_HANDLE_VALUE;
+    } else {
+        late = _open(g_log_path, _O_WRONLY | _O_APPEND | _O_TEXT);
+    }
+    if (late >= 0) {
+        _dup2(late, _fileno(stdout));
+        _dup2(late, _fileno(stderr));
+        _close(late);
+    }
 }
 
 static void start_session_log(void) {
