@@ -11,6 +11,8 @@
 
 #include "controller_settings.h"
 
+extern "C" void bluewake_padmap_install(void);  // runtime/host/src/pad_remap.cpp
+
 namespace {
 
 constexpr u16 kRemapPad[BW_REMAP_COUNT] = {PAD_BUTTON_A, PAD_BUTTON_B, PAD_BUTTON_X,
@@ -45,8 +47,11 @@ extern "C" void bluewake_settings_tick(void) {
     static unsigned applied_generation;
     static int applied_controller = -2;
     static unsigned frames;
-    if (applied_generation == 0u)
+    if (applied_generation == 0u) {
         bluewake_settings_changed();
+        // The host's jump and sprint leave a GameCube controller's buttons to the game.
+        bluewake_padmap_install();
+    }
     const BWSettingsSnapshot& s = g_bw_settings;
     const bool changed = applied_generation != s.generation;
     if (changed) {

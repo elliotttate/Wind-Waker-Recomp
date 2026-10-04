@@ -34,6 +34,9 @@ set(BLUEWAKE_HOST_SOURCES
     ${BLUEWAKE_HOST_SRC}/delivery_digest.c
     ${BLUEWAKE_HOST_SRC}/edge_intercepts.c
     ${BLUEWAKE_HOST_SRC}/game_options.c
+    ${BLUEWAKE_HOST_SRC}/gamepads.c
+    ${BLUEWAKE_HOST_SRC}/input_bindings.c
+    ${BLUEWAKE_HOST_SRC}/pad_remap.cpp
     ${BLUEWAKE_HOST_SRC}/forest_water.c
     ${BLUEWAKE_HOST_SRC}/fast_load.c
     ${BLUEWAKE_HOST_SRC}/fps_watch.c

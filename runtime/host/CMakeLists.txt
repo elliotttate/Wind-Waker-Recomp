@@ -44,6 +44,10 @@ add_executable(bluewake_host
     src/delivery_digest.c
     src/edge_intercepts.c
     src/game_options.c
+    src/gamepads.c
+    src/input_bindings.c
+    src/controller_glyphs.c
+    src/pad_remap.cpp
     src/forest_water.c
     src/fast_load.c
     src/fps_watch.c
@@ -243,6 +247,19 @@ target_include_directories(bluewake_edge_intercepts_test PRIVATE
 )
 add_test(NAME bluewake_edge_intercepts_test
     COMMAND bluewake_edge_intercepts_test)
+
+# The controller registry and the host's button bindings (gamepads.c,
+# input_bindings.c, controller_glyphs.c), with SDL's virtual controllers.
+if(AURORA_SDL3_TARGET)
+    add_executable(bluewake_gamepads_test
+        ../../tests/gamepads_test.c
+        src/gamepads.c
+        src/input_bindings.c
+        src/controller_glyphs.c)
+    target_include_directories(bluewake_gamepads_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(bluewake_gamepads_test PRIVATE ${AURORA_SDL3_TARGET})
+    add_test(NAME bluewake_gamepads_test COMMAND bluewake_gamepads_test)
+endif()
 
 add_executable(bluewake_forest_water_test
     ../../tests/forest_water_test.c

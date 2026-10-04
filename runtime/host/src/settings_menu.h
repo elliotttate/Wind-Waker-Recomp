@@ -12,7 +12,9 @@ extern "C" {
 #endif
 
 // The options menu (the Mac host): Esc (once the mouse is given back), F1 or a
-// controller's Back button opens it over the paused game. Its choices are the
+// controller's Back button (as set under Controllers; Start and Back held for
+// a second always) opens it over the paused game, and so does player 1's
+// controller disconnecting (gamepads.h). Its choices are the
 // settings the host reads from the environment (BLUEWAKE_*, DOL_AURORA_*),
 // saved in a settings file and applied at the next launch, and most of them
 // at once.

@@ -1,4 +1,5 @@
 #include "jump_button.h"
+#include "input_bindings.h"
 
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_gamepad.h>
@@ -104,16 +105,15 @@ static bool g_pending;
 static bool g_enabled = true;
 static bool g_trace;
 static CPUState* g_cpu;
-static atomic_uint g_presses; // Space presses, from the event thread
+static atomic_uint g_presses; // jump key presses, from the event thread
 static unsigned g_presses_seen;
 static unsigned long long g_retrace, g_deadline;
 static unsigned g_follow; // retraces to trace after a jump
 static unsigned long long g_jumps;
-// A controller's left bumper jumps too: the GameCube mapping leaves it free,
-// except on the Switch Online GameCube controller (product 0x2073), where it
-// is L.
+// Player 1's jump button (input_bindings.h; the left bumper unless chosen
+// otherwise) jumps too. A GameCube controller's buttons are the game's: on
+// one, a button the game's mapping uses does not jump.
 static bool g_bumper_was_down;
-static const Uint16 kNsoGameCubeProduct = 0x2073;
 
 // BLUEWAKE_JUMP_TEST=retrace,...: presses without a keyboard.
 // BLUEWAKE_JUMP_TEST_TARGET=retrace:length: L held (targeting) meanwhile.
@@ -222,7 +222,7 @@ void bluewake_jump_button_event(const void* sdl_event) {
     (void)sdl_event;
 #else
     const SDL_Event* event = (const SDL_Event*)sdl_event;
-    if (event->type == SDL_EVENT_KEY_DOWN && !event->key.repeat && event->key.scancode == SDL_SCANCODE_SPACE)
+    if (event->type == SDL_EVENT_KEY_DOWN && bluewake_action_pressed_by(BW_ACTION_JUMP, sdl_event))
         atomic_fetch_add_explicit(&g_presses, 1u, memory_order_relaxed);
 #endif
 }
@@ -253,7 +253,7 @@ void bluewake_jump_button_attach(CPUState* cpu) {
         g_trace = true;
 #if !(defined(__APPLE__) && TARGET_OS_IPHONE)
     if (g_enabled)
-        fprintf(stderr, "[jump] Space (or a controller's left bumper) makes Link jump\n");
+        fprintf(stderr, "[jump] Space (or a controller's left bumper, or as chosen in the options) makes Link jump\n");
 #endif
 }
 
@@ -275,18 +275,9 @@ static void follow(void) {
         g_follow = 0u;
 }
 
-// A press of any connected controller's left bumper since the last retrace.
+// A press of player 1's jump button since the last retrace.
 static bool bumper_pressed(void) {
-    bool down = false;
-    int count = 0;
-    SDL_JoystickID* ids = SDL_GetGamepads(&count);
-    for (int i = 0; ids != NULL && i < count && !down; ++i) {
-        SDL_Gamepad* pad = SDL_GetGamepadFromID(ids[i]);
-        if (pad != NULL && SDL_GetGamepadProduct(pad) != kNsoGameCubeProduct &&
-            SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER))
-            down = true;
-    }
-    SDL_free(ids);
+    const bool down = bluewake_action_pad_down(BW_ACTION_JUMP);
     const bool pressed = down && !g_bumper_was_down;
     g_bumper_was_down = down;
     return pressed;
