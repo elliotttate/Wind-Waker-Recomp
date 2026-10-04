@@ -182,7 +182,7 @@ ENTRIES[0x8032601C] = ("GXSetTevColorS10", "gx", [(_GX_0201, 0x8032601C, 0x80326
 ENTRIES[0x80326090] = ("GXSetTevKColor", "gx", [(_GX_0201, 0x80326090, 0x80326104)], "d03989eadea5e3658468928b8e654bb4f2ce6fba0e0ea999304c3e37110f5830")
 ENTRIES[0x80322568] = ("GXSetArray", "gx", [(_GX_0200, 0x80322568, 0x803225F4)], "994bdd8537fa1d6a105929c11f72831f0049fad254a14182141cdcc376d83b0c")
 ENTRIES[0x803263A0] = ("GXSetTevOrder", "gx", [(_GX_0201, 0x803263A0, 0x80326578)], "90dd983a02547d3ba4d679dd9f8c6b3e037aed7aee6e34acb429be9c8a5ec7cc")
-ENTRIES[0x80326B80] = ("GXCallDisplayList", "gx", [(_GX_0201, 0x80326B80, 0x80326BF0)], "e621c45ae139631aca2cf9d0247f9918414e003d700b8ef57f78e6772142b37c")
+ENTRIES[0x80326B80] = ("GXCallDisplayList", "gx", [(_GX_0201, 0x80326B80, 0x80326BF0)], "5ccd94da70ba6178a57e70e518f79ac6d966529cd93a52774dc6b952bbaefe16")
 # GXBegin alone: where its dirty state needs a call, it declines, and the
 # translation makes the call, each callee native at its own hook.
 ENTRIES[0x803230C4] = ("GXBegin", "gx", [(_GX_0200, 0x803230C4, 0x803231B4)], "aa7721852ed559a5a69aaae0cf62658dfe6f292a902da2dbad164c49b0fb276d")
@@ -383,7 +383,14 @@ def addresses(text):  # noqa: F811 (the checks above, less what FOURTH_HOST_OWN 
 # __GXSendFlushPrim with a goto inside its chunk; on each of those paths the
 # native declines before the call, so the translation it stands in for never
 # reaches them. So in those fragments - and only there - those addresses are
-# left out of the check.
+# left out of the check. (Since the trace's ranges went between
+# bluewake-unwatched markers, none of these addresses is watched any more and
+# this exemption changes nothing; calls into them are direct calls now, which
+# changed GXCallDisplayList's translation - its call to __GXSetDirtyState - and
+# so its hash, not its native: native_gx_gen.py writes the same code from the
+# new text. The declines stay: __GXSendFlushPrim's loop is extracted, which the
+# generator does not replay, and GXCallDisplayList's dirty path is left to
+# the translation, as GXBegin's is.)
 FIFTH_HOST_OWN = {
     "\nlabel_803230C4:\n": {0x803230C4, 0x803231B4},              # GXBegin
     "\nlabel_80326B80:\n": {0x80326B80, 0x80323024, 0x803231B4},  # GXCallDisplayList
