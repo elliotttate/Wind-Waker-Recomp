@@ -1,4 +1,7 @@
 #include "mouse_camera.h"
+#include "gamepads.h"
+#include "input_bindings.h"
+#include "pad_remap.h"
 #include "jump_button.h"
 #include "settings_menu.h"
 #include "save_state.h"
@@ -216,7 +219,9 @@ static void set_captured(bool captured) {
 static void observe(const void* sdl_event, void* user) {
     (void)user;
     const SDL_Event* event = (const SDL_Event*)sdl_event;
-    // The options menu first: it opens and closes on its keys, and while it
+    // The controllers first (player 1 changes hands even with the menu open).
+    bluewake_gamepads_event(sdl_event);
+    // The options menu next: it opens and closes on its keys, and while it
     // is open it has the keyboard, mouse and controller to itself.
     if (bluewake_settings_menu_event(sdl_event))
         return;
@@ -385,10 +390,11 @@ void bluewake_mouse_camera_attach(CPUState* cpu) {
     }
 }
 
-// The right stick of whichever controller is tilted most (SDL's axes, -1..1,
-// y down), whether any controller's right stick is clicked, and when asked
-// for, the D-pad's zoom (1 up, -1 down, 0) and the left stick of whichever
-// controller has it tilted most.
+// Player 1's C-stick and stick as the game has them through the mapping (SDL's
+// axes, -1..1, y down: a stick swap moves the camera too), whether the first
+// person button is held, and when asked for, the zoom buttons (1 in, -1 out,
+// 0; input_bindings.h). Without a player 1, the right and left sticks of
+// whichever controller has them tilted most.
 static void read_stick_left(double* x, double* y, bool* click, int* zoom, double* left_x, double* left_y) {
     *x = *y = 0.0;
     *click = false;
@@ -409,6 +415,16 @@ static void read_stick_left(double* x, double* y, bool* click, int* zoom, double
             return;
         }
     }
+    *click = bluewake_action_down(BW_ACTION_FIRST_PERSON);
+    if (zoom != NULL)
+        *zoom = bluewake_action_down(BW_ACTION_ZOOM_IN)    ? 1
+                : bluewake_action_down(BW_ACTION_ZOOM_OUT) ? -1
+                                                           : 0;
+    if (bluewake_padmap_stick(1, x, y)) {
+        if (left_x != NULL)
+            (void)bluewake_padmap_stick(0, left_x, left_y);
+        return;
+    }
     int count = 0;
     SDL_JoystickID* ids = SDL_GetGamepads(&count);
     double most = 0.0;
@@ -416,12 +432,6 @@ static void read_stick_left(double* x, double* y, bool* click, int* zoom, double
         SDL_Gamepad* pad = SDL_GetGamepadFromID(ids[i]);
         if (pad == NULL)
             continue;
-        if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_RIGHT_STICK))
-            *click = true;
-        if (zoom != NULL && *zoom == 0)
-            *zoom = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_UP)     ? 1
-                    : SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_DPAD_DOWN) ? -1
-                                                                               : 0;
         double px = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX) / 32767.0;
         double py = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTY) / 32767.0;
         px = px < -1.0 ? -1.0 : px;

@@ -145,12 +145,20 @@ The keyboard and mouse are the same on Windows and Mac:
 | Jump | Space | Left bumper |
 | Sprint | Shift | Click the left stick |
 | Camera | Click the game, then move the mouse (Esc gives it back); the wheel zooms | Right stick |
-| Settings | F1, or Esc when the mouse is free | Back (Mac) |
+| Settings | F1, or Esc when the mouse is free | Back, or Start and Back held for a second (Mac) |
 | Save state | F5 | |
 | Load the latest state | F8 on Windows, F9 on Mac (hold fn on a MacBook) | |
 | Fullscreen | F11 or Alt+Enter (Windows); the settings on both | |
 | Frame interpolation on or off | F10 (Windows) | |
 | Frame rate | F9 (Windows) | |
+
+On the Mac, **Settings › Controllers** sets every button: the game's (A, B, X, Y, Z, L, R, Start, the
+D-pad, both sticks and the triggers) and Wind Waker Recomp's (jump, sprint, first person, zoom, the
+menu), on the controller and on the keyboard: choose a button, then press the one to use. Each
+controller model keeps its own mapping, with its dead zones; the menu names buttons as the controller
+prints them (Cross, A, B...). Controllers can be plugged in and out while you play: the first one
+connected becomes player 1, another can be made player 1 from the list (or by pressing a button on it,
+with *Last used*), and the game pauses on the menu when player 1's controller disconnects.
 
 On iPhone and iPad, the touch controls, controllers and keyboards that iOS supports work; camera
 inversion and button remapping are under **⋯ › Controller**, and the game's rumble reaches the controller.

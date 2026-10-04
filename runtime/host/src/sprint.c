@@ -1,4 +1,7 @@
 #include "sprint.h"
+#include "input_bindings.h"
+#include "pad_remap.h"
+#include "gamepads.h"
 
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_keyboard.h>
@@ -87,26 +90,26 @@ void bluewake_sprint_attach(CPUState* cpu) {
 static bool shift_held(void) {
     if (g_retrace >= g_test_start && g_retrace < g_test_start + g_test_length)
         return true;
-    int count = 0;
-    const bool* keys = SDL_GetKeyboardState(&count);
-    return keys != NULL &&
-           ((count > SDL_SCANCODE_LSHIFT && keys[SDL_SCANCODE_LSHIFT]) ||
-            (count > SDL_SCANCODE_RSHIFT && keys[SDL_SCANCODE_RSHIFT]));
+    return bluewake_action_key_down(BW_ACTION_SPRINT);
 }
 
-// Any connected controller: its left stick's click, and how far that stick is
-// pushed (the largest, 0..1).
+// Player 1's sprint button, and how far the controller's stick (the game's,
+// through the mapping) is pushed (0..1). Without a player 1, any connected
+// controller's left stick, the largest.
 static void read_pads(bool* click, float* tilt) {
-    *click = false;
+    *click = bluewake_action_pad_down(BW_ACTION_SPRINT);
     *tilt = 0.0f;
+    double x, y;
+    if (bluewake_padmap_stick(0, &x, &y)) {
+        *tilt = (float)SDL_sqrt(x * x + y * y);
+        return;
+    }
     int count = 0;
     SDL_JoystickID* ids = SDL_GetGamepads(&count);
     for (int i = 0; ids != NULL && i < count; ++i) {
         SDL_Gamepad* pad = SDL_GetGamepadFromID(ids[i]);
         if (pad == NULL)
             continue;
-        if (SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_LEFT_STICK))
-            *click = true;
         const float x = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX) / 32767.0f;
         const float y = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY) / 32767.0f;
         const float t = x * x + y * y;

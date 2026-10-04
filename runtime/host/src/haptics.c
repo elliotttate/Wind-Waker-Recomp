@@ -1,4 +1,5 @@
 #include "haptics.h"
+#include "gamepads.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -212,7 +213,8 @@ static void dualsense_triggers(SDL_Gamepad* pad, SDL_JoystickID id, double level
         g_dualsense[slot].watchdog = SDL_AddTimer(kWatchdogMs, dualsense_watchdog, (void*)(uintptr_t)slot);
 }
 
-// Every open controller gets the same levels (0-1, before strength).
+// Player 1's controller gets the levels (0-1, before strength); while no
+// controller is player 1, every open one does.
 static void send(double heavy, double light, double trigger, Uint64 now) {
     const Uint16 low = (Uint16)lround(fmin(heavy * g_strength, 1.0) * 65535.0);
     const Uint16 high = (Uint16)lround(fmin(light * g_strength, 1.0) * 65535.0);
@@ -225,9 +227,10 @@ static void send(double heavy, double light, double trigger, Uint64 now) {
         return;
     int count = 0;
     SDL_JoystickID* ids = SDL_GetGamepads(&count);
+    SDL_Gamepad* player = bluewake_gamepads_for_port(0);
     for (int i = 0; ids != NULL && i < count; i++) {
         SDL_Gamepad* pad = SDL_GetGamepadFromID(ids[i]);
-        if (pad == NULL)
+        if (pad == NULL || (player != NULL && pad != player))
             continue;
         SDL_RumbleGamepad(pad, low, high, kExpiryMs);
         const SDL_PropertiesID props = SDL_GetGamepadProperties(pad);
