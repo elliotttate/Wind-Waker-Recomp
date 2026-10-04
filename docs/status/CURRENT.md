@@ -1,3 +1,48 @@
+## 2026-10-04 After fusion: the game by warp again, the game thread's share, and what did not help
+
+**The survey with fusion** (the 47 places of 2026-10-03, four E-cores `0x000F0000`, uncapped, Smooth Motion
+off, scratchpad survey.ps1). Every place now runs at 38 game frames a second or more: the slowest are the
+sea by the Forsaken Fortress (`sea:1`) 38.3, Dragon Roost Island 39.1, Forest Haven 40.2 and Outset 40.7
+(before the transform copies and fusion: Forest Haven 29.5, Dragon Roost 31.3, the sea by the Fortress
+32.6, Hyrule Castle's room 33.3). The worst GX worker is Forest Haven's 12.1 ms a game frame; the worst
+game threads are the sea by the Fortress 22.7 ms, Dragon Roost 21.6, Outset 21.1 and Forest Haven 20.1. The
+worst frame of each second at Forest Haven fell from about 37 ms to 25.5, and GX batches of 20 ms or more
+(`[gx-slow]`) from 864 to 66 over the tour (the rest at warps). On two E-cores (`0x00030000`): Forest Haven
+29.3 -> 38.8, Hyrule Castle's room 33.8 -> 45.0, Dragon Roost 35.5 -> 37.6, Outset 36.3 -> 40.5.
+
+**Where the game thread goes now** (Forest Haven, four E-cores, guest pc sampled, grouped by subsystem): J3D
+19.8 percent, the GX SDK and its FIFO writes 13.7 (4.4 of it GXSetDrawDone's wait for the GX worker's
+drain, about 1.3 ms a frame now), particles (JPA) 10.7, collision 10.4, matrix and vector math 6.7, audio
+(JASystem) 6.0, actor search and process management 5.9, the sea and sky (d_kankyo) 5.8, 2D (J2D, fonts)
+4.7, the rest (actors' own logic) about 14. The fourth round of natives (`game-natives-4`, merged;
+docs/status/NATIVE_ANIM_KANKYO_CC_2026-10-04.md) takes the environment colour blends, key-frame animation
+(calcTransform, its interpolations and splines, J3DPSCalcInverseTranspose) and two collision setups,
+estimated at 2.6-3.2 points of the game thread at Dragon Roost and Forest Haven. The next round is the code
+that writes the GX FIFO, which no round has taken yet: the GX SDK leaves (GXLoadPosMtxImm, GXBegin,
+GXLoadTexObj and about twenty more, together 5-6 percent), the particle draw executors (about 4) and the
+sea's drawWave and drawVrkumo (1.4).
+
+**Power throttling off** (2fce4e5). Windows 11 runs a process whose window is not in front with EcoQoS and,
+while it is hidden, ignores its timer resolution; BlueWake now opts out of both, beside the above-normal
+priority it already sets (`BLUEWAKE_PRIORITY=0` keeps the defaults). No measurable change with the window
+in front (all cores, the game at its cap), as expected; it keeps a game left behind another window at
+speed.
+
+**Tried and dropped:**
+- Bigger FIFO batches for the GX worker (the game thread wakes it every 1 KB): 4 and 16 KB measured the same
+  as 1 KB at Forest Haven, Dragon Roost and Hyrule Castle's room (four E-cores, two runs each).
+- A CPU cache of decoded vertices: the decode is cheap; the cost is the volume (13.4 MB a game frame at
+  Forest Haven, 86,000 vertices of 156 bytes, written, copied to the frame's staging and uploaded), which a
+  CPU cache would copy just the same. Only a GPU-resident cache would remove it, and the GX worker no longer
+  limits the frame.
+- ThinLTO for the game module: each chunk is one very large function, so there is nothing small to inline
+  across chunks.
+- `begin_frame`'s waits for a frame slot in uncapped runs (1-1.8 ms a frame with Smooth Motion off, more with
+  it on) are the presents' pace, not lost work: in play at 30 game frames a second the slots are free.
+- Frontend-level fusion (joining a display list's primitives as the FIFO is parsed, before they become
+  packets) would save perhaps a fifth of the GX worker's remaining time; deferred while the game thread is
+  the limit.
+
 ## 2026-10-04 A display list's primitives fused into one draw: a tenth of the draws, 30-60 percent more frames on slow CPUs
 
 **What the GX worker was doing.** Its profile at Forest Haven was flat: no function above about 1 percent,
