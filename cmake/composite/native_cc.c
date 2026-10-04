@@ -84,7 +84,10 @@ CC u32 cc_slw(u32 value, u32 amount) {
 CC u32 cc_convert(Cc* s, u32 end_word, u32 slot) {
     const f64 end = nr_single_bits(end_word);
     f32 e, m, c;
-    bool bad = !nr_plain_word(end_word, &e) | !nr_plain(s->f[1].a, &m) | !nr_plain(s->f[2].a, &c);
+    const bool plain_end = nr_plain_word(end_word, &e), plain_min = nr_plain(s->f[1].a, &m);
+    bool bad = !(plain_end && plain_min && nr_plain(s->f[2].a, &c));
+    if (bad)
+        m = c = e = 0.0f;
     const f32 d = nr_r(e - m, &bad), p = nr_r(c * d, &bad);
     u64 stored;
     if (!bad && fabsf(p) < 2147483648.0f) {
