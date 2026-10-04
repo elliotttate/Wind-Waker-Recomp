@@ -57,8 +57,10 @@ typedef struct GxUndo {
     u64 old;
 } GxUndo;
 
+/* The run's undo log and pipe bytes (their counts are the run's own, in
+ * GxRun: locals the compiler keeps in registers, where the RAM stores, made
+ * through byte pointers, would make it reload a count kept here). */
 typedef struct GxLog {
-    u32 stores, pipe_length;
     GxUndo undo[GX_MAX_STORES];
     u8 pipe[GX_MAX_PIPE + 8u];
 } GxLog;
@@ -68,6 +70,7 @@ typedef struct GxRun {
     GxLog* log;
     u8* ram;
     u32 ram_size;
+    u32 stores, pipe_length; /* the log's entries and bytes */
     s64 downcount, budget, deadline;
     u32 suffix;       /* the last access's cycle suffix, as the run leaves it */
     u32 reserve_addr; /* the reservation, as the stores leave it */
@@ -87,7 +90,7 @@ typedef struct GxRun {
 GX_RUN bool gx_start(GxRun* s, GxLog* log, CPUState* cpu) {
     s->cpu = cpu;
     s->log = log;
-    log->stores = log->pipe_length = 0u;
+    s->stores = s->pipe_length = 0u;
     s->ram = cpu->ram;
     s->ram_size = cpu->ram_size;
     s->downcount = cpu->downcount;
@@ -106,8 +109,8 @@ GX_RUN bool gx_start(GxRun* s, GxLog* log, CPUState* cpu) {
 }
 
 /* Every RAM byte the run wrote put back, latest first. */
-static __attribute__((noinline)) void gx_undo(GxLog* log, u8* ram) {
-    for (u32 i = log->stores; i-- > 0u;) {
+static __attribute__((noinline)) void gx_undo(const GxLog* log, u8* ram, u32 stores) {
+    for (u32 i = stores; i-- > 0u;) {
         const GxUndo* u = &log->undo[i];
         u8* at = ram + (u->address - GC_RAM_BASE);
         switch (u->size) {
@@ -117,13 +120,12 @@ static __attribute__((noinline)) void gx_undo(GxLog* log, u8* ram) {
         default: write_be64(at, u->old); break;
         }
     }
-    log->stores = 0u;
 }
 
 /* Decline: nothing changed. */
 GX_RUN int gx_decline(GxRun* s) {
-    if (s->log->stores != 0u)
-        gx_undo(s->log, s->ram);
+    if (s->stores != 0u)
+        gx_undo(s->log, s->ram, s->stores);
     return 0;
 }
 
@@ -204,29 +206,27 @@ GX_RUN bool gx_pipe_address(u32 address) {
 
 /* A pipe store's bytes, big-endian, after the run's others. */
 GX_RUN void gx_put(GxRun* s, u64 value, u32 size) {
-    GxLog* log = s->log;
-    if (log->pipe_length + size > GX_MAX_PIPE) {
+    if (s->pipe_length + size > GX_MAX_PIPE) {
         s->bad = true;
         return;
     }
-    u8* out = log->pipe + log->pipe_length;
+    u8* out = s->log->pipe + s->pipe_length;
     switch (size) {
     case 1: out[0] = (u8)value; break;
     case 2: write_be16(out, (u16)value); break;
     case 4: write_be32(out, (u32)value); break;
     default: write_be64(out, value); break;
     }
-    log->pipe_length += size;
+    s->pipe_length += size;
 }
 
 /* A RAM store in place, its old bytes kept. */
 GX_RUN void gx_ram_store(GxRun* s, u32 address, u64 value, u32 size) {
-    GxLog* log = s->log;
-    if (log->stores >= GX_MAX_STORES) {
+    if (s->stores >= GX_MAX_STORES) {
         s->bad = true;
         return;
     }
-    GxUndo* u = &log->undo[log->stores++];
+    GxUndo* u = &s->log->undo[s->stores++];
     u8* at = s->ram + (address - GC_RAM_BASE);
     u->address = address;
     u->size = size;
@@ -459,10 +459,18 @@ static __attribute__((noinline)) void gx_pipe_spill(const u8* bytes, u32 length)
 GX_RUN void gx_commit(GxRun* s) {
     GxLog* log = s->log;
     CPUState* cpu = s->cpu;
-    const u32 length = log->pipe_length;
+    const u32 length = s->pipe_length;
     if (length != 0u) {
         if (bw_gather_pipe_length + length < BW_GATHER_PIPE_BATCH) {
-            memcpy(bw_gather_pipe_buffer + bw_gather_pipe_length, log->pipe, length);
+            /* Eight bytes at a time: the log and the batch both have eight
+             * bytes to spare past their ends, and the batch's bytes past its
+             * length are written before they are read. */
+            u8* out = bw_gather_pipe_buffer + bw_gather_pipe_length;
+            for (u32 i = 0; i < length; i += 8u) {
+                u64 v;
+                memcpy(&v, log->pipe + i, 8u);
+                memcpy(out + i, &v, 8u);
+            }
             bw_gather_pipe_length += length;
         } else {
             gx_pipe_spill(log->pipe, length);
