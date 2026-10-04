@@ -1,5 +1,6 @@
 /* The collision checker's area division (GZLE01
- * cCcD_DivideArea::CalcDivideInfoOverArea), native.
+ * cCcD_DivideArea::CalcDivideInfoOverArea) and a cylinder's centre
+ * (cM3dGCyl::SetC, at the end of this file), native.
  *
  * Every collider the checker sets each frame has its bounding box divided
  * over the area's 11 x 10 x 11 cells: per axis, the box's two ends scaled to
@@ -26,7 +27,7 @@
  * operation on the translation's inline path (a NaN or infinite bound or
  * scale declines).
  *
- * tests/native_cc_test.c compares it with the translation, every register
+ * tests/native_cc_test.c compares both with the translation, every register
  * and byte. No identifier here may be `ctx`. */
 #include "native_cc.h"
 #include "native_replay.h"
