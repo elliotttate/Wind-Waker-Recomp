@@ -1,0 +1,289 @@
+--- a/chunks_dol/chunk_0171_text1_802AD6E0.c
++++ b/chunks_dol/chunk_0171_text1_802AD6E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_gx.h"
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+ /* bluewake: lean memory accesses in prepaid copies (scripts/windows/lean_memory.py) */
+@@ -36409,4 +36411,6 @@
+ 
+ label_802AFBD4:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_802AFBD4(ctx))
++        goto return_dispatch_802AD6E0;
+     ctx->pc = 0x802AFBD4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -38027,4 +38031,6 @@
+ 
+ label_802AFDDC:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_802AFDDC(ctx))
++        goto return_dispatch_802AD6E0;
+     ctx->pc = 0x802AFDDCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 23u);
+@@ -38328,4 +38334,6 @@
+ 
+ label_802AFE38:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_802AFE38(ctx))
++        goto return_dispatch_802AD6E0;
+     ctx->pc = 0x802AFE38u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 26u);
+--- a/chunks_dol/chunk_0181_text1_802D56E0.c
++++ b/chunks_dol/chunk_0181_text1_802D56E0.c
+@@ -4,4 +4,5 @@
+ #include "../generated.h"
+ /* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_gx.h"
+ #include "native_fifo.h"
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -42045,4 +42046,6 @@
+ 
+ label_802D80D0:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_802D80D0(ctx))
++        goto return_dispatch_802D56E0;
+     ctx->pc = 0x802D80D0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -46536,4 +46539,6 @@
+ 
+ label_802D85F8:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_802D85F8(ctx))
++        goto return_dispatch_802D56E0;
+     ctx->pc = 0x802D85F8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+--- a/chunks_dol/chunk_0199_text1_8031D6E0.c
++++ b/chunks_dol/chunk_0199_text1_8031D6E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_gx.h"
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+ /* bluewake: lean memory accesses in prepaid copies (scripts/windows/lean_memory.py) */
+@@ -60023,4 +60025,6 @@
+ 
+ label_803214B0:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803214B0(ctx))
++        goto return_dispatch_8031D6E0;
+     ctx->pc = 0x803214B0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+--- a/chunks_dol/chunk_0200_text1_803216E0.c
++++ b/chunks_dol/chunk_0200_text1_803216E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_gx.h"
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+ /* bluewake: lean memory accesses in prepaid copies (scripts/windows/lean_memory.py) */
+@@ -6936,4 +6938,6 @@
+ 
+ label_80321958:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80321958(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80321958u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 17u);
+@@ -7244,4 +7248,6 @@
+ 
+ label_803219AC:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803219AC(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x803219ACu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -13458,4 +13464,6 @@
+ 
+ label_803221D8:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803221D8(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x803221D8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -16612,4 +16620,6 @@
+ 
+ label_80322568:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80322568(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80322568u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -17150,4 +17160,6 @@
+ 
+ label_80322604:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80322604(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80322604u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -19233,4 +19245,6 @@
+ 
+ label_803228D4:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803228D4(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x803228D4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 16u);
+@@ -26303,4 +26317,6 @@
+ 
+ label_803230C4:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803230C4(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x803230C4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 13u);
+@@ -28962,4 +28978,6 @@
+ 
+ label_803233B0:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803233B0(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x803233B0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -42242,4 +42260,6 @@
+ 
+ label_80324390:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80324390(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80324390u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -43092,4 +43112,6 @@
+ 
+ label_80324484:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80324484(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80324484u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -43942,4 +43964,6 @@
+ 
+ label_80324578:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80324578(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80324578u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 17u);
+@@ -44155,4 +44179,6 @@
+ 
+ label_803245BC:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803245BC(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x803245BCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -48584,4 +48610,6 @@
+ 
+ label_80324B68:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80324B68(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80324B68u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -50248,4 +50276,6 @@
+ 
+ label_80324D50:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80324D50(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80324D50u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 68u);
+@@ -51703,4 +51733,6 @@
+ 
+ label_80324EE8:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80324EE8(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x80324EE8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -55807,4 +55839,6 @@
+ 
+ label_803253B8:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803253B8(ctx))
++        goto return_dispatch_803216E0;
+     ctx->pc = 0x803253B8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 18u);
+--- a/chunks_dol/chunk_0201_text1_803256E0.c
++++ b/chunks_dol/chunk_0201_text1_803256E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_gx.h"
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+ /* bluewake: lean memory accesses in prepaid copies (scripts/windows/lean_memory.py) */
+@@ -6964,4 +6966,6 @@
+ 
+ label_80325810:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80325810(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80325810u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 3u);
+@@ -10897,4 +10901,6 @@
+ 
+ label_80325CD4:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80325CD4(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80325CD4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -13173,4 +13179,6 @@
+ 
+ label_80325FA8:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80325FA8(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80325FA8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 29u);
+@@ -13538,4 +13546,6 @@
+ 
+ label_8032601C:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_8032601C(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x8032601Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 29u);
+@@ -13903,4 +13913,6 @@
+ 
+ label_80326090:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80326090(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80326090u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 29u);
+@@ -16284,4 +16296,6 @@
+ 
+ label_803263A0:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803263A0(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x803263A0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 13u);
+@@ -17916,4 +17930,6 @@
+ 
+ label_803265A8:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_803265A8(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x803265A8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 10u);
+@@ -19252,4 +19268,6 @@
+ 
+ label_80326758:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80326758(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80326758u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -22622,4 +22640,6 @@
+ 
+ label_80326B80:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80326B80(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80326B80u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 11u);
+@@ -26194,4 +26214,6 @@
+ 
+ label_80326F38:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80326F38(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80326F38u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 20u);
+@@ -26508,4 +26530,6 @@
+ 
+ label_80326F88:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80326F88(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80326F88u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 22u);
+@@ -26821,4 +26845,6 @@
+ 
+ label_80326FD8:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80326FD8(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80326FD8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 10u);
+@@ -30012,4 +30038,6 @@
+ 
+ label_80327364:
++    if (bluewake_native_gx_enabled && bluewake_native_gx_80327364(ctx))
++        goto return_dispatch_803256E0;
+     ctx->pc = 0x80327364u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
