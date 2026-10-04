@@ -76,6 +76,11 @@ add_library(${MODULE_NAME} SHARED
   native_mtxcalc.c
   # Certified native entries, the third set: the actor search by name.
   native_search.c
+  # Certified native entries, the fourth set: the colour blends, key-frame
+  # animation and the collision checker's area division and cylinder centre.
+  native_kankyo.c
+  native_anim.c
+  native_cc.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c

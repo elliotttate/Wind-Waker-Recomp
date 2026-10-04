@@ -910,6 +910,13 @@ int main(void) {
         for path in (ROOT / "cmake/composite/native_search.c", ROOT / "cmake/composite/native_search.h"):
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
+        # Certified native entries, the fourth set: its sources (its hooks are
+        # native_entries.py's, above).
+        for name in ("native_replay.h", "native_kankyo.c", "native_kankyo.h", "native_anim.c", "native_anim.h",
+                     "native_cc.c", "native_cc.h"):
+            path = ROOT / "cmake/composite" / name
+            key.update(path.relative_to(ROOT).as_posix().encode())
+            key.update(path.read_bytes())
         return key.hexdigest()
 
     def train(self):
