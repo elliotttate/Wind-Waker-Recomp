@@ -1,14 +1,16 @@
 /* tests/native_gx_test.c's hooked mode (-DNATIVE5_HOOKED=1): the hooks, end
  * to end.
  *
- * The test then also links the three GX chunks native_entries.py hooks for
- * this set (0199, 0200, 0201), compiled as the module compiles them (their
- * sources the player's own, hooked on a copy, never distributed), with
- * native_gx.c, guest_cpu.c, direct_calls.c and gather_pipe.c:
+ * The test then also links the five chunks native_entries.py hooks for this
+ * set (0171, 0181, 0199, 0200, 0201), compiled as the module compiles
+ * them (their sources the player's own, hooked on a copy, never
+ * distributed), with native_gx.c, native_fifo.c (the second set's hooks in
+ * 0181), guest_cpu.c, direct_calls.c and gather_pipe.c:
  *
- *   (%HOOKED%: composite-src's chunks_dol/chunk_0199..0201 and generated.h,
- *    copied, then scripts/windows/native_entries.py %HOOKED%)
- *   for each chunk in 0199_text1_8031D6E0 0200_text1_803216E0 0201_text1_803256E0:
+ *   (%HOOKED%: composite-src's chunks_dol/chunk_NNNN for those five and
+ *    generated.h, copied, then scripts/windows/native_entries.py %HOOKED%)
+ *   for each chunk in 0171_text1_802AD6E0 0181_text1_802D56E0 0199_text1_8031D6E0
+ *                     0200_text1_803216E0 0201_text1_803256E0:
  *     clang -c -O2 -march=x86-64-v3 -ffp-contract=off -fno-slp-vectorize
  *       -mllvm -large-interval-freq-threshold=10
  *       -DMODULE_GAME_ID=\"GZLE01\" -DDOLRECOMP_CPU_HEADER=\"core/cpu.h\"
@@ -29,6 +31,10 @@
  * byte for byte both times. The chunks' MEM1 (guest_cpu.c) is read-only but
  * the test's pages, like the images. */
 
+#include "native_fifo.h"
+
+void func_802AD6E0(CPUState*);
+void func_802D56E0(CPUState*);
 void func_8031D6E0(CPUState*);
 void func_803216E0(CPUState*);
 void func_803256E0(CPUState*);
@@ -36,7 +42,8 @@ static const struct {
     unsigned index;
     u32 start;
     BwChunkFn fn;
-} HOOKED_CHUNKS[] = {{199, 0x8031D6E0u, func_8031D6E0}, {200, 0x803216E0u, func_803216E0},
+} HOOKED_CHUNKS[] = {{171, 0x802AD6E0u, func_802AD6E0}, {181, 0x802D56E0u, func_802D56E0},
+                     {199, 0x8031D6E0u, func_8031D6E0}, {200, 0x803216E0u, func_803216E0},
                      {201, 0x803256E0u, func_803256E0}};
 
 static void missing_chunk(CPUState* cpu) {
@@ -53,7 +60,9 @@ BwChunkFn bw_find_chunk(u32 address) {
     return NULL;
 }
 
-/* No leaf behind the GX chunks' direct calls has a native form. */
+/* The leaves behind the chunks' direct calls (the matrix and vector leaves)
+ * run translated, in chunks this test does not link: no path the test runs
+ * reaches one. */
 int bw_native_call(CPUState* cpu, u32 address) {
     (void)cpu;
     (void)address;
@@ -99,6 +108,7 @@ static void hooked_case(const Harness* h, u32 entry, const char* name, unsigned 
     for (int on = 1; on >= 0; --on) {
         copy_regions(bw_guest_mem1, h->before);
         bluewake_native_gx_enabled = on;
+        bluewake_native_fifo_enabled = on;
         set_test_pipe(pipe->mode);
         if (pipe->mode == PIPE_BATCH)
             prefill_test_pipe(pipe->prefill);
@@ -135,6 +145,7 @@ static void hooked_case(const Harness* h, u32 entry, const char* name, unsigned 
         }
     }
     bluewake_native_gx_enabled = 0;
+    bluewake_native_fifo_enabled = 0;
     unsigned slot = 0;
     while (slot < 127u && s_hooked_entry[slot] != 0u && s_hooked_entry[slot] != entry)
         slot++;
@@ -143,10 +154,11 @@ static void hooked_case(const Harness* h, u32 entry, const char* name, unsigned 
 }
 
 /* ns per call through the hooked chunks from `entry` on `base` (its pages as
- * in `ram`): the natives off, then on. r1, r3 to r6 and LR are set again
+ * in `ram`): the natives off, then on. r1, r3 to r6, f1 to f4 and LR are set again
  * before each call; the chunk's entry and return dispatch are in the time,
  * the chassis's own dispatcher is not (a call from translated code reaches
  * the chunk directly). */
+static void bench_gd_reset(u8* ram); /* native_gx_test.c */
 static void hooked_bench(const Harness* h, const u8* ram, u32 entry, const CPUState* base, unsigned calls,
                          const char* name, unsigned variant) {
     (void)h;
@@ -167,9 +179,11 @@ static void hooked_bench(const Harness* h, const u8* ram, u32 entry, const CPUSt
             CPUState* c = &bw_guest_cpu;
             c->gpr[1] = base->gpr[1];
             memcpy(&c->gpr[3], &base->gpr[3], 4u * sizeof(u32));
+            memcpy(&c->fpr[1], &base->fpr[1], 4u * sizeof base->fpr[0]);
             c->lr = RETURN_ADDRESS;
             if (variant)
                 put32(bw_guest_mem1, GXD + 1268u, 0x3Fu);
+            bench_gd_reset(bw_guest_mem1);
             c->pc = entry;
             do
                 s_hooked_table[(c->pc - 0x800016E0u) >> 14](c);

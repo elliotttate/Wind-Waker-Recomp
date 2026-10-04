@@ -9,7 +9,7 @@
  *     tests/native_gx_test.c cmake/composite/native_gx.c cmake/composite/direct_calls.c
  *     cmake/composite/gather_pipe.c
  *     E:\Github\Wind-Waker-Recomp\build\windows\app\gxruntime_build\gxruntime.lib -o native_gx_test.exe
- *   native_gx_test MODULE.dll [CASES_PER_FUNCTION=60000] [BENCH_CALLS=1000000]
+ *   native_gx_test MODULE.dll [CASES_PER_FUNCTION=60000] [BENCH_CALLS=1000000] [NAME_PREFIX,...]
  *
  * The hooked build (-DNATIVE5_HOOKED=1, with the hooked chunks: the recipe
  * is in native_gx_hooked.h) also runs every case the native runs through the
@@ -19,10 +19,11 @@
  * and writes nothing but its own memory. For each function: random registers,
  * flags, FPSCR, reservation (sometimes on a granule the function stores to)
  * and cycle state; __GXData, the texture objects, the colours, the matrices,
- * the small-data areas and the table GXSetTevOrder reads filled with random
- * bytes, with the fields that choose paths biased toward the ones play takes
- * (the dirty state clear or set, the region callbacks the SDK's own, the
- * first word nonzero) and sometimes not; pointers in RAM, sometimes not
+ * the small-data areas, the current GD list and the table GXSetTevOrder reads
+ * filled with random bytes, with the fields that choose paths biased toward
+ * the ones play takes (the dirty state clear or set, the region callbacks the
+ * SDK's own, the first word nonzero, the GD list with room, the fog's
+ * constants and a scene's fog distances) and sometimes not; pointers in RAM, sometimes not
  * (unaligned, a mirror, the hardware, past MEM1); the turn's budget spent or
  * not; deadlines near and inside the work; a write journal, aliases over
  * MEM1, an exception pending; the host busy (the module then asks its edge
@@ -39,13 +40,15 @@
 #define SDA2 0x80F10000u  /* 0x8000: r2's small data (the __GXData pointer at r2 - 12848) */
 #define R2 (SDA2 + 0x4000u)
 #define GXD 0x80F20000u   /* 0x4000: __GXData (and what indices past its tables reach) */
-#define SDA 0x80F2C000u   /* 0x1000: r13's small data (GXLoadTexObjPreLoaded's register tables) */
+#define SDA 0x80F2C000u   /* 0x8000: r13's small data (GXLoadTexObjPreLoaded's register tables, the GD list) */
 #define R13 (SDA + 0x8000u)
 #define OBJ 0x80F38000u   /* 0x2000: texture objects, colours, matrices */
 #define TABLE 0x803A1000u /* 0x2000: GXSetTevOrder's channel table (0x803A1E80) */
+#define CONSTS 0x80370000u /* 0x2000: __cvt_fp2unsigned's constants (0x80370FC8) */
+#define GDL (OBJ + 0x1F00u) /* the current display list (GDLObj: start, length, ptr, top) */
 
 static const Region k_regions[] = {
-    {STACK, 0x2000u}, {SDA2, 0x8000u}, {GXD, 0x4000u}, {SDA, 0x1000u}, {OBJ, 0x2000u}, {TABLE, 0x2000u},
+    {STACK, 0x2000u}, {SDA2, 0x8000u}, {GXD, 0x4000u}, {SDA, 0x8000u}, {OBJ, 0x2000u}, {TABLE, 0x2000u}, {CONSTS, 0x2000u},
 };
 
 typedef struct Native {
@@ -75,36 +78,22 @@ static const Native k_natives[] = {
     {0x80321958u, "__GXSetVCD", 17, true},
     {0x803214B0u, "__GXXfVtxSpecs", 10, false},
     {0x803219ACu, "__GXCalculateVLim", 10, false},
-    {0x80321608u, "GXSetVtxDesc", 12, false},
-    {0x80321AD0u, "GXClearVtxDesc", 10, false},
-    {0x80321B08u, "GXSetVtxAttrFmt", 12, false},
     {0x80322604u, "GXSetTexCoordGen2", 20, false},
     {0x803228D4u, "GXSetNumTexGens", 10, false},
-    {0x80323328u, "GXSetCullMode", 10, false},
     {0x80324390u, "GXSetChanAmbColor", 6, false},
     {0x80324484u, "GXSetChanMatColor", 6, false},
     {0x80324578u, "GXSetNumChans", 10, false},
     {0x803245BCu, "GXSetChanCtrl", 20, false},
-    {0x80324D28u, "GXGetTexObjFmt", 2, false},
-    {0x80325774u, "GXSetTevIndirect", 20, false},
-    {0x80325C00u, "GXSetNumIndStages", 8, false},
-    {0x80325C28u, "GXSetTevDirect", 20, false},
-    {0x80325E50u, "GXSetTevColorIn", 15, false},
-    {0x80325E94u, "GXSetTevAlphaIn", 15, false},
-    {0x80325ED8u, "GXSetTevColorOp", 15, false},
-    {0x80325F40u, "GXSetTevAlphaOp", 15, false},
-    {0x80326104u, "GXSetTevKColorSel", 15, false},
-    {0x80326170u, "GXSetTevKAlphaSel", 15, false},
-    {0x803261DCu, "GXSetTevSwapMode", 15, false},
-    {0x803262C8u, "GXSetAlphaCompare", 15, false},
-    {0x80326578u, "GXSetNumTevStages", 10, false},
-    {0x80326858u, "GXSetBlendMode", 15, false},
-    {0x803268ACu, "GXSetColorUpdate", 10, false},
-    {0x803268D8u, "GXSetAlphaUpdate", 10, false},
-    {0x80326904u, "GXSetZMode", 10, false},
-    {0x80326938u, "GXSetZCompLoc", 10, false},
-    {0x80326A8Cu, "GXSetDstAlpha", 10, false},
     {0x80326FD8u, "GXSetCurrentMtx", 10, false},
+    {0x803265A8u, "GXSetFog", 30, false},
+    {0x80326758u, "GXSetFogRangeAdj", 10, false},
+    {0x80324B68u, "GXInitTexObjLOD", 30, false},
+    {0x80325810u, "GXSetIndTexMtx", 30, false},
+    {0x802D85F8u, "J3DGDSetFog", 30, false},
+    {0x802D80D0u, "J3DGDSetTevOrder", 30, false},
+    {0x802AFDDCu, "GFSetTevColor", 20, false},
+    {0x802AFE38u, "GFSetTevColorS10", 20, false},
+    {0x802AFBD4u, "GFSetFog", 30, false},
 };
 #define NATIVE_COUNT (sizeof k_natives / sizeof k_natives[0])
 
@@ -120,8 +109,6 @@ typedef struct JumpTable {
 } JumpTable;
 #define LEADERS(x) x, (u32)(sizeof x / sizeof x[0])
 static const JumpTable k_jump_tables[] = {
-    {0x80321608u, 0x803A1910u, 26u, 0x80321624u, LEADERS(k_leaders_80321608)}, /* GXSetVtxDesc: attr */
-    {0x80321B08u, 0x803A1978u, 17u, 0x80321B40u, LEADERS(k_leaders_80321B08)}, /* GXSetVtxAttrFmt: attr - 9 */
     {0x80322604u, 0x803A1A60u, 21u, 0x80322638u, LEADERS(k_leaders_80322604)}, /* GXSetTexCoordGen2: src */
     {0x80322604u, 0x803A1A44u, 7u, 0x803227C4u, LEADERS(k_leaders_80322604)},  /* and dst */
 };
@@ -168,11 +155,29 @@ static u32 pointer(u32 area, u32 span, u32 align) {
     }
 }
 
+/* A pointer that is not plain MEM1: a mirror, the hardware, past MEM1, or
+ * anything else outside it. */
+static u32 bad_pointer(u32 area) {
+    switch (below(4u)) {
+    case 0: return area | 0x40000000u;
+    case 1: return 0xCC000000u + 4u * below(64u);
+    case 2: return GC_RAM_BASE + GC_MAIN_RAM_SIZE + 4u * below(64u);
+    default: {
+        const u32 any = next();
+        return any - GC_RAM_BASE < 0x02000000u ? any ^ 0x10000000u : any;
+    }
+    }
+}
+
 static Case build(u8* ram, unsigned which, unsigned scenario) {
     Case k;
     memset(&k, 0, sizeof k);
     for (unsigned r = 0; r < sizeof k_regions / sizeof k_regions[0]; ++r)
         fill(ram, k_regions[r].start, k_regions[r].bytes);
+    /* r2's small data: the constants the FP code loads, singles mostly. */
+    for (u32 i = 0; i < 0x8000u; i += 4u)
+        if (below(8u) != 0u)
+            put32(ram, SDA2 + i, any_single(2u));
     CPUState* c = &k.cpu;
     random_cpu(c, ram);
     const Native* n = &k_natives[which];
@@ -182,7 +187,7 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
     c->gpr[13] = below(128u) == 0u ? (0x90000000u | (next() & 0x0FFFFFFFu)) : R13;
     /* __GXData: its pointer, the first word (vNumNot, bpSentNot: zero sends a
      * flush primitive first), the dirty state and the region callbacks. */
-    put32(ram, R2 - 12848u, below(64u) == 0u ? pointer(GXD, 0x400u, 4u) : GXD);
+    put32(ram, R2 - 12848u, below(64u) == 0u ? (below(2u) ? bad_pointer(GXD) : GXD + 4u * below(0x100u)) : GXD);
     if (below(32u) == 0u)
         put32(ram, GXD, 0u);
     /* GXCallDisplayList and GXBegin decline where the dirty state needs a call. */
@@ -205,6 +210,49 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
             for (u32 i = 0; i < j->count; ++i)
                 put32(ram, j->table + 4u * i,
                       below(16u) == 0u ? next() : jump_case(j));
+    }
+    /* FP arguments: singles mostly (the inline paths take them), sometimes
+     * any double. */
+    for (unsigned r = 1; r <= 8; ++r)
+        if (below(16u) != 0u)
+            c->fpr[r] = f64_value(convert_to_double(any_single(2u)));
+    /* The fog functions' constants (GXSetFog, J3DGDSetFog, GFSetFog: the
+     * SDK's 0.0f, 0.5f, 1.0, 2.0f, 0.5, 8388638.0f and the int conversion's
+     * magic double, each set's at its own place in r2's data); sometimes not. */
+    if (below(16u) != 0u) {
+        static const s32 bases[] = {-12696, -13404, -14056};
+        for (unsigned b = 0; b < 3u; ++b) {
+            const u32 at = R2 + (u32)bases[b];
+            put32(ram, at, 0x00000000u);
+            put32(ram, at + 4u, 0x3F000000u);
+            put32(ram, at + 8u, 0x3FF00000u);
+            put32(ram, at + 12u, 0u);
+            put32(ram, at + 16u, 0x40000000u);
+            put32(ram, at + 24u, 0x3FE00000u);
+            put32(ram, at + 28u, 0u);
+            put32(ram, at + 32u, 0x4B00001Eu);
+            put32(ram, at + 40u, 0x43300000u);
+            put32(ram, at + 44u, 0x80000000u);
+        }
+    }
+    /* __cvt_fp2unsigned's constants: 0, 2^32, 2^31 (sometimes not). */
+    if (below(16u) != 0u) {
+        put32(ram, 0x80370FC8u, 0u);
+        put32(ram, 0x80370FCCu, 0u);
+        put32(ram, 0x80370FD0u, 0x41F00000u);
+        put32(ram, 0x80370FD4u, 0u);
+        put32(ram, 0x80370FD8u, 0x41E00000u);
+        put32(ram, 0x80370FDCu, 0u);
+    }
+    /* The current GD list (r13 - 25656): its write pointer in OBJ with room
+     * mostly, sometimes near or past its top (GDOverflowed). */
+    put32(ram, R13 - 25656u, below(64u) == 0u ? bad_pointer(GDL) : GDL);
+    {
+        const u32 start = OBJ + 0x1000u + below(0x400u);
+        put32(ram, GDL, start);
+        put32(ram, GDL + 4u, 0x400u);
+        put32(ram, GDL + 8u, start);
+        put32(ram, GDL + 12u, below(16u) == 0u ? start + below(64u) : start + 0x400u);
     }
     switch (n->entry) {
     case BLUEWAKE_GX_LOAD_POS_MTX_IMM:
@@ -250,14 +298,6 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
     case BLUEWAKE_GX_SET_MATRIX_INDEX:
         c->gpr[3] = below(8u) == 0u ? below(256u) : below(12u);
         break;
-    case 0x80321608u: /* GXSetVtxDesc(attr, type) */
-        c->gpr[3] = below(8u) == 0u ? below(256u) : below(27u);
-        c->gpr[4] = below(8u) == 0u ? below(256u) : below(4u);
-        break;
-    case 0x80321B08u: /* GXSetVtxAttrFmt(fmt, attr, cnt, type, frac) */
-        c->gpr[3] = below(8u) == 0u ? below(256u) : below(8u);
-        c->gpr[4] = below(8u) == 0u ? below(256u) : 9u + below(18u);
-        break;
     case 0x80322604u: /* GXSetTexCoordGen2(dst, func, src, mtx, normalize, postmtx) */
         c->gpr[3] = below(8u) == 0u ? below(256u) : below(9u);
         c->gpr[4] = below(8u) == 0u ? below(256u) : below(12u);
@@ -270,8 +310,34 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
         c->gpr[3] = below(8u) == 0u ? below(256u) : below(7u);
         c->gpr[4] = pointer(OBJ, 0x1F00u, below(2u) ? 4u : 1u);
         break;
-    case 0x80324D28u: /* GXGetTexObjFmt(obj) */
+    case 0x80324B68u: /* GXInitTexObjLOD(obj, ...) */
         c->gpr[3] = pointer(OBJ, 0x1F00u, 4u);
+        break;
+    case 0x803265A8u: /* GXSetFog(type, startz, endz, nearz, farz, color) */
+    case 0x802D85F8u: /* J3DGDSetFog */
+    case 0x802AFBD4u: /* GFSetFog */
+        /* A scene's fog mostly: start before end, near before far. */
+        if (below(4u) != 0u) {
+            const f32 start = (f32)(next() % 100000u) * 0.01f, end = start + 1.0f + (f32)(next() % 500000u) * 0.01f;
+            const f32 nearz = 0.1f + (f32)(next() % 10000u) * 0.01f, farz = nearz + 10.0f + (f32)(next() % 5000000u) * 0.01f;
+            c->fpr[1] = start;
+            c->fpr[2] = end;
+            c->fpr[3] = nearz;
+            c->fpr[4] = farz;
+        }
+        /* fall through: the colour */
+    case 0x802AFDDCu: /* GFSetTevColor(reg, color) */
+    case 0x802AFE38u: /* GFSetTevColorS10 */
+        c->gpr[4] = pointer(OBJ, 0x1F00u, below(2u) ? 4u : 1u);
+        break;
+    case 0x80326758u: /* GXSetFogRangeAdj(enable, center, table) */
+        c->gpr[5] = pointer(OBJ, 0x1F00u, 2u);
+        break;
+    case 0x80325810u: /* GXSetIndTexMtx(id, offset matrix, scale) */
+        c->gpr[4] = pointer(OBJ, 0xF00u, 4u);
+        if (c->gpr[4] - OBJ < 0xF00u)
+            for (u32 i = 0; i < 6u; ++i)
+                put32(ram, (c->gpr[4] & ~3u) + 4u * i, any_single(2u));
         break;
     default:
         break;
@@ -335,7 +401,30 @@ static void set_host(unsigned host) {
 
 static int native_gx(CPUState* cpu, u32 address) { return bluewake_native_gx(cpu, address); }
 
+static const char* s_only;
+static bool skip(const Native* n) {
+    if (s_only == NULL)
+        return false;
+    for (const char* p = s_only; *p != 0;) { /* name prefixes, comma-separated */
+        const char* end = strchr(p, ',');
+        const size_t length = end != NULL ? (size_t)(end - p) : strlen(p);
+        if (length != 0u && strncmp(n->name, p, length) == 0)
+            return false;
+        p += length + (end != NULL);
+    }
+    return true;
+}
+
 /* --- The microbenchmark: ordinary inputs, the budget large. -------------- */
+
+/* The J3DGD natives write a GD list: each benchmark call starts on the case's
+ * list again (both sides), so the list never fills. */
+static u8 s_bench_gdl[16];
+static bool s_bench_gd;
+static void bench_gd_reset(u8* ram) {
+    if (s_bench_gd)
+        memcpy(ram + (GDL - GC_RAM_BASE), s_bench_gdl, sizeof s_bench_gdl);
+}
 
 static void bench(Harness* h, unsigned calls) {
     h->set_pipe(sink_word);
@@ -346,6 +435,8 @@ static void bench(Harness* h, unsigned calls) {
     u8* ram = h->native_ram;
     for (unsigned which = 0; which < NATIVE_COUNT; ++which) {
         const Native* n = &k_natives[which];
+        if (skip(n))
+            continue;
         for (unsigned variant = 0; variant < 1u; ++variant) {
             Case k;
             unsigned tries = 0;
@@ -374,6 +465,8 @@ static void bench(Harness* h, unsigned calls) {
                 continue;
             }
             const CPUState base = k.cpu;
+            s_bench_gd = n->entry - 0x802D0000u < 0x20000u;
+            memcpy(s_bench_gdl, ram + (GDL - GC_RAM_BASE), sizeof s_bench_gdl);
             bluewake_composite_set_gather_pipe(sink_word); /* the probe set the logging pipe */
             bluewake_composite_set_gather_pipe_bytes(sink_bytes);
             bw_gather_pipe_length = 0;
@@ -389,9 +482,11 @@ static void bench(Harness* h, unsigned calls) {
                 for (unsigned i = 0; i < calls; ++i) {
                     g->gpr[1] = base.gpr[1];
                     memcpy(&g->gpr[3], &base.gpr[3], 4u * sizeof(u32));
+                    memcpy(&g->fpr[1], &base.fpr[1], 4u * sizeof base.fpr[0]); /* the FP arguments */
                     g->lr = RETURN_ADDRESS;
                     if (variant)
                         put32(h->reference_ram, GXD + 1268u, 0x3Fu);
+                    bench_gd_reset(h->reference_ram);
                     g->pc = n->entry;
                     h->mod->dispatch(g, n->entry);
                 }
@@ -401,9 +496,11 @@ static void bench(Harness* h, unsigned calls) {
                 for (unsigned i = 0; i < calls; ++i) {
                     native.gpr[1] = base.gpr[1];
                     memcpy(&native.gpr[3], &base.gpr[3], 4u * sizeof(u32));
+                    memcpy(&native.fpr[1], &base.fpr[1], 4u * sizeof base.fpr[0]);
                     native.lr = RETURN_ADDRESS;
                     if (variant)
                         put32(ram, GXD + 1268u, 0x3Fu);
+                    bench_gd_reset(ram);
                     native.pc = n->entry;
                     if (!bluewake_native_gx(&native, n->entry)) {
                         printf("%08X %s: the benchmark case declined\n", n->entry, n->name);
@@ -435,12 +532,17 @@ int main(int argc, char** argv) {
     }
     const unsigned cases = argc > 2 ? (unsigned)strtoul(argv[2], NULL, 10) : 60000u;
     const unsigned bench_calls = argc > 3 ? (unsigned)strtoul(argv[3], NULL, 10) : 1000000u;
+    /* A fourth argument: only the natives whose names start with one of its
+     * comma-separated prefixes. */
+    s_only = argc > 4 ? argv[4] : NULL;
     Harness h;
     if (!harness_load(&h, argv[1], false, k_regions, sizeof k_regions / sizeof k_regions[0]))
         return 1;
     int failed = 0;
     for (unsigned which = 0; which < NATIVE_COUNT; ++which) {
         const Native* n = &k_natives[which];
+        if (skip(n))
+            continue;
         unsigned ran = 0, declined = 0;
         s_flushed_inside = 0;
         for (unsigned i = 0; i < cases; ++i) {
