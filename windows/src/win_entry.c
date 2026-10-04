@@ -709,6 +709,17 @@ int main(int argc, char** argv) {
     if (priority == NULL || priority[0] != '0') {
         if (SetPriorityClass(GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS))
             fprintf(stderr, "[windows] priority above normal\n");
+        // Windows 11 runs a process whose window is not in front with EcoQoS
+        // (efficiency cores, lower clocks) and, when the window is hidden,
+        // ignores its 1 ms timer resolution: a game left behind another window
+        // (a guide, a chat) slowed down. Opting out keeps it at full speed.
+        PROCESS_POWER_THROTTLING_STATE throttling = {
+            .Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION,
+            .ControlMask = PROCESS_POWER_THROTTLING_EXECUTION_SPEED | 0x4u /* IGNORE_TIMER_RESOLUTION */,
+            .StateMask = 0,
+        };
+        if (SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling, &throttling, sizeof throttling))
+            fprintf(stderr, "[windows] power throttling off\n");
     }
     // The name the volume mixer shows for the game's audio.
     SDL_SetAppMetadata("BlueWake", "0.1", "dev.bluewake.BlueWake");
