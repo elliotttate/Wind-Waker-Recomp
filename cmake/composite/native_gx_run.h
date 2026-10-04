@@ -341,9 +341,13 @@ GX_RUN void gx_psq_l(GxRun* s, f64* first, f64* second, u32 address, bool w) {
 
 /* ppc_psq_store_inline (type 0): bw_mem_write32 of each half, flushed to zero. */
 GX_RUN void gx_psq_st(GxRun* s, u32 pc, f64 first, f64 second, u32 address, bool w) {
-    gx_stp32(s, pc, address, convert_to_single_ftz(f64_bits(first)));
+    /* The bits opaque (native_replay.h's nr_bits): on bits it sees came from a
+     * double, clang turns convert_to_single_ftz's zero test into a
+     * floating-point compare, which the host's denormals-are-zero mode (the
+     * guest's NI) answers differently - a denormal half then stored unflushed. */
+    gx_stp32(s, pc, address, convert_to_single_ftz(nr_bits(first)));
     if (!w)
-        gx_stp32(s, pc, address + 4u, convert_to_single_ftz(f64_bits(second)));
+        gx_stp32(s, pc, address + 4u, convert_to_single_ftz(nr_bits(second)));
 }
 
 /* --- Floating-point arithmetic. -----------------------------------------
