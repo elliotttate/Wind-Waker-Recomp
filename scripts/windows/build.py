@@ -918,8 +918,8 @@ int main(void) {
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
         # Certified native entries, the fifth set: its sources (its hooks are
-        # native_entries.py's, above; native_gx_gen.py writes native_gx_gen.inc).
-        for name in ("native_gx_run.h", "native_gx.c", "native_gx.h", "native_gx_gen.inc"):
+        # native_entries.py's, above; native_gx_gen.py writes native_gx_gen.inc and native_gx_list.h).
+        for name in ("native_gx_run.h", "native_gx.c", "native_gx.h", "native_gx_list.h", "native_gx_gen.inc"):
             path = ROOT / "cmake/composite" / name
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
