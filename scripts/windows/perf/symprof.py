@@ -5,6 +5,7 @@ BlueWake.exe via llvm-symbolizer + PDB (innermost and outermost inlined frame),
 system DLLs by nearest export, the game module by offset only. Leaf runtime
 routines' callers come from PROFILE-callers.txt."""
 import bisect, collections, os, re, subprocess, sys
+from pathlib import Path
 
 VS = r"E:\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin"
 APP = os.environ.get("SYMPROF_APP", str(Path(__file__).resolve().parents[3] / "build/windows/app/BlueWake.exe"))
