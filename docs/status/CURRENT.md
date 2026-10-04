@@ -1,3 +1,63 @@
+## 2026-10-04 Faster lfs, early returns out of the dispatch, the GX SDK's FIFO writers native: 5-7 percent of the game thread
+
+**Where the game thread's time goes now** (Forest Haven, four E-cores, uncapped, the module rebuilt with line
+tables). The translated module is 91 percent of the thread; within it the chunks' own code is 44 percent,
+gather_pipe.h's memory paths 13, the generated header's helpers 11 (the block's precharge test 3, the
+single-to-double conversion 3.7), inline_fp.h 10, the direct calls' readiness tests 4, the return dispatches'
+switches 3.7, and each native a few. Nothing is above 4 percent. A fifth of the module's time lands at block
+starts (the pc store after a block's label, its two tests): arriving at blocks, which a host-kept floor did
+not make cheaper on 2026-10-01.
+
+**Three changes:**
+- `lfs` and the other single loads (7aca42a): the generated header widens a single's bits by hand, so that a
+  signalling NaN keeps its payload. For a normal single (exponent 1-254) the hardware's widening gives the same
+  double; inline_fp.h's dolrecomp_f32_from_bits takes that path and keeps the generated one for zeros,
+  denormals, infinities and NaNs. tests/f32_from_bits_test.c compares the two over all 2^32 patterns: no
+  difference, 99.2 percent on the fast path.
+- Each chunk's return dispatch (scripts/windows/return_ranges.py, 7aca42a) first tests the return address
+  against its lowest and highest case: a return into another chunk, which ends at `default: return;`, no longer
+  walks the switch's binary search.
+- The fifth round of natives (docs/status/NATIVE_GX_2026-10-04.md, merged in 56dcd70): 35 of the GX SDK's FIFO
+  writers (matrix and texture loads, TEV colours and orders, vertex arrays, GXBegin with its dirty-state
+  callees, the J3DGD and GF writers) replayed exactly from their translation, pipe bytes included; 60,000
+  cases each without a difference. GXCallDisplayList is not hooked yet (the change below altered its
+  translation; it is being recertified).
+- The GX entry trace's range bounds in runtime/host/src/main.c were the host's only mention of GXBegin,
+  GXLoadTexObj, GXCallDisplayList and four others, and direct_calls.py took them for addresses the edge
+  service acts at, so every call to them went round the chassis loop (5edeacc). They now sit between
+  `bluewake-unwatched` markers, and direct calls are off while that trace is on. 407 more calls are direct.
+
+**Exact.** Link's position at all 621 probes identical to the build before (W-n4), for both new builds.
+Smooth Motion dumps at the sea by the Fortress, Forest Haven, Dragon Roost, Hyrule, the Earth Temple's boss and
+the Forbidden Woods: real and in-between frames identical. Both builder passes certify game math 12/12 and
+native entries 59/60 with no hook lost.
+
+**What it saves** (four E-cores, uncapped, Smooth Motion off, two runs each, interleaved; game thread CPU per
+game frame in ms, then game frames a second):
+
+| Place | Before | lfs + returns | + fifth round, watch list | FPS before -> after |
+| --- | --- | --- | --- | --- |
+| Forest Haven | 20.92 | 20.21 | 19.46 (-7.0%) | 47.2 -> 49.8 |
+| Dragon Roost | 22.13 | 21.29 | 20.92 (-5.5%) | 44.5 -> 46.7 |
+| The sea by the Fortress | 23.62 | 22.62 | 22.43 (-5.0%) | 41.5 -> 43.8 |
+| Outset | 17.03 | 16.45 | 16.27 (-4.5%) | 57.0 -> 60.7 |
+| Hyrule Castle's room | 17.99 | 17.24 | 16.92 (-5.9%) | 54.4 -> 57.9 |
+
+**Two E-cores** (`0x00030000`) with Smooth Motion at 60, paced: 60 shown and 30 game frames a second at all six
+heavy places, before and after (GX worker 7-15 ms, the in-between matching 1-4 ms, the render worker 4-5 ms a
+game frame).
+
+**Tried and dropped:**
+- Prepaid copies that leave for the original block on an access's out-of-line path, so the compiler could keep
+  guest registers and the memory tests from one access to the next: exact, but the chunks' code grew 35 percent
+  (the original blocks, now entered with `cycle_block_prepaid` set, lost their specialization). Not built.
+- A coarser DSP step: the LLE DSP is stepped every 12,600 cycles and that ends 93 percent of the game thread's
+  turns (deadline census, about 78,000 a second). Twice and four times the step kept every position, but saved
+  0-3 percent: the turns' own cost is small.
+- Checks without a window: `BLUEWAKE_RENDERER=headless` gives the same 621 positions as a windowed run, so
+  game-logic exactness can be checked without taking the screen; the GX natives decline there (no batch writer),
+  so FIFO work still needs windowed runs.
+
 ## 2026-10-04 The fourth round of natives in the build: exact, in play, and what it saves
 
 **A builder fix first** (70b33dd). The builder runs its source steps twice over one tree (the base with
