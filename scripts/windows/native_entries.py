@@ -120,6 +120,20 @@ for _resume in (0x8004156C, 0x80041578, 0x80041588):
                         [(0x8003D6E0, 0x80041544, 0x800415B4), (0x8032D6E0, 0x8032DB44, 0x8032DC6C)],
                         "bdf91cee67046b81e7b60bb4669129749a912db84cd9fd96028b74a4cac01dd7")
 # --- end of the resumable entries ---
+# --- The fourth set (tests/native_kankyo_test.c): the environment's colour
+# blends (cmake/composite/native_kankyo.c). kankyo_color_ratio_set stands in
+# for the three s16_data_ratio_set calls it makes inside its chunk, so its
+# hash covers that function too. ---
+GROUPS["kankyo"] = ("native_kankyo.h", "bluewake_native_kankyo_enabled",
+                    "bluewake_native_kankyo(ctx, 0x{entry:08X}u)")
+ENTRIES[0x8018F894] = ("s16_data_ratio_set (d_kankyo)", "kankyo", [(0x8018D6E0, 0x8018F894, 0x8018F8E4)],
+                       "a97d798df755a9dfa8d8c76e9387bd63fcb1a3a01ac77dea64257a70f3c02ed2")
+ENTRIES[0x8018F8E4] = ("kankyo_color_ratio_set", "kankyo",
+                       [(0x8018D6E0, 0x8018F8E4, 0x8018F9E8), (0x8018D6E0, 0x8018F894, 0x8018F8E4)],
+                       "97603052f10971cf557a41245d089cb826682dbbbd57ffdc4fc68d9c38f2106b")
+ENTRIES[0x8019803C] = ("s16_data_ratio_set (d_kyeff)", "kankyo", [(0x801956E0, 0x8019803C, 0x8019808C)],
+                       "5d00d5f30faa943ea2066d221c0027d91cf9cdf449c1dd493964417803fc6c82")
+# --- end of the fourth set's colour blends ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
 J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"
@@ -223,6 +237,26 @@ def addresses(text):  # noqa: F811 (the check above, less what SEARCH_HOST_OWN l
             found -= own
     return found
 # --- end of the third set's exemption ---
+
+
+# --- The fourth set: mods' variants of a chunk ---
+# A mod's variant of a chunk (scripts/mods/build_mod_variants.py) names its
+# function func_XXXXXXXX__mod_NAME. The second and third sets' chunks have no
+# variants; the fourth set's kankyo chunk (8018D6E0) has two (the widescreen
+# mods), whose fragments must hash the same as the base's to be hooked.
+_main_function_of = main_function
+
+
+def main_function(text, chunk):  # noqa: F811 (the base's function, or a mod variant's)
+    found = _main_function_of(text, chunk)
+    if found is not None:
+        return found
+    m = re.search(rf"\nvoid func_{chunk:08X}__mod_\w+\(CPUState\* ctx_param\) {{\n", text)
+    if m is None:
+        return None
+    end = text.find("\n}\n", m.start())
+    return text[m.start():end + 3] if end >= 0 else None
+# --- end of the fourth set's mod variants ---
 
 
 def chunk_files(root, chunk):
