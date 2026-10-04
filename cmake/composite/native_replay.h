@@ -522,6 +522,56 @@ NR NrPair nr_ps_res(NrFp* s, NrPair b) {
     return r;
 }
 
+/* --- Single precision. -------------------------------------------------------
+ *
+ * Long chains of dependent single operations (the Hermite splines, the
+ * conversions to cell indices) gain little from the replay's double
+ * arithmetic and its two conversions an operation. On zero or normal singles whose every
+ * result is zero or normal (at least 2^-125 and finite), host single
+ * arithmetic gives the translation's results: a sum, difference, product or
+ * quotient of singles computed in double and rounded once to single is the
+ * single operation correctly rounded (double rounding is innocuous, 53 >= 2 x
+ * 24 + 2), the 25-bit multiplier leaves a single unchanged, the fused
+ * multiply-add's tie correction gives fmaf, and nothing nears the range where
+ * NI flushes or the host's flush to zero acts. Anything else - a register
+ * that is not such a single, a result out of that range - takes the double
+ * replay, which is exact for every input it accepts. */
+
+/* A double register or loaded value that is a zero or a normal single of at
+ * least 2^-125, as that single. */
+NR bool nr_plain(f64 value, f32* out) {
+    const u64 bits = nr_bits(value);
+    const u64 exponent = (bits >> 52) & 0x7FFu;
+    *out = (f32)value;
+    return (bits & 0x7FFFFFFFFFFFFFFFull) == 0u ||
+           (exponent >= 898u && exponent <= 1150u && (bits & 0x1FFFFFFFull) == 0u);
+}
+
+/* A single result: zero, or normal of at least 2^-125. */
+NR f32 nr_r(f32 value, bool* bad) {
+    u32 bits;
+    memcpy(&bits, &value, sizeof bits);
+    bits = nr_opaque32(bits);
+    const u32 exponent = bits & 0x7F800000u;
+    *bad |= !((bits & 0x7FFFFFFFu) == 0u || (exponent >= (2u << 23) && exponent != 0x7F800000u));
+    return value;
+}
+
+/* An lfs's value as a single, if plain. */
+NR bool nr_plain_word(u32 word, f32* out) {
+    const u32 exponent = word & 0x7F800000u;
+    memcpy(out, &word, sizeof *out);
+    return (word & 0x7FFFFFFFu) == 0u || (exponent >= (2u << 23) && exponent != 0x7F800000u);
+}
+
+/* The class of a plain single result (FPRF). */
+NR u32 nr_class_plain(f32 value) {
+    u32 bits;
+    memcpy(&bits, &value, sizeof bits);
+    bits = nr_opaque32(bits);
+    return (bits & 0x7FFFFFFFu) == 0u ? (bits >> 31 ? 0x12u : 0x02u) : (bits >> 31 ? 0x08u : 0x04u);
+}
+
 /* --- Integer compares: CR0 with XER's SO. --------------------------------- */
 
 NR u32 nr_cr0(u32 cr, u32 xer, bool less, bool greater) {

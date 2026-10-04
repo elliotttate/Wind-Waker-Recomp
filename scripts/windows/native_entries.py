@@ -154,6 +154,12 @@ ENTRIES[0x802F0954] = ("J3DAnmTransformKey::calcTransform", "anim",
 ENTRIES[0x802DA584] = ("J3DPSCalcInverseTranspose", "anim", [(0x802D96E0, 0x802DA584, 0x802DA64C)],
                        "15f0f639f4c2003e1d1bfa800ce1c8e75ffeb6268d5ed96240d6ddbb76c7b861")
 # --- end of the fourth set's animation ---
+# --- The fourth set (tests/native_cc_test.c): the collision checker's area
+# division (cmake/composite/native_cc.c). ---
+GROUPS["cc"] = ("native_cc.h", "bluewake_native_cc_enabled", "bluewake_native_cc(ctx, 0x{entry:08X}u)")
+ENTRIES[0x8024170C] = ("cCcD_DivideArea::CalcDivideInfoOverArea", "cc", [(0x802416E0, 0x8024170C, 0x80241924)],
+                       "8a3217398db768a43715377f0b10f65fe4d31ae19d1f7e8725d236a2142281c9")
+# --- end of the fourth set's area division ---
 # prepare_native_j3d.py's hooks, in the J3DGetTranslateRotateMtx fragments
 # (it runs first): not part of the translation certified here.
 J3D_HOOK = re.compile(r"    /\* bluewake: recovered J3D matrix [0-9A-F]{8} \*/\n"

@@ -253,56 +253,6 @@ AN bool an_silent(const CPUState* cpu, const u32* addresses, unsigned count) {
     return true;
 }
 
-/* --- The splines in single precision. -------------------------------------
- *
- * Both Hermite splines are long chains of dependent single operations; the
- * replay's double arithmetic and its two conversions an operation make them
- * no faster than the translation. On zero or normal singles whose every
- * result is zero or normal (at least 2^-125 and finite), host single
- * arithmetic gives the translation's results: a sum, difference, product or
- * quotient of singles computed in double and rounded once to single is the
- * single operation correctly rounded (double rounding is innocuous, 53 >= 2 x
- * 24 + 2), the 25-bit multiplier leaves a single unchanged, the fused
- * multiply-add's tie correction gives fmaf, and nothing nears the range where
- * NI flushes or the host's flush to zero acts. Anything else - a register
- * that is not such a single, a result out of that range - takes the double
- * replay, which is exact for every input it accepts. */
-
-/* A double register or loaded value that is a zero or a normal single of at
- * least 2^-125, as that single. */
-AN bool an_plain(f64 value, f32* out) {
-    const u64 bits = nr_bits(value);
-    const u64 exponent = (bits >> 52) & 0x7FFu;
-    *out = (f32)value;
-    return (bits & 0x7FFFFFFFFFFFFFFFull) == 0u ||
-           (exponent >= 898u && exponent <= 1150u && (bits & 0x1FFFFFFFull) == 0u);
-}
-
-/* A single result: zero, or normal of at least 2^-125. */
-AN f32 an_r(f32 value, bool* bad) {
-    u32 bits;
-    memcpy(&bits, &value, sizeof bits);
-    bits = nr_opaque32(bits);
-    const u32 exponent = bits & 0x7F800000u;
-    *bad |= !((bits & 0x7FFFFFFFu) == 0u || (exponent >= (2u << 23) && exponent != 0x7F800000u));
-    return value;
-}
-
-/* An lfs's value as a single, if plain. */
-AN bool an_plain_word(u32 word, f32* out) {
-    const u32 exponent = word & 0x7F800000u;
-    memcpy(out, &word, sizeof *out);
-    return (word & 0x7FFFFFFFu) == 0u || (exponent >= (2u << 23) && exponent != 0x7F800000u);
-}
-
-/* The class of a plain single result (FPRF). */
-AN u32 an_class_plain(f32 value) {
-    u32 bits;
-    memcpy(&bits, &value, sizeof bits);
-    bits = nr_opaque32(bits);
-    return (bits & 0x7FFFFFFFu) == 0u ? (bits >> 31 ? 0x12u : 0x02u) : (bits >> 31 ? 0x08u : 0x04u);
-}
-
 /* --- JMAHermiteInterpolation (803012D8): f1 the frame, f2 t0, f3 v0, f4 d0,
  * f5 t1, f6 v1, f7 d1; one block of 46 cycles. -------------------------- */
 
@@ -310,32 +260,32 @@ AN u32 an_class_plain(f32 value) {
 AN bool an_hermite_single(An* s) {
     const u32 r2 = s->g[2];
     f32 x1, x2, x3, x4, x5, x6, x7, k1, k2, k3, k4;
-    if (!an_plain(s->f[1], &x1) || !an_plain(s->f[2], &x2) || !an_plain(s->f[3], &x3) ||
-        !an_plain(s->f[4], &x4) || !an_plain(s->f[5], &x5) || !an_plain(s->f[6], &x6) ||
-        !an_plain(s->f[7], &x7))
+    if (!nr_plain(s->f[1], &x1) || !nr_plain(s->f[2], &x2) || !nr_plain(s->f[3], &x3) ||
+        !nr_plain(s->f[4], &x4) || !nr_plain(s->f[5], &x5) || !nr_plain(s->f[6], &x6) ||
+        !nr_plain(s->f[7], &x7))
         return false;
-    if (!an_plain_word(an_lwz(s, r2 - 13000u), &k1) || !an_plain_word(an_lwz(s, r2 - 12996u), &k2) ||
-        !an_plain_word(an_lwz(s, r2 - 12992u), &k3) || !an_plain_word(an_lwz(s, r2 - 12988u), &k4))
+    if (!nr_plain_word(an_lwz(s, r2 - 13000u), &k1) || !nr_plain_word(an_lwz(s, r2 - 12996u), &k2) ||
+        !nr_plain_word(an_lwz(s, r2 - 12992u), &k3) || !nr_plain_word(an_lwz(s, r2 - 12988u), &k4))
         return false;
     bool bad = false;
-    const f32 f9 = an_r(x1 - x2, &bad);
+    const f32 f9 = nr_r(x1 - x2, &bad);
     const f32 f8 = k1;
-    const f32 d = an_r(x5 - x2, &bad);
+    const f32 d = nr_r(x5 - x2, &bad);
     if (bad)
         return false;
-    const f32 inv = an_r(f8 / d, &bad);
-    const f32 sq = an_r(f9 * f9, &bad);
-    const f32 f2a = an_r(inv * sq, &bad);
-    const f32 f10 = an_r(f2a * inv, &bad);
-    const f32 f11 = an_r(f9 * f10, &bad);
-    const f32 f12 = an_r(f11 * inv, &bad);
-    const f32 f5 = an_r(x7 * an_r(f11 - f2a, &bad), &bad);
-    const f32 f2 = an_r(x4 * an_r(f9 + an_r(f11 - an_r(k2 * f2a, &bad), &bad), &bad), &bad);
-    const f32 f4 = an_r(k3 * f10, &bad);
-    const f32 f1a = an_r(x3 * an_r(f8 + an_r(an_r(k2 * f12, &bad) - f4, &bad), &bad), &bad);
-    const f32 f0a = an_r(x6 * an_r(an_r(k4 * f12, &bad) + f4, &bad), &bad);
-    const f32 f0 = an_r(f2 + an_r(f1a + f0a, &bad), &bad);
-    const f32 f1 = an_r(f5 + f0, &bad);
+    const f32 inv = nr_r(f8 / d, &bad);
+    const f32 sq = nr_r(f9 * f9, &bad);
+    const f32 f2a = nr_r(inv * sq, &bad);
+    const f32 f10 = nr_r(f2a * inv, &bad);
+    const f32 f11 = nr_r(f9 * f10, &bad);
+    const f32 f12 = nr_r(f11 * inv, &bad);
+    const f32 f5 = nr_r(x7 * nr_r(f11 - f2a, &bad), &bad);
+    const f32 f2 = nr_r(x4 * nr_r(f9 + nr_r(f11 - nr_r(k2 * f2a, &bad), &bad), &bad), &bad);
+    const f32 f4 = nr_r(k3 * f10, &bad);
+    const f32 f1a = nr_r(x3 * nr_r(f8 + nr_r(nr_r(k2 * f12, &bad) - f4, &bad), &bad), &bad);
+    const f32 f0a = nr_r(x6 * nr_r(nr_r(k4 * f12, &bad) + f4, &bad), &bad);
+    const f32 f0 = nr_r(f2 + nr_r(f1a + f0a, &bad), &bad);
+    const f32 f1 = nr_r(f5 + f0, &bad);
     if (bad)
         return false;
     an_set(s, 0, f0);
@@ -348,7 +298,7 @@ AN bool an_hermite_single(An* s) {
     an_set(s, 10, f10);
     an_set(s, 11, f11);
     an_set(s, 12, f12);
-    s->fp.fpscr = (s->fp.fpscr & ~(NR_FPSCR_FI | NR_FPSCR_FR | (0x1Fu << 12))) | (an_class_plain(f1) << 12);
+    s->fp.fpscr = (s->fp.fpscr & ~(NR_FPSCR_FI | NR_FPSCR_FR | (0x1Fu << 12))) | (nr_class_plain(f1) << 12);
     return true;
 }
 
@@ -541,28 +491,28 @@ AN void an_psq_short(An* s, unsigned r, u32 address, f64 scale) {
 /* In single precision: false (nothing written) where it does not apply. */
 AN bool an_hermite_s_single(An* s, f64 scale) {
     f32 x1;
-    if (!an_plain(s->f[1], &x1))
+    if (!nr_plain(s->f[1], &x1))
         return false;
     const f32 sc = (f32)scale;
     const f32 t0 = (f32)(s16)an_lhz(s, s->g[3]) * sc, v0 = (f32)(s16)an_lhz(s, s->g[4]) * sc;
     const f32 d0 = (f32)(s16)an_lhz(s, s->g[5]) * sc, t1 = (f32)(s16)an_lhz(s, s->g[6]) * sc;
     const f32 v1 = (f32)(s16)an_lhz(s, s->g[7]) * sc, d1 = (f32)(s16)an_lhz(s, s->g[8]) * sc;
     bool bad = false;
-    an_r(t0, &bad), an_r(v0, &bad), an_r(d0, &bad), an_r(t1, &bad), an_r(v1, &bad), an_r(d1, &bad);
-    const f32 f4 = an_r(t1 - t0, &bad);
-    const f32 f6a = an_r(x1 - t0, &bad);
-    const f32 f5a = an_r(v1 - v0, &bad);
+    nr_r(t0, &bad), nr_r(v0, &bad), nr_r(d0, &bad), nr_r(t1, &bad), nr_r(v1, &bad), nr_r(d1, &bad);
+    const f32 f4 = nr_r(t1 - t0, &bad);
+    const f32 f6a = nr_r(x1 - t0, &bad);
+    const f32 f5a = nr_r(v1 - v0, &bad);
     if (bad)
         return false;
-    const f32 f6 = an_r(f6a / f4, &bad);
-    const f32 f1a = an_r(fmaf(d1, f4, v0), &bad);
-    const f32 f7 = an_r(f6 * f6, &bad);
-    const f32 f5 = an_r(-fmaf(f4, d0, -f5a), &bad);
-    const f32 f1b = an_r(an_r(f1a - v1, &bad) - f5, &bad);
-    const f32 f3 = an_r(f7 * f1b, &bad);
-    const f32 f1c = an_r(fmaf(an_r(fmaf(f4, d0, f3), &bad), f6, v0), &bad); /* fmadds f1, f4, f0, f3; f1, f6, f2 */
-    const f32 f1d = an_r(fmaf(f5, f7, f1c), &bad);                         /* fmadds f1, f5, f7, f1 */
-    const f32 f1 = an_r(f1d - f3, &bad);                                    /* fsubs f1, f1, f3 */
+    const f32 f6 = nr_r(f6a / f4, &bad);
+    const f32 f1a = nr_r(fmaf(d1, f4, v0), &bad);
+    const f32 f7 = nr_r(f6 * f6, &bad);
+    const f32 f5 = nr_r(-fmaf(f4, d0, -f5a), &bad);
+    const f32 f1b = nr_r(nr_r(f1a - v1, &bad) - f5, &bad);
+    const f32 f3 = nr_r(f7 * f1b, &bad);
+    const f32 f1c = nr_r(fmaf(nr_r(fmaf(f4, d0, f3), &bad), f6, v0), &bad); /* fmadds f1, f4, f0, f3; f1, f6, f2 */
+    const f32 f1d = nr_r(fmaf(f5, f7, f1c), &bad);                         /* fmadds f1, f5, f7, f1 */
+    const f32 f1 = nr_r(f1d - f3, &bad);                                    /* fsubs f1, f1, f3 */
     if (bad)
         return false;
     s->f[0] = d0;
@@ -575,7 +525,7 @@ AN bool an_hermite_s_single(An* s, f64 scale) {
     an_set(s, 5, f5);
     an_set(s, 6, f6);
     an_set(s, 7, f7);
-    s->fp.fpscr = (s->fp.fpscr & ~(NR_FPSCR_FI | NR_FPSCR_FR | (0x1Fu << 12))) | (an_class_plain(f1) << 12);
+    s->fp.fpscr = (s->fp.fpscr & ~(NR_FPSCR_FI | NR_FPSCR_FR | (0x1Fu << 12))) | (nr_class_plain(f1) << 12);
     return true;
 }
 
@@ -1054,25 +1004,25 @@ AN void an_inverse_general(NrFp* fp, const u32 m[9], AnInverse* o) {
 AN bool an_inverse_single(NrFp* fp, const u32 m[9], AnInverse* o) {
     f32 a[9];
     for (unsigned i = 0; i < 9u; ++i)
-        if (!an_plain_word(m[i], &a[i]))
+        if (!nr_plain_word(m[i], &a[i]))
             return false;
     bool bad = false;
     const f32 m00 = a[0], m01 = a[1], m02 = a[2], m10 = a[3], m11 = a[4], m12 = a[5], m20 = a[6], m21 = a[7],
               m22 = a[8];
-    const f32 f11a = an_r(fmaf(m01, m12, -an_r(m11 * m02, &bad)), &bad);
-    const f32 f11b = an_r(fmaf(m02, m10, -an_r(m12 * m00, &bad)), &bad);
-    const f32 f13a = an_r(fmaf(m11, m22, -an_r(m21 * m12, &bad)), &bad);
-    const f32 f13b = an_r(fmaf(m12, m20, -an_r(m22 * m10, &bad)), &bad);
-    const f32 f12a = an_r(fmaf(m21, m02, -an_r(m01 * m22, &bad)), &bad);
-    const f32 f12b = an_r(fmaf(m22, m00, -an_r(m02 * m20, &bad)), &bad);
-    const f32 f10a = an_r(fmaf(m10, m21, -an_r(m11 * m20, &bad)), &bad);
-    const f32 f10b = an_r(m22 - m12, &bad);
-    const f32 f9a = an_r(fmaf(m01, m20, -an_r(m00 * m21, &bad)), &bad);
-    const f32 f9b = an_r(m02 - m22, &bad);
-    const f32 f8a = an_r(fmaf(m00, m11, -an_r(m01 * m10, &bad)), &bad);
-    const f32 f8b = an_r(m12 - m02, &bad);
-    const f32 f7a = an_r(fmaf(m20, f11a, an_r(fmaf(m10, f12a, an_r(m00 * f13a, &bad)), &bad)), &bad);
-    const f32 f7b = an_r(f11b + an_r(f12b + f13b, &bad), &bad);
+    const f32 f11a = nr_r(fmaf(m01, m12, -nr_r(m11 * m02, &bad)), &bad);
+    const f32 f11b = nr_r(fmaf(m02, m10, -nr_r(m12 * m00, &bad)), &bad);
+    const f32 f13a = nr_r(fmaf(m11, m22, -nr_r(m21 * m12, &bad)), &bad);
+    const f32 f13b = nr_r(fmaf(m12, m20, -nr_r(m22 * m10, &bad)), &bad);
+    const f32 f12a = nr_r(fmaf(m21, m02, -nr_r(m01 * m22, &bad)), &bad);
+    const f32 f12b = nr_r(fmaf(m22, m00, -nr_r(m02 * m20, &bad)), &bad);
+    const f32 f10a = nr_r(fmaf(m10, m21, -nr_r(m11 * m20, &bad)), &bad);
+    const f32 f10b = nr_r(m22 - m12, &bad);
+    const f32 f9a = nr_r(fmaf(m01, m20, -nr_r(m00 * m21, &bad)), &bad);
+    const f32 f9b = nr_r(m02 - m22, &bad);
+    const f32 f8a = nr_r(fmaf(m00, m11, -nr_r(m01 * m10, &bad)), &bad);
+    const f32 f8b = nr_r(m12 - m02, &bad);
+    const f32 f7a = nr_r(fmaf(m20, f11a, nr_r(fmaf(m10, f12a, nr_r(m00 * f13a, &bad)), &bad)), &bad);
+    const f32 f7b = nr_r(f11b + nr_r(f12b + f13b, &bad), &bad);
     if (bad)
         return false;
     NrPair* f = o->f;
@@ -1091,7 +1041,7 @@ AN bool an_inverse_single(NrFp* fp, const u32 m[9], AnInverse* o) {
     f[12] = (NrPair){f12a, f12b};
     f[13] = (NrPair){f13a, f13b};
     const u32 compare = f7a < 0.0f ? 0x8u : f7a > 0.0f ? 0x4u : 0x2u;
-    fp->fpscr = (fp->fpscr & ~(0x1Fu << 12)) | (an_class_plain(f7a) << 12) | (compare << 12);
+    fp->fpscr = (fp->fpscr & ~(0x1Fu << 12)) | (nr_class_plain(f7a) << 12) | (compare << 12);
     o->cr0 = compare;
     o->suffix = 19u;
     if (compare == 0x2u) {
@@ -1104,22 +1054,22 @@ AN bool an_inverse_single(NrFp* fp, const u32 m[9], AnInverse* o) {
     if (f7b == 0.0f)
         return false;
     f32 n0, n1;
-    if (!an_plain(ppc_approx_reciprocal(f7a), &n0) || !an_plain(ppc_approx_reciprocal(f7b), &n1))
+    if (!nr_plain(ppc_approx_reciprocal(f7a), &n0) || !nr_plain(ppc_approx_reciprocal(f7b), &n1))
         return false;
     f32 a0 = 0.0f, a1 = 0.0f, q0 = 0.0f, q1 = 0.0f;
     for (unsigned step = 0; step < 2u; ++step) {
-        a0 = an_r(n0 + n0, &bad);
-        a1 = an_r(n1 + n1, &bad);
-        q0 = an_r(n0 * n0, &bad);
-        q1 = an_r(n1 * n1, &bad);
-        n0 = an_r(-fmaf(f7a, q0, -a0), &bad);
-        n1 = an_r(-fmaf(f7b, q1, -a1), &bad);
+        a0 = nr_r(n0 + n0, &bad);
+        a1 = nr_r(n1 + n1, &bad);
+        q0 = nr_r(n0 * n0, &bad);
+        q1 = nr_r(n1 * n1, &bad);
+        n0 = nr_r(-fmaf(f7a, q0, -a0), &bad);
+        n1 = nr_r(-fmaf(f7b, q1, -a1), &bad);
     }
     const f32 c[6][2] = {{f13a, f13b}, {f12a, f12b}, {f11a, f11b}, {f10a, f10b}, {f9a, f9b}, {f8a, f8b}};
     f32 scaled[6][2];
     for (unsigned i = 0; i < 6u; ++i) {
-        scaled[i][0] = an_r(c[i][0] * n0, &bad);
-        scaled[i][1] = an_r(c[i][1] * n0, &bad);
+        scaled[i][0] = nr_r(c[i][0] * n0, &bad);
+        scaled[i][1] = nr_r(c[i][1] * n0, &bad);
     }
     if (bad)
         return false;
@@ -1128,7 +1078,7 @@ AN bool an_inverse_single(NrFp* fp, const u32 m[9], AnInverse* o) {
     f[6] = (NrPair){a0, a1};
     for (unsigned i = 0; i < 6u; ++i)
         f[13u - i] = (NrPair){scaled[i][0], scaled[i][1]};
-    fp->fpscr = (fp->fpscr & ~(0x1Fu << 12)) | (an_class_plain(scaled[5][0]) << 12);
+    fp->fpscr = (fp->fpscr & ~(0x1Fu << 12)) | (nr_class_plain(scaled[5][0]) << 12);
     o->r3 = 1u;
     o->cycles = 21u;
     o->stores = true;
