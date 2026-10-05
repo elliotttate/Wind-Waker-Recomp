@@ -34,7 +34,10 @@ do (39 pixels in one frame): those particles are not deterministic from run to r
 **Also:**
 - The app's own profile (windows/pgo/app.profdata) is trained again on RecompCore 11c1369
   (`scripts/windows/train_app_profile.py` now takes an .rvz through the builder's disc step and starts from a fresh
-  folder); level with the old one in play.
+  folder). The builder had passed it by its fixed name, which is not a dependency: a new profile left every object
+  already built on the old counts (the first build after it changed nothing) and the next change failed to link
+  (ThinLTO refuses objects made with two profiles). It now goes in under its hash, so a new one rebuilds the app.
+  Measured only together with the change above (the app clean-built with it, W-vd, against the build before): level.
 - With the decline gate, the sixth natives set is level with it off (Forest Haven 19.69 vs 19.99 ms a game frame,
   Dragon Roost 20.94 vs 20.63, Hyrule Castle's room 16.69 vs 16.93): it stays opt-in.
 
