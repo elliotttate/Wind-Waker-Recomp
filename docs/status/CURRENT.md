@@ -1,3 +1,54 @@
+## 2026-10-05 The GPU's work is the upload: what each frame sends, 53-59 percent smaller
+
+**Where the GPU's time goes** (RTX 5090, `DOL_AURORA_GPU_PROF=1`, whose `[gpu-prof]` lines give each pass's GPU time
+and the bytes the frame's staging copies move; `scripts/windows/perf/gpu_summary.py` sums them per place). The
+GPU is busy 0.1-1.5 ms a frame, and 75-90 percent of that is the staging copies: the frame's vertices, constant
+blocks, indices and textures copied from upload memory. The EFB passes and the present are 0.01-0.2 ms even at
+four times the internal resolution. So the GPU's work, and much of the GX worker's copying, is the upload.
+Three changes made it smaller (RecompCore 6f52a68 and 1602248):
+
+- **A compact decoded vertex** (0138): 60 bytes for the draws whose format carries no colour 1, tex 2-4,
+  matrix indices for texgens or binormal/tangent (nearly all), instead of 132; the pipeline reads the others'
+  defaults from a one-element stream. Vertex bytes -55 percent.
+- **Two texture identities per guest address** (0139): near Dragon Roost a 256x512 CI8 texture is drawn under
+  two palettes in turn, and the cache, holding one identity per address, evicted it at every alternation: about
+  68 decodes and 512 KB uploads a second (1,710 of a run's 2,007 uploads). The run now uploads 295, all first
+  loads.
+- **The vertex constant block as three bindings** (0142). Every draw staged all 2,832 bytes of its block
+  whenever any of it changed; at the sea a draw's own matrices change in 96 percent of blocks, XF matrix memory
+  in 97, the lights in 2, and most draws (lit, no matrix indices) read no matrix memory at all. The block is now
+  the draw's own fields (656 bytes), matrix memory (1,536) and the lights (640), each a dynamic-offset binding
+  staged and de-duplicated on its own, and only as far as the draw's shader reads it
+  (`gxc::vertex_uniform_use`, which gxcore_wgsl_test checks against every field each tested shader reads).
+  Uniform bytes -50 to -69 percent.
+
+KB moved per frame (the same tour, Smooth Motion at 60):
+
+| Place | Vertices | Constants | Textures | GPU busy, ms |
+| --- | --- | --- | --- | --- |
+| Forest Haven | 13,100 -> 5,954 | 4,154 -> 1,341 | 0 | - |
+| Dragon Roost | 8,884 -> 4,038 | 2,110 -> 849 | 1,028 -> 4 | 1.42 -> 0.34 |
+| The sea by the Fortress | 8,283 -> 3,765 | 1,085 -> 497 | 0 | 1.55 -> 0.82 |
+| Hyrule | 9,841 -> 4,481 | 1,111 -> 396 | 0 | 0.15 -> 0.11 |
+| Hyrule Castle's room | 11,932 -> 5,424 | 1,309 -> 653 | 0 | 0.35 -> 0.20 |
+| The Earth Temple's boss | 7,936 -> 3,607 | 1,553 -> 824 | 0 | 0.18 -> 0.16 |
+
+**Exact.** Smooth Motion dumps at the sea by the Fortress, Forest Haven, Dragon Roost, Hyrule, the Earth
+Temple's boss and the Forbidden Woods: real and in-between frames identical, before and after each change.
+frame_interp_test had failed 74 checks since the compact layout (two cases built tex2 draws in it, which has no
+uv2); they now build full-layout draws, and all pass (0141).
+
+**Also:**
+- The builder's training module is compiled at -O1 (its counters are the source's either way; at -O0 one
+  module with 2026-10-04's straight prepaid copies was 2.05 GB, past what Windows loads). The straight copies
+  are out again: with the optimization profile they were no faster, and the module 15 percent bigger.
+- The sixth natives round (the particle draw code and drawWave, docs/status/NATIVE_DRAW_2026-10-04.md) is in
+  the build and exact (621 of 621 positions, dumps identical), but on four E-cores the game thread is 4-8
+  percent slower than with the fifth round alone: with all natives off the two modules are within 1-3
+  percent, and the natives save 0.7 ms at the sea by the Fortress instead of 1.8. The round's particle draw
+  natives take over calls the fifth round's GX and math natives made (GXBegin's native count halves); being
+  measured set by set (`BLUEWAKE_NATIVE_GX=0`, `BLUEWAKE_NATIVE_DRAW=0`).
+
 ## 2026-10-04 Faster lfs, early returns out of the dispatch, the GX SDK's FIFO writers native: 5-7 percent of the game thread
 
 **Where the game thread's time goes now** (Forest Haven, four E-cores, uncapped, the module rebuilt with line

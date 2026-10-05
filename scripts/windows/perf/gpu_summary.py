@@ -1,6 +1,6 @@
 """Per place, the [gpu-prof] lines of a run (DOL_AURORA_GPU_PROF=1): GPU busy time,
-the staging copies' and the render passes' time per frame (ms), and the KB the
-staging copies move per frame, averaged over the lines after each warp but the
+the staging copies' and the render passes' time per frame (ms), and the KB of
+vertices, uniforms and textures the staging copies move per frame, averaged over the lines after each warp but the
 first (the load).
 
   python gpu_summary.py LOG [LOG ...]
@@ -33,10 +33,10 @@ for path in sys.argv[1:]:
             continue
         r = rows.setdefault(place, [])
         r.append((float(m.group(1)), kind_ms(m.group(6), "Staging copies"), kind_ms(m.group(6), "EFB"),
-                  int(m.group(2) or 0), int(m.group(5) or 0)))
+                  int(m.group(2) or 0), int(m.group(3) or 0), int(m.group(5) or 0)))
     print(path)
-    print(f"  {'place':<12} {'busy':>7} {'staging':>8} {'EFB':>7} {'verts KB':>9} {'tex KB':>7}")
+    print(f"  {'place':<12} {'busy':>7} {'staging':>8} {'EFB':>7} {'verts KB':>9} {'unif KB':>8} {'tex KB':>7}")
     for p, r in rows.items():
         n = len(r)
-        avg = [sum(x[i] for x in r) / n for i in range(5)]
-        print(f"  {p:<12} {avg[0]:7.3f} {avg[1]:8.3f} {avg[2]:7.3f} {avg[3]:9.0f} {avg[4]:7.0f}")
+        avg = [sum(x[i] for x in r) / n for i in range(6)]
+        print(f"  {p:<12} {avg[0]:7.3f} {avg[1]:8.3f} {avg[2]:7.3f} {avg[3]:9.0f} {avg[4]:8.0f} {avg[5]:7.0f}")
