@@ -680,8 +680,6 @@ int main(void) {
         self.source_step("fast-blocks", "scripts/windows/fast_blocks.py", root)
         # The copies' plain loads and stores without their pc and suffix stores.
         self.source_step("lean-memory", "scripts/windows/lean_memory.py", root)
-        # The copies' out-of-line accesses continue in the original block.
-        self.source_step("straight-copies", "scripts/windows/straight_copies.py", root)
         self.source_step("return-ranges", "scripts/windows/return_ranges.py", root)
         self.source_step("native-j3d", "scripts/mods/prepare_native_j3d.py", root)
         # Certified native entries, the second set (FIFO matrix loads, collision
@@ -693,8 +691,8 @@ int main(void) {
         self.source_step("native-math", "scripts/mods/prepare_native_math.py", root)
         print((self.logs / "native-game-math.log").read_text(errors="replace").strip().splitlines()[-1])
         for name in ("guest-cpu", "gpr-inline", "chunk-headers", "direct-calls", "native-skin", "fast-blocks",
-                     "lean-memory", "straight-copies", "return-ranges", "native-j3d", "native-entries",
-                     "simulation-prepare", "native-math"):
+                     "lean-memory", "return-ranges", "native-j3d", "native-entries", "simulation-prepare",
+                     "native-math"):
             print((self.logs / f"{name}.log").read_text(errors="replace").strip().splitlines()[-1])
 
     def source_step(self, name, script, root):
@@ -892,8 +890,7 @@ int main(void) {
         # chunk is one function, so a step that changes that shape leaves the
         # old counts matching nothing.
         for name in ("global_guest_cpu.py", "inline_save_restore_gpr.py", "chunk_headers.py", "direct_calls.py",
-                     "native_skin.py", "fast_blocks.py", "lean_memory.py", "straight_copies.py",
-                     "return_ranges.py"):
+                     "native_skin.py", "fast_blocks.py", "lean_memory.py", "return_ranges.py"):
             path = ROOT / "scripts/windows" / name
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
@@ -956,9 +953,9 @@ int main(void) {
         exe = self.build_app()
         start = time.monotonic()
         # At -O1, not -O0: the counters are the source's regions either way, so the
-        # profile is the same. With the straight prepaid copies the -O0 module was
-        # 2.05 GB, past what Windows loads (error 193); at -O1 it is 1.0 GB, and the
-        # playbacks run faster.
+        # profile is the same, and the module is about half the size (one with
+        # 2026-10-04's straight prepaid copies was 2.05 GB at -O0, past the 2 GB
+        # Windows loads, and 1.0 GB at -O1); the playbacks run faster too.
         module = self.compile_composite(work / "composite", "1", ["-fprofile-instr-generate"],
                                         ["-fprofile-instr-generate"], "training-composite")
         print(f"instrumented game module built ({int(time.monotonic() - start) // 60} min)")

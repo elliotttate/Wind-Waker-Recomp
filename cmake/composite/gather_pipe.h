@@ -260,45 +260,6 @@ BW_ACCESS_AT(32, u32)
 BW_ACCESS_AT(64, u64)
 #undef BW_ACCESS_AT
 
-/* scripts/windows/straight_copies.py's form, for the prepaid copies: the same
- * accesses, which also set *out on the way out of line. The copy then
- * continues in the original block, so no out-of-line call ever returns into
- * the copy, and the compiler may keep what it has loaded (guest registers,
- * the tests above) from one access to the next. A gather-pipe store that
- * fits in the batch stays in line: it is the out-of-line store's own put,
- * which then neither flushes nor reads or writes the guest state. */
-#define BW_ACCESS_OUT(bits, type) \
-    static inline __attribute__((always_inline)) type bw_read##bits##_out(bool* out, CPUState* cpu, u32 pc, \
-                                                                       u32 suffix, u32 addr) { \
-        if (__builtin_expect(BW_RAM_FAST(cpu, addr, bits / 8u), 1)) \
-            return bw_mem_read##bits(cpu, addr); \
-        *out = true; \
-        cpu->pc = pc; \
-        cpu->cycle_observation_suffix = suffix; \
-        return bw_mem_read##bits##_slow(cpu, addr); \
-    } \
-    static inline __attribute__((always_inline)) void bw_write##bits##_out(bool* out, CPUState* cpu, u32 pc, \
-                                                                        u32 suffix, u32 addr, type value) { \
-        if (__builtin_expect(BW_RAM_FAST_STORE(cpu, addr, bits / 8u), 1)) { \
-            bw_mem_write##bits(cpu, addr, value); \
-            return; \
-        } \
-        if (bw_gather_pipe(addr) && bw_gather_pipe_bytes != NULL && \
-            bw_gather_pipe_length + bits / 8u < BW_GATHER_PIPE_BATCH) { \
-            bw_gather_pipe_put(value, bits / 8u); \
-            return; \
-        } \
-        *out = true; \
-        cpu->pc = pc; \
-        cpu->cycle_observation_suffix = suffix; \
-        bw_mem_write##bits##_slow(cpu, addr, value); \
-    }
-BW_ACCESS_OUT(8, u8)
-BW_ACCESS_OUT(16, u16)
-BW_ACCESS_OUT(32, u32)
-BW_ACCESS_OUT(64, u64)
-#undef BW_ACCESS_OUT
-
 /* What the interpreter runs for the chunks makes its own accesses, outside
  * these wrappers: an instruction the translation hands it, the quantised
  * paired-single types (the generated inline forms take only type 0) and the
