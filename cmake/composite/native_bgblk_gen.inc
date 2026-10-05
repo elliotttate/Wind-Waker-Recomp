@@ -51,7 +51,7 @@ B_80247C4C: /* 9 cycles */
     // 80247C58: lfs     f0, 0(r5)
     {
         u32 ea = g5 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -60,7 +60,7 @@ B_80247C4C: /* 9 cycles */
     // 80247C5C: lfs     f1, 0(r3)
     {
         u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -95,7 +95,7 @@ B_80247C6C: /* 4 cycles */
     // 80247C6C: lfs     f0, 0(r6)
     {
         u32 ea = g6 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -104,7 +104,7 @@ B_80247C6C: /* 4 cycles */
     // 80247C70: lfs     f1, 0(r3)
     {
         u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -139,7 +139,7 @@ B_80247C80: /* 4 cycles */
     // 80247C80: lfs     f0, 4(r5)
     {
         u32 ea = g5 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -148,7 +148,7 @@ B_80247C80: /* 4 cycles */
     // 80247C84: lfs     f1, 4(r3)
     {
         u32 ea = g3 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -183,7 +183,7 @@ B_80247C94: /* 4 cycles */
     // 80247C94: lfs     f0, 4(r6)
     {
         u32 ea = g6 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -192,7 +192,7 @@ B_80247C94: /* 4 cycles */
     // 80247C98: lfs     f1, 4(r3)
     {
         u32 ea = g3 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -227,7 +227,7 @@ B_80247CA8: /* 4 cycles */
     // 80247CA8: lfs     f0, 8(r5)
     {
         u32 ea = g5 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -236,7 +236,7 @@ B_80247CA8: /* 4 cycles */
     // 80247CAC: lfs     f1, 8(r3)
     {
         u32 ea = g3 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -271,7 +271,7 @@ B_80247CBC: /* 4 cycles */
     // 80247CBC: lfs     f0, 8(r6)
     {
         u32 ea = g6 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -280,7 +280,7 @@ B_80247CBC: /* 4 cycles */
     // 80247CC0: lfs     f1, 8(r3)
     {
         u32 ea = g3 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -541,7 +541,7 @@ B_80247C4C: /* 9 cycles */
     // 80247C58: lfs     f0, 0(r5)
     {
         u32 ea = g5 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -550,7 +550,7 @@ B_80247C4C: /* 9 cycles */
     // 80247C5C: lfs     f1, 0(r3)
     {
         u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -585,7 +585,7 @@ B_80247C6C: /* 4 cycles */
     // 80247C6C: lfs     f0, 0(r6)
     {
         u32 ea = g6 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -594,7 +594,7 @@ B_80247C6C: /* 4 cycles */
     // 80247C70: lfs     f1, 0(r3)
     {
         u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -629,7 +629,7 @@ B_80247C80: /* 4 cycles */
     // 80247C80: lfs     f0, 4(r5)
     {
         u32 ea = g5 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -638,7 +638,7 @@ B_80247C80: /* 4 cycles */
     // 80247C84: lfs     f1, 4(r3)
     {
         u32 ea = g3 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -673,7 +673,7 @@ B_80247C94: /* 4 cycles */
     // 80247C94: lfs     f0, 4(r6)
     {
         u32 ea = g6 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -682,7 +682,7 @@ B_80247C94: /* 4 cycles */
     // 80247C98: lfs     f1, 4(r3)
     {
         u32 ea = g3 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -717,7 +717,7 @@ B_80247CA8: /* 4 cycles */
     // 80247CA8: lfs     f0, 8(r5)
     {
         u32 ea = g5 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -726,7 +726,7 @@ B_80247CA8: /* 4 cycles */
     // 80247CAC: lfs     f1, 8(r3)
     {
         u32 ea = g3 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -761,7 +761,7 @@ B_80247CBC: /* 4 cycles */
     // 80247CBC: lfs     f0, 8(r6)
     {
         u32 ea = g6 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -770,7 +770,7 @@ B_80247CBC: /* 4 cycles */
     // 80247CC0: lfs     f1, 8(r3)
     {
         u32 ea = g3 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -1030,7 +1030,7 @@ B_80247D4C: /* 13 cycles */
     // 80247D4C: lfs     f0, -16620(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16620);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1060,7 +1060,7 @@ B_80247D4C: /* 13 cycles */
     // 80247D5C: lfs     f0, -16616(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16616);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1281,7 +1281,7 @@ B_80247DE4: /* 19 cycles */
     // 80247DE4: lfs     f0, 0(r30)
     {
         u32 ea = g30 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1290,7 +1290,7 @@ B_80247DE4: /* 19 cycles */
     // 80247DE8: lfs     f1, -16612(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16612);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F1 = value;
         P1 = value;
     }
@@ -1309,7 +1309,7 @@ B_80247DE4: /* 19 cycles */
     // 80247DF4: lfs     f0, 4(r30)
     {
         u32 ea = g30 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1328,7 +1328,7 @@ B_80247DE4: /* 19 cycles */
     // 80247E00: lfs     f0, 8(r30)
     {
         u32 ea = g30 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1347,7 +1347,7 @@ B_80247DE4: /* 19 cycles */
     // 80247E0C: lfs     f0, 0(r31)
     {
         u32 ea = g31 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1366,7 +1366,7 @@ B_80247DE4: /* 19 cycles */
     // 80247E18: lfs     f0, 4(r31)
     {
         u32 ea = g31 + (u32)(s32)(4);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1385,7 +1385,7 @@ B_80247DE4: /* 19 cycles */
     // 80247E24: lfs     f0, 8(r31)
     {
         u32 ea = g31 + (u32)(s32)(8);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1459,14 +1459,14 @@ B_8030DCE0: /* 9 cycles */
     // 8030DCE0: psq_l   f2, 0(r3), 0, 0
     {
         u32 ea = g3 + (u32)(s32)(0);
-        gx_psq_l(&s, &F2, &P2, ea, false);
+        lf_psq_l(&s, &F2, &P2, ea, false);
     }
 
     s.suffix = 7u;
     // 8030DCE4: psq_l   f4, 0(r4), 0, 0
     {
         u32 ea = g4 + (u32)(s32)(0);
-        gx_psq_l(&s, &F4, &P4, ea, false);
+        lf_psq_l(&s, &F4, &P4, ea, false);
     }
 
     // 8030DCE8: ps_add  f6, f2, f4
@@ -1483,14 +1483,14 @@ B_8030DCE0: /* 9 cycles */
     // 8030DCF0: psq_l   f3, 8(r3), 1, 0
     {
         u32 ea = g3 + (u32)(s32)(8);
-        gx_psq_l(&s, &F3, &P3, ea, true);
+        lf_psq_l(&s, &F3, &P3, ea, true);
     }
 
     s.suffix = 3u;
     // 8030DCF4: psq_l   f5, 8(r4), 1, 0
     {
         u32 ea = g4 + (u32)(s32)(8);
-        gx_psq_l(&s, &F5, &P5, ea, true);
+        lf_psq_l(&s, &F5, &P5, ea, true);
     }
 
     // 8030DCF8: ps_add  f7, f3, f5

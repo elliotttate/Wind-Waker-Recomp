@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Write the seventh set's natives: leaf compute code (libm's fmod and the
-random numbers and angles built on it, the collision blocks' bounds, the
-planes and the Euler quaternions), each a translated function's prepaid
-blocks replayed on local registers - scripts/windows/native_gx_gen.py's
-generator, here for code that writes RAM only - into, for each group,
+"""Write the seventh set's natives: leaf compute code (libm's fmod, sin, cos
+and tan, the random numbers and angle built on fmod, the collision blocks'
+bounds, the Euler quaternions, the arc tangents, the planes, polar
+coordinates and point winds), each a translated function's prepaid blocks -
+callees included - replayed on local registers: scripts/windows/native_gx_gen.py's
+generator, here for code that writes RAM only. For each group:
 
   cmake/composite/native_<group>_gen.inc   (the natives)
   cmake/composite/native_<group>_list.h    (X(entry, native, name, digits))
 
-  native_leaf_gen.py COMPOSITE_SRC [OUT_DIR]
+  native_leaf_gen.py COMPOSITE_SRC [OUT_DIR [GROUP,...]]
 
 A developer's tool, run by hand on a builder's composite-src; its output is
 committed, and scripts/windows/native_entries.py hooks each native only where
@@ -26,16 +27,22 @@ for this set (cmake/composite/native_leaf_run.h):
   gather pipe included - declines, so a native here hands the host nothing;
 - the translator's extracted loops (`label_X: loop_X(ctx); if (ctx->pc ==
   Y) goto label_Y; return;`, a `static void loop_X` beside the chunk's
-  function): each replayed as a block of its own, its prepaid copy on the
-  same locals - the loop function's precharge test and budget test at its
-  head (one gx_block), its body, its back edge's budget test (gx_live), and
-  on to label_Y where it leaves;
+  function, reached by a branch or by a block's text running on into it):
+  each replayed as a block of its own, its prepaid copy on the same locals -
+  the loop function's precharge test and budget test at its head (one block
+  test), its body, its back edge's budget test (gx_live), and on to label_Y
+  where it leaves;
+- each block's test one comparison against the clock's floor (lf_block);
+- single loads widened by the hardware where the single is normal, as the
+  chunks' inline_fp.h does (lf_f32_from_bits);
 - the double divide (ppc_fdiv, which the translation hands GXRuntime's
-  interpreter in every case) and the interpreter's fctiw, frsqrte and frsp,
-  each the interpreter's own function on a scratch state that holds the run's
-  FPSCR and the registers it reads;
+  interpreter in every case) and the interpreter's fctiw, frsqrte and frsp:
+  fctiwz and frsp of anything but a NaN written out on the run's FPSCR
+  (nr_fctiwz, lf_frsp), the rest the interpreter's own function on a scratch
+  state that holds the run's FPSCR and the registers it reads;
 - a decline's reason counted (lf_decline: the state at entry, the clock, an
-  address, an FP operand off the inline path, a call or jump not replayed).
+  address, an FP operand off the inline path, the host at a boundary, a call
+  or jump not replayed).
 
 Anything else in the text (an instruction form the fifth set's generator does
 not know) stops the script.
@@ -106,6 +113,20 @@ class LeafGen(Gen):
         return self.chunks[start]
 
     def transform(self, native, chunk, leader, text, from_copy):
+        # ps_neg and the other sign operations on a pair's halves: generated.h's
+        # dolrecomp_ps_from_bits/to_bits are the single conversions.
+        text = text.replace("dolrecomp_ps_from_bits(", "gx_f32_from_bits(").replace(
+            "dolrecomp_ps_to_bits(", "gx_f32_to_bits(")
+        # A block that runs on into an extracted loop (the loop function called
+        # where its head falls in the block's text): a jump to the loop's own
+        # block, whose test is the loop function's first.
+        def into_loop(m):
+            head, exit_ = int(m.group(1), 16), int(m.group(2), 16)
+            if chunk.loops.get(head) != exit_:
+                raise SystemExit(f"{native.name}: loop_{head:08X} of an unknown form")
+            return f"    goto label_{head:08X};\n"
+        text = re.sub(r"    loop_([0-9A-F]{8})\(ctx\);\n    if \(ctx->pc == 0x([0-9A-F]{8})u\) goto label_\2;\n"
+                      r"    return;\n", into_loop, text)
         # The double divide: GXRuntime's interpreter in every case, here on the
         # run's scratch state (native_leaf_run.h's lf_fdiv).
         text = re.sub(r"ppc_fdiv\(ctx, (\d+), (\d+), (\d+)\);",
@@ -118,7 +139,7 @@ class LeafGen(Gen):
         # log and scratch state, the decline's reason.
         out = out.replace("gx_start(&s, &s_gx_log, cpu)", "lf_start(&s, &s_lf_log, cpu)")
         out = re.sub(r"\bgx_st(p?)(8|16|32|64)\(", r"lf_st\1\2(", out)
-        out = re.sub(r"\bgx_(psq_st|fctiw|frsqrte|frsp)\(", r"lf_\1(", out)
+        out = re.sub(r"\bgx_(psq_st|psq_l|f32_from_bits|fctiw|frsqrte|frsp)\(", r"lf_\1(", out)
         out = out.replace("gx_commit(&s);", "lf_commit(&s);")
         # Each block's leader against the clock's floor (native_leaf_run.h's
         # lf_block: one test where gx_block makes three).
@@ -168,13 +189,11 @@ REM_PIO2 = (0x8032EF58, 0x8032F2F8)      # __ieee754_rem_pio2 (its __kernel_rem_
 KERNEL_SIN = (0x80330240, 0x803302E0)
 KERNEL_COS = (0x8032F2F8, 0x8032F3EC)
 KERNEL_TAN = (0x803302E0, 0x803304F4)
-CLIB_ADD_CALC = (0x802528E4, 0x802529A4)  # cLib_addCalc (chunk 0148)
-CLIB_ADD_CALC2 = (0x802529A4, 0x802529E8)
 MAKE_BLCK_MIN_MAX = (0x80247C4C, 0x80247CD4)  # cBgW::MakeBlckMinMax (chunk 0145)
 MAKE_BLCK_BND = (0x80247CD4, 0x80247E48)      # cBgW::MakeBlckBnd: MakeBlckMinMax, MakeBlckTransMinMax
 MAKE_BLCK_TRANS_MIN_MAX = (0x80247BF8, 0x80247C4C)
 JMA_EULER_TO_QUAT = (0x80301150, 0x80301218)  # JMAEulerToQuat (chunk 0191)
-PSVEC_ADD = (0x8030DCE0, 0x8030DD04)          # the SDK's vector leaves (chunk 0197)
+PSVEC_ADD = (0x8030DCE0, 0x8030DD04)          # the SDK's vector leaves (chunk 0195)
 PSVEC_SUBTRACT = (0x8030DD04, 0x8030DD28)
 PSVEC_SCALE = (0x8030DD28, 0x8030DD44)
 PSVEC_MAG = (0x8030DE68, 0x8030DEAC)
@@ -217,11 +236,11 @@ GROUPS = {
     "rot": [
         Native("JMAEulerToQuat", 0x80301150, [JMA_EULER_TO_QUAT]),
     ],
-    # The game's own small calculations: easing a value toward a target, the
-    # arc tangent of a slope as an angle.
+    # The game's arc tangent of a slope as an angle (cLib_addCalc and
+    # cLib_addCalc2, its easing, are 60 Hz simulation sites -
+    # prepare_simulation_60hz.py rewrites them by frame-rate mode - and stay
+    # translated).
     "calc": [
-        Native("cLib_addCalc", 0x802528E4, [CLIB_ADD_CALC]),
-        Native("cLib_addCalc2", 0x802529A4, [CLIB_ADD_CALC2]),
         Native("cM_atan2s", 0x802460D0, [CM_ATAN2S, U_GET_ATAN_TABLE]),
         Native("cM_atan2f", 0x80246270, [CM_ATAN2F, CM_ATAN2S, U_GET_ATAN_TABLE]),
     ],

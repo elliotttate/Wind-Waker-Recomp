@@ -5976,7 +5976,7 @@ B_802462C8: /* 234 cycles */
     // 80246344: lfs     f0, -16672(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16672);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -6013,7 +6013,7 @@ B_802462C8: /* 234 cycles */
     // 80246360: lfs     f0, -16668(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16668);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -6050,7 +6050,7 @@ B_802462C8: /* 234 cycles */
     // 8024637C: lfs     f0, -16664(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16664);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -8202,7 +8202,7 @@ B_802462C8: /* 234 cycles */
     // 80246344: lfs     f0, -16672(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16672);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -8239,7 +8239,7 @@ B_802462C8: /* 234 cycles */
     // 80246360: lfs     f0, -16668(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16668);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -8276,7 +8276,7 @@ B_802462C8: /* 234 cycles */
     // 8024637C: lfs     f0, -16664(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16664);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -8397,7 +8397,7 @@ B_802463CC: /* 8 cycles */
     // 802463D0: psq_l   f31, 24(r1), 0, 0
     {
         u32 ea = g1 + (u32)(s32)(24);
-        gx_psq_l(&s, &F31, &P31, ea, false);
+        lf_psq_l(&s, &F31, &P31, ea, false);
     }
 
     s.suffix = 5u;
@@ -10520,7 +10520,7 @@ B_802462C8: /* 234 cycles */
     // 80246344: lfs     f0, -16672(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16672);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -10557,7 +10557,7 @@ B_802462C8: /* 234 cycles */
     // 80246360: lfs     f0, -16668(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16668);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -10594,7 +10594,7 @@ B_802462C8: /* 234 cycles */
     // 8024637C: lfs     f0, -16664(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16664);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -10712,7 +10712,7 @@ B_80246404: /* 12 cycles */
     // 80246404: lfs     f0, -16644(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16644);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -10727,7 +10727,7 @@ B_80246404: /* 12 cycles */
     // 80246410: lfs     f0, -16648(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16648);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -10739,7 +10739,7 @@ B_80246404: /* 12 cycles */
     // 80246418: psq_l   f31, 24(r1), 0, 0
     {
         u32 ea = g1 + (u32)(s32)(24);
-        gx_psq_l(&s, &F31, &P31, ea, false);
+        lf_psq_l(&s, &F31, &P31, ea, false);
     }
 
     s.suffix = 5u;
@@ -20234,7 +20234,7 @@ B_803304E4: /* 4 cycles */
     // 803304E4: psq_l   f31, 56(r1), 0, 0
     {
         u32 ea = g1 + (u32)(s32)(56);
-        gx_psq_l(&s, &F31, &P31, ea, false);
+        lf_psq_l(&s, &F31, &P31, ea, false);
     }
 
     s.suffix = 2u;

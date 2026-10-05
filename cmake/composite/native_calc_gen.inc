@@ -2,551 +2,6 @@
  * seventh set's calc natives, each the translation's own blocks on local registers
  * (native_leaf_run.h). Do not edit; regenerate, retest, recertify. */
 
-/* cLib_addCalc (802528E4): 802528E4..802529A4 */
-static int lfn_802528E4(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!lf_start(&s, &s_lf_log, cpu))
-        return lf_decline(&s, LF_STATE);
-    const s64 lf_floor_ = lf_floor(&s);
-    if (!gx_fp_ready(cpu))
-        return lf_decline(&s, LF_STATE);
-    if (!gx_fp_arith_ready(cpu))
-        return lf_decline(&s, LF_STATE);
-    u32 g2 = cpu->gpr[2];
-    u32 g3 = cpu->gpr[3];
-    f64 F0 = cpu->fpr[0];
-    f64 F1 = cpu->fpr[1];
-    f64 F2 = cpu->fpr[2];
-    f64 F3 = cpu->fpr[3];
-    f64 F4 = cpu->fpr[4];
-    f64 F5 = cpu->fpr[5];
-    f64 F6 = cpu->fpr[6];
-    f64 P0 = cpu->ps1[0];
-    f64 P1 = cpu->ps1[1];
-    f64 P5 = cpu->ps1[5];
-    f64 P6 = cpu->ps1[6];
-    u32 cr = cpu->cr;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_802528E4;
-B_802528E4: /* 3 cycles */
-    if (!lf_block(&s, lf_floor_, 3u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 2u;
-    // 802528E4: lfs     f5, 0(r3)
-    /* bluewake60:802528E4 shared smoothing */
-    F2 = bluewake_simulation_approach(F2);
-    if (bluewake_simulation_step == 0.5f) { F3 *= 0.5; F4 *= 0.5; }
-    /* end bluewake60 */
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F5 = value;
-        P5 = value;
-    }
-
-    // 802528E8: fcmpu   cr0, f5, f1
-    gx_fcmp(&s.fp, &cr, 0u, F5, F1);
-
-    // 802528EC: bc    12, 2, 0x80252990
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80252990;
-        }
-    }
-    goto B_802528F0;
-B_802528F0: /* 5 cycles */
-    if (!lf_block(&s, lf_floor_, 5u))
-        return lf_decline(&s, LF_BLOCK);
-    // 802528F0: fsubs   f0, f1, f5
-    F0 = P0 = nr_fsubs(&s.fp, F1, F5);
-
-    // 802528F4: fmuls   f6, f2, f0
-    F6 = P6 = nr_fmuls(&s.fp, F2, F0);
-
-    // 802528F8: fcmpo   cr0, f6, f4
-    gx_fcmp(&s.fp, &cr, 0u, F6, F4);
-
-    // 802528FC: cror    2, 1, 2
-    {
-        u32 a = (cr >> (31u - 1u)) & 1u;
-        u32 b = (cr >> (31u - 2u)) & 1u;
-        u32 mask = 0x80000000u >> 2;
-        u32 value = (a | b) & 1u;
-        cr = (cr & ~mask) | (value ? mask : 0u);
-    }
-
-    // 80252900: bc    12, 2, 0x80252914
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            goto B_80252914;
-        }
-    }
-    goto B_80252904;
-B_80252904: /* 4 cycles */
-    if (!lf_block(&s, lf_floor_, 4u))
-        return lf_decline(&s, LF_BLOCK);
-    // 80252904: fneg    f2, f4
-    F2 = gx_f64_from_bits(gx_f64_to_bits(F4) ^ 0x8000000000000000ull);
-
-    // 80252908: fcmpo   cr0, f6, f2
-    gx_fcmp(&s.fp, &cr, 0u, F6, F2);
-
-    // 8025290C: cror    2, 0, 2
-    {
-        u32 a = (cr >> (31u - 0u)) & 1u;
-        u32 b = (cr >> (31u - 2u)) & 1u;
-        u32 mask = 0x80000000u >> 2;
-        u32 value = (a | b) & 1u;
-        cr = (cr & ~mask) | (value ? mask : 0u);
-    }
-
-    // 80252910: bc    4, 2, 0x80252940
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252940;
-        }
-    }
-    goto B_80252914;
-B_80252914: /* 2 cycles */
-    if (!lf_block(&s, lf_floor_, 2u))
-        return lf_decline(&s, LF_BLOCK);
-    // 80252914: fcmpo   cr0, f6, f3
-    gx_fcmp(&s.fp, &cr, 0u, F6, F3);
-
-    // 80252918: bc    4, 1, 0x80252920
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252920;
-        }
-    }
-    goto B_8025291C;
-B_8025291C: /* 1 cycles */
-    if (!lf_block(&s, lf_floor_, 1u))
-        return lf_decline(&s, LF_BLOCK);
-    // 8025291C: fmr    f6, f3
-    F6 = F3;
-    goto B_80252920;
-B_80252920: /* 3 cycles */
-    if (!lf_block(&s, lf_floor_, 3u))
-        return lf_decline(&s, LF_BLOCK);
-    // 80252920: fneg    f0, f3
-    F0 = gx_f64_from_bits(gx_f64_to_bits(F3) ^ 0x8000000000000000ull);
-
-    // 80252924: fcmpo   cr0, f6, f0
-    gx_fcmp(&s.fp, &cr, 0u, F6, F0);
-
-    // 80252928: bc    4, 0, 0x80252930
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252930;
-        }
-    }
-    goto B_8025292C;
-B_8025292C: /* 1 cycles */
-    if (!lf_block(&s, lf_floor_, 1u))
-        return lf_decline(&s, LF_BLOCK);
-    // 8025292C: fmr    f6, f0
-    F6 = F0;
-    goto B_80252930;
-B_80252930: /* 4 cycles */
-    if (!lf_block(&s, lf_floor_, 4u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 3u;
-    // 80252930: lfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F0 = value;
-        P0 = value;
-    }
-
-    // 80252934: fadds   f0, f0, f6
-    F0 = P0 = nr_fadds(&s.fp, F0, F6);
-
-    s.suffix = 1u;
-    // 80252938: stfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        lf_stp32(&s, 0x80252938u, ea, gx_f32_to_bits(F0));
-    }
-
-    // 8025293C: b       0x80252990
-    {
-            goto B_80252990;
-    }
-B_80252940: /* 3 cycles */
-    if (!lf_block(&s, lf_floor_, 3u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 2u;
-    // 80252940: lfs     f0, -16352(r2)
-    {
-        u32 ea = g2 + (u32)(s32)(-16352);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F0 = value;
-        P0 = value;
-    }
-
-    // 80252944: fcmpo   cr0, f6, f0
-    gx_fcmp(&s.fp, &cr, 0u, F6, F0);
-
-    // 80252948: bc    4, 1, 0x80252970
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252970;
-        }
-    }
-    goto B_8025294C;
-B_8025294C: /* 2 cycles */
-    if (!lf_block(&s, lf_floor_, 2u))
-        return lf_decline(&s, LF_BLOCK);
-    // 8025294C: fcmpo   cr0, f6, f4
-    gx_fcmp(&s.fp, &cr, 0u, F6, F4);
-
-    // 80252950: bc    4, 0, 0x80252990
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252990;
-        }
-    }
-    goto B_80252954;
-B_80252954: /* 5 cycles */
-    if (!lf_block(&s, lf_floor_, 5u))
-        return lf_decline(&s, LF_BLOCK);
-    // 80252954: fadds   f0, f5, f4
-    F0 = P0 = nr_fadds(&s.fp, F5, F4);
-
-    s.suffix = 3u;
-    // 80252958: stfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        lf_stp32(&s, 0x80252958u, ea, gx_f32_to_bits(F0));
-    }
-
-    s.suffix = 2u;
-    // 8025295C: lfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F0 = value;
-        P0 = value;
-    }
-
-    // 80252960: fcmpo   cr0, f0, f1
-    gx_fcmp(&s.fp, &cr, 0u, F0, F1);
-
-    // 80252964: bc    4, 1, 0x80252990
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252990;
-        }
-    }
-    goto B_80252968;
-B_80252968: /* 2 cycles */
-    if (!lf_block(&s, lf_floor_, 2u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 1u;
-    // 80252968: stfs     f1, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        lf_stp32(&s, 0x80252968u, ea, gx_f32_to_bits(F1));
-    }
-
-    // 8025296C: b       0x80252990
-    {
-            goto B_80252990;
-    }
-B_80252970: /* 2 cycles */
-    if (!lf_block(&s, lf_floor_, 2u))
-        return lf_decline(&s, LF_BLOCK);
-    // 80252970: fcmpo   cr0, f6, f2
-    gx_fcmp(&s.fp, &cr, 0u, F6, F2);
-
-    // 80252974: bc    4, 1, 0x80252990
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252990;
-        }
-    }
-    goto B_80252978;
-B_80252978: /* 5 cycles */
-    if (!lf_block(&s, lf_floor_, 5u))
-        return lf_decline(&s, LF_BLOCK);
-    // 80252978: fadds   f0, f5, f2
-    F0 = P0 = nr_fadds(&s.fp, F5, F2);
-
-    s.suffix = 3u;
-    // 8025297C: stfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        lf_stp32(&s, 0x8025297Cu, ea, gx_f32_to_bits(F0));
-    }
-
-    s.suffix = 2u;
-    // 80252980: lfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F0 = value;
-        P0 = value;
-    }
-
-    // 80252984: fcmpo   cr0, f0, f1
-    gx_fcmp(&s.fp, &cr, 0u, F0, F1);
-
-    // 80252988: bc    4, 0, 0x80252990
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_80252990;
-        }
-    }
-    goto B_8025298C;
-B_8025298C: /* 1 cycles */
-    if (!lf_block(&s, lf_floor_, 1u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 0u;
-    // 8025298C: stfs     f1, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        lf_stp32(&s, 0x8025298Cu, ea, gx_f32_to_bits(F1));
-    }
-
-    goto B_80252990;
-B_80252990: /* 5 cycles */
-    if (!lf_block(&s, lf_floor_, 5u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 4u;
-    // 80252990: lfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F0 = value;
-        P0 = value;
-    }
-
-    // 80252994: fsubs   f0, f1, f0
-    F0 = P0 = nr_fsubs(&s.fp, F1, F0);
-
-    // 80252998: fabs    f0, f0
-    F0 = gx_f64_from_bits(gx_f64_to_bits(F0) & 0x7FFFFFFFFFFFFFFFull);
-
-    // 8025299C: frsp    f1, f0
-    lf_frsp(&s.fp, &F1, &P1, F0);
-
-    // 802529A0: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return lf_decline(&s, LF_PATH);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return lf_decline(&s, LF_BLOCK);
-    lf_commit(&s);
-    cpu->fpr[0] = F0;
-    cpu->fpr[1] = F1;
-    cpu->fpr[2] = F2;
-    cpu->fpr[5] = F5;
-    cpu->fpr[6] = F6;
-    cpu->ps1[0] = P0;
-    cpu->ps1[1] = P1;
-    cpu->ps1[5] = P5;
-    cpu->ps1[6] = P6;
-    cpu->cr = cr;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
-/* cLib_addCalc2 (802529A4): 802529A4..802529E8 */
-static int lfn_802529A4(CPUState* cpu, u32 at) {
-    GxRun s;
-    if (!lf_start(&s, &s_lf_log, cpu))
-        return lf_decline(&s, LF_STATE);
-    const s64 lf_floor_ = lf_floor(&s);
-    if (!gx_fp_ready(cpu))
-        return lf_decline(&s, LF_STATE);
-    if (!gx_fp_arith_ready(cpu))
-        return lf_decline(&s, LF_STATE);
-    u32 g3 = cpu->gpr[3];
-    f64 F0 = cpu->fpr[0];
-    f64 F1 = cpu->fpr[1];
-    f64 F2 = cpu->fpr[2];
-    f64 F3 = cpu->fpr[3];
-    f64 P0 = cpu->ps1[0];
-    f64 P1 = cpu->ps1[1];
-    u32 cr = cpu->cr;
-    u32 lr = cpu->lr;
-    u32 gx_t = 0;
-    (void)gx_t;
-    (void)at;
-    goto B_802529A4;
-B_802529A4: /* 3 cycles */
-    if (!lf_block(&s, lf_floor_, 3u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 2u;
-    // 802529A4: lfs     f0, 0(r3)
-    /* bluewake60:802529A4 shared smoothing */
-    F2 = bluewake_simulation_approach(F2);
-    if (bluewake_simulation_step == 0.5f) { F3 *= 0.5; }
-    /* end bluewake60 */
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F0 = value;
-        P0 = value;
-    }
-
-    // 802529A8: fcmpu   cr0, f0, f1
-    gx_fcmp(&s.fp, &cr, 0u, F0, F1);
-
-    // 802529AC: bclr  12, 2
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-    goto B_802529B0;
-B_802529B0: /* 4 cycles */
-    if (!lf_block(&s, lf_floor_, 4u))
-        return lf_decline(&s, LF_BLOCK);
-    // 802529B0: fsubs   f0, f1, f0
-    F0 = P0 = nr_fsubs(&s.fp, F1, F0);
-
-    // 802529B4: fmuls   f1, f2, f0
-    F1 = P1 = nr_fmuls(&s.fp, F2, F0);
-
-    // 802529B8: fcmpo   cr0, f1, f3
-    gx_fcmp(&s.fp, &cr, 0u, F1, F3);
-
-    // 802529BC: bc    4, 1, 0x802529C8
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x40000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_802529C8;
-        }
-    }
-    goto B_802529C0;
-B_802529C0: /* 2 cycles */
-    if (!lf_block(&s, lf_floor_, 2u))
-        return lf_decline(&s, LF_BLOCK);
-    // 802529C0: fmr    f1, f3
-    F1 = F3;
-
-    // 802529C4: b       0x802529D8
-    {
-            goto B_802529D8;
-    }
-B_802529C8: /* 3 cycles */
-    if (!lf_block(&s, lf_floor_, 3u))
-        return lf_decline(&s, LF_BLOCK);
-    // 802529C8: fneg    f0, f3
-    F0 = gx_f64_from_bits(gx_f64_to_bits(F3) ^ 0x8000000000000000ull);
-
-    // 802529CC: fcmpo   cr0, f1, f0
-    gx_fcmp(&s.fp, &cr, 0u, F1, F0);
-
-    // 802529D0: bc    4, 0, 0x802529D8
-    {
-        bool ctr_ok = true;
-        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
-        if (ctr_ok && cr_ok) {
-            goto B_802529D8;
-        }
-    }
-    goto B_802529D4;
-B_802529D4: /* 1 cycles */
-    if (!lf_block(&s, lf_floor_, 1u))
-        return lf_decline(&s, LF_BLOCK);
-    // 802529D4: fmr    f1, f0
-    F1 = F0;
-    goto B_802529D8;
-B_802529D8: /* 4 cycles */
-    if (!lf_block(&s, lf_floor_, 4u))
-        return lf_decline(&s, LF_BLOCK);
-    s.suffix = 3u;
-    // 802529D8: lfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
-        F0 = value;
-        P0 = value;
-    }
-
-    // 802529DC: fadds   f0, f0, f1
-    F0 = P0 = nr_fadds(&s.fp, F0, F1);
-
-    s.suffix = 1u;
-    // 802529E0: stfs     f0, 0(r3)
-    {
-        u32 ea = g3 + (u32)(s32)(0);
-        lf_stp32(&s, 0x802529E0u, ea, gx_f32_to_bits(F0));
-    }
-
-    // 802529E4: blr
-    {
-        u32 target = lr & ~3u;
-        bool ctr_ok = true;
-        bool cr_ok = true;
-        if (ctr_ok && cr_ok) {
-            gx_t = target;
-            goto GX_RETURN;
-        }
-    }
-GX_RETURN:
-    if (s.depth == 0u)
-        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
-    return lf_decline(&s, LF_PATH);
-GX_DONE:
-    if (s.bad || s.fp.bad)
-        return lf_decline(&s, LF_BLOCK);
-    lf_commit(&s);
-    cpu->fpr[0] = F0;
-    cpu->fpr[1] = F1;
-    cpu->fpr[2] = F2;
-    cpu->ps1[0] = P0;
-    cpu->ps1[1] = P1;
-    cpu->cr = cr;
-    cpu->lr = lr;
-    cpu->pc = gx_t;
-    return 1;
-}
-
 /* cM_atan2s (802460D0): 802460D0..80246270, 8024609C..802460D0 */
 static int lfn_802460D0(CPUState* cpu, u32 at) {
     GxRun s;
@@ -590,7 +45,7 @@ B_8024609C: /* 29 cycles */
     // 802460A0: lfs     f3, -16696(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16696);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F3 = value;
         P3 = value;
     }
@@ -680,7 +135,7 @@ B_802460D0: /* 9 cycles */
     // 802460E8: lfs     f3, -16544(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16544);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F3 = value;
         P3 = value;
     }
@@ -704,7 +159,7 @@ B_802460F4: /* 4 cycles */
     // 802460F4: lfs     f0, -16692(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16692);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -781,7 +236,7 @@ B_80246128: /* 4 cycles */
     // 80246128: lfs     f0, -16692(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16692);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -837,7 +292,7 @@ B_8024614C: /* 4 cycles */
     // 8024614C: lfs     f0, -16692(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16692);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1377,7 +832,7 @@ B_8024609C: /* 29 cycles */
     // 802460A0: lfs     f3, -16696(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16696);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F3 = value;
         P3 = value;
     }
@@ -1467,7 +922,7 @@ B_802460D0: /* 9 cycles */
     // 802460E8: lfs     f3, -16544(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16544);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F3 = value;
         P3 = value;
     }
@@ -1491,7 +946,7 @@ B_802460F4: /* 4 cycles */
     // 802460F4: lfs     f0, -16692(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16692);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1568,7 +1023,7 @@ B_80246128: /* 4 cycles */
     // 80246128: lfs     f0, -16692(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16692);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -1624,7 +1079,7 @@ B_8024614C: /* 4 cycles */
     // 8024614C: lfs     f0, -16692(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16692);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }
@@ -2157,7 +1612,7 @@ B_80246280: /* 15 cycles */
     // 802462A0: lfs     f0, -16688(r2)
     {
         u32 ea = g2 + (u32)(s32)(-16688);
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F0 = value;
         P0 = value;
     }

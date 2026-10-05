@@ -153,6 +153,27 @@ GX_RUN void lf_psq_st(GxRun* s, u32 pc, f64 first, f64 second, u32 address, bool
         lf_stp32(s, pc, address + 4u, convert_to_single_ftz(nr_bits(second)));
 }
 
+/* lfs and the other single loads (dolrecomp_f32_from_bits): a normal
+ * single (exponent 1-254) widened by the hardware, which gives the same
+ * double, as inline_fp.h's form in the chunks does (tests/f32_from_bits_test.c
+ * compares the two over every bit pattern); zeros, denormals, infinities and
+ * NaNs by hand (native_replay.h's nr_to_double, types.h's convert_to_double
+ * inline: native_gx_run.h's gx_f32_from_bits calls it out of line). */
+GX_RUN f64 lf_f32_from_bits(u32 bits) {
+    if (__builtin_expect(((bits >> 23) & 0xFFu) - 1u < 254u, 1)) {
+        f32 single;
+        memcpy(&single, &bits, sizeof single);
+        return (f64)single;
+    }
+    return f64_value(nr_to_double(bits));
+}
+
+/* ppc_psq_load_inline (type 0): the first single, then the second (or 1.0). */
+GX_RUN void lf_psq_l(GxRun* s, f64* first, f64* second, u32 address, bool w) {
+    *first = lf_f32_from_bits(gx_ld32(s, address));
+    *second = w ? 1.0 : lf_f32_from_bits(gx_ld32(s, address + 4u));
+}
+
 /* The clock, the suffix, the reservation and the FPSCR the run leaves. The
  * caller then writes the registers and pc. */
 GX_RUN void lf_commit(GxRun* s) {
@@ -180,7 +201,13 @@ static inline void lf_fdiv(NrFp* f, f64* d, f64 a, f64 b) {
     *d = lf_fp_scratch.fpr[0];
 }
 
+/* fctiw, fctiwz: toward zero, native_replay.h's nr_fctiwz (ppc_fctiw written
+ * out on the run's FPSCR, as the fourth set's natives use it); in the
+ * rounding mode (nearest: the natives that convert require it), the
+ * interpreter's own. */
 static inline bool lf_fctiw(NrFp* f, f64 value, bool toward_zero, u64* result) {
+    if (toward_zero)
+        return nr_fctiwz(f, value, result);
     lf_fp_scratch.fpscr = f->fpscr;
     const bool written = ppc_fctiw(&lf_fp_scratch, value, toward_zero, result);
     f->fpscr = lf_fp_scratch.fpscr;
@@ -194,8 +221,28 @@ static inline bool lf_frsqrte(NrFp* f, f64 value, f64* result) {
     return written;
 }
 
-/* frsp d, b: fpr[d] and ps1[d] as ppc_frsp leaves them (or unchanged). */
+/* frsp d, b: fpr[d] and ps1[d] as ppc_frsp leaves them (or unchanged). Of
+ * anything but a NaN, ppc_frsp written out on the run's FPSCR: force_single
+ * (nr_round), XX with FI where the single is not the value (FI cleared
+ * otherwise), FR where it rounded away from zero, the single's FPRF; its
+ * compares are the same SSE compares under the same MXCSR. A NaN: the
+ * interpreter's own. */
 static inline void lf_frsp(NrFp* f, f64* d, f64* d1, f64 b) {
+    if (__builtin_expect(!(b != b), 1)) {
+        const f32 rounded = nr_round(f, b);
+        const f64 back = (f64)rounded;
+        if (b != back) {
+            nr_fp_exception(f, NR_FPSCR_XX);
+            f->fpscr |= NR_FPSCR_FI;
+        } else {
+            f->fpscr &= ~NR_FPSCR_FI;
+        }
+        f->fpscr = (f->fpscr & ~NR_FPSCR_FR) | (fabs(back) > fabs(b) ? NR_FPSCR_FR : 0u);
+        nr_fprf(f, nr_class32(rounded));
+        *d = back;
+        *d1 = back;
+        return;
+    }
     lf_fp_scratch.fpscr = f->fpscr;
     lf_fp_scratch.fpr[0] = *d;
     lf_fp_scratch.ps1[0] = *d1;

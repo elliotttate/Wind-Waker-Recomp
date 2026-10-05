@@ -123,7 +123,7 @@ B_80301150: /* 50 cycles */
     // 80301170: lfsx    f2, r7, r8
     {
         u32 ea = g7 + g8;
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F2 = value;
         P2 = value;
     }
@@ -190,7 +190,7 @@ B_80301150: /* 50 cycles */
     // 8030118C: lfsx    f3, r7, r4
     {
         u32 ea = g7 + g4;
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F3 = value;
         P3 = value;
     }
@@ -257,7 +257,7 @@ B_80301150: /* 50 cycles */
     // 803011A8: lfsx    f4, r7, r0
     {
         u32 ea = g7 + g0;
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F4 = value;
         P4 = value;
     }
@@ -272,7 +272,7 @@ B_80301150: /* 50 cycles */
     // 803011B0: lfsx    f5, r3, r8
     {
         u32 ea = g3 + g8;
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F5 = value;
         P5 = value;
     }
@@ -281,7 +281,7 @@ B_80301150: /* 50 cycles */
     // 803011B4: lfsx    f6, r3, r4
     {
         u32 ea = g3 + g4;
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F6 = value;
         P6 = value;
     }
@@ -290,7 +290,7 @@ B_80301150: /* 50 cycles */
     // 803011B8: lfsx    f7, r3, r0
     {
         u32 ea = g3 + g0;
-        f64 value = gx_f32_from_bits(gx_ld32(&s, ea));
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
         F7 = value;
         P7 = value;
     }

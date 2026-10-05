@@ -1,9 +1,9 @@
 #ifndef BLUEWAKE_NATIVE_CALC_H
 #define BLUEWAKE_NATIVE_CALC_H
 
-/* The game's own small calculations - easing a value toward a target
- * (cLib_addCalc, cLib_addCalc2), a slope's arc tangent as an angle
- * (cM_atan2s, cM_atan2f) - natively (native_calc.c). */
+/* The game's arc tangents - a slope as an angle (cM_atan2s, with its table
+ * lookup U_GetAtanTable, and cM_atan2f in radians) - natively
+ * (native_calc.c). */
 
 #include "core/cpu.h"
 #include "native_calc_list.h"
