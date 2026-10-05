@@ -83,6 +83,8 @@ add_library(${MODULE_NAME} SHARED
   native_cc.c
   # Certified native entries, the fifth set: the GX SDK's FIFO writers.
   native_gx.c
+  # Certified native entries, the sixth set: the particle draws, with stops.
+  native_draw.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c

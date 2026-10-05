@@ -22,6 +22,8 @@
 #include "native_cc.h"
 /* Certified native entries, the fifth set: the GX SDK's FIFO writers (native_gx.c). */
 #include "native_gx.h"
+/* Certified native entries, the sixth set: the particle draws, with stops (native_draw.c). */
+#include "native_draw.h"
 #include <stdlib.h>
 #include <stdio.h>
 static int s_native_math;
@@ -277,6 +279,12 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
             bluewake_native_gx_enabled = on;
             if (on)
                 atexit(bluewake_native_gx_report);
+            /* The sixth set: JPA's particle draw and calc visitors and
+             * JPADraw::calcParticle, stopping before the calls they do not
+             * make and resuming after them, with the same switch. */
+            bluewake_native_draw_enabled = on;
+            if (on)
+                atexit(bluewake_native_draw_report);
         }
         if (s_native_math) {
             atexit(bluewake_native_skin_report);
