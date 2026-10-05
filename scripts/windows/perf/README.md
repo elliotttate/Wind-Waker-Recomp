@@ -28,7 +28,7 @@ settings.ini, card and stderr.txt) and, for dumps, `build\windows\test-<tag>-dum
 | `survey.ps1` + `survey.py` | The 47-place survey: per place, game FPS and the game thread's, GX worker's and render worker's CPU per game frame. |
 | `survey_sm.py` | The same for Smooth Motion runs, with the in-between frames' matching thread. |
 | `survey_drain.py` | The same with the draw-done drain per frame (`drain_ms` of the `[fps]` lines). |
-| `compare_apps_sm.ps1` | Several app copies at six heavy places, Smooth Motion at 60, paced (`-Mask`, `-Apps`). |
+| `compare_apps_sm.ps1` | Several app copies at six heavy places (`-Places`), Smooth Motion at `-Fps` (60), paced (`-Mask`, `-Apps`, `-Env`): shown and game FPS, and the GX worker's, in-between matching's and render worker's CPU per game frame. |
 | `appab.ps1`, `envab.ps1` | A/B of app copies, or of one environment variable's values, uncapped (`survey_drain.py`). |
 | `capture_run.ps1` | The Outset route with frame captures (`BLUEWAKE_CAPTURE_*`) and Link's position probes (`BLUEWAKE_PLAYER_PROBE`). Captures are asynchronous readbacks: compare the `[player-scene-state] ... pos=` lines between builds, not the capture hashes. |
 | `state_run.ps1` | Boots into a save state (`-State`). |
@@ -51,7 +51,7 @@ differ where the change is in the in-between path.
 | Script | What it does |
 | --- | --- |
 | `placeprof.ps1` | One place, uncapped on four E-cores, Smooth Motion off: samples the game thread's guest pc (`guest_sampler.py`, or call stacks with `-Stacks`, `guest_stack_sampler.py`) and the busiest host threads' instruction pointers (`thread_sampler_w32.py`). Guest functions are named from the zeldaret decompilation's symbols (a `tww` checkout beside this repository, or `BLUEWAKE_TWW`). |
-| `smprof.ps1` | The host threads only, Smooth Motion on, paced, all cores. |
+| `smprof.ps1` | The host threads only, Smooth Motion on at `-Fps` (60), paced, all cores or `-Mask`. |
 | `symprof.py` | Symbolizes a host thread profile with the exe's PDB (`SYMPROF_APP` = the exe that ran; a rebuilt exe gives wrong names). |
 | `threads_at.ps1` + `thread_cpu.py` | Every thread's CPU over 15 s at one place. |
 

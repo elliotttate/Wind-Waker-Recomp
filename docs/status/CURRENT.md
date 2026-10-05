@@ -1,3 +1,76 @@
+## 2026-10-05 A draw's constants as immediate data: the render worker's encoding 14-30 percent faster
+
+**Two E-cores with Smooth Motion** (`0x00030000`, paced; the build before today's work, W-n5, against this
+morning's last, W-n12; two runs each; CPU per game frame in ms). Both hold 60 and 120 shown frames a second at all
+six places, so on this stand-in the day's work shows as headroom:
+
+| Place | GX worker, SM 60 | GX worker, SM 120 | Render worker, SM 60 | Render worker, SM 120 |
+| --- | --- | --- | --- | --- |
+| Outset | 6.61 -> 6.17 | 6.79 -> 5.79 | 2.90 -> 3.02 | 5.11 -> 5.63 |
+| Forest Haven | 13.59 -> 11.76 | 13.25 -> 11.87 | 3.48 -> 4.20 | 6.09 -> 7.41 |
+| Dragon Roost | 10.49 -> 8.29 | 10.67 -> 8.78 | 3.49 -> 3.82 | 6.31 -> 6.66 |
+| The sea by the Fortress | 7.57 -> 6.06 | 7.15 -> 6.67 | 2.98 -> 2.73 | 5.12 -> 5.17 |
+| Hyrule | 8.54 -> 7.21 | 8.59 -> 7.50 | 3.02 -> 3.26 | 4.81 -> 5.11 |
+| Hyrule Castle's room | 9.37 -> 7.39 | 9.34 -> 7.76 | 3.20 -> 3.13 | 5.05 -> 5.12 |
+
+The GX worker 7-21 percent faster, but the render worker up to 22 percent slower. Running the day's renderer
+builds in order (the same two places, two runs each) put the render worker's rise on one step: 0142's three-part
+vertex block, Forest Haven 6.18 -> 7.46 ms a game frame at 120 (and 0.5 ms off the in-between matching).
+
+**What the render worker hands Dawn** (`DOL_AURORA_ENCODE_STATS=1`, new: per game frame, the passes, draws, bind
+groups, pipelines and vertex buffers it sets, and the milliseconds encoding them and submitting the in-between
+frames'). Forest Haven at 120: 12 passes (each encoded four times), 7,975 draws, 5,300 vertex-block binds and
+1,867 pixel-constant binds, 2.7 ms encoding and 2.3 ms submitting: about 700 ns a draw on an E-core, nearly all
+inside Dawn and the driver (host samples: our own encoding loop is about 1 percent of the thread). A switch that
+skipped the constant binds (wrong pictures, a measure only) cut encoding and submitting by 38 percent there, 23 at
+Dragon Roost and 17 at Outset: each bind cost about 330 ns, three-part ones more.
+
+**The change** (RecompCore 0146, 400728a). Where the device has immediate data (this Dawn's `SetImmediates`; D3D12
+offers 64 bytes) and WGSL's immediate address space, a gxcore shader reads its constants from storage:
+`immediate_constants_wgsl` rewrites the generated modules' `vsc.`, `vsm.`, `vsl.` and `psc.` reads into loads at
+rows of the frame's constant buffer, or the in-between frames' (a row's high bit), and a draw's 16 bytes of
+immediate data say where its vertex block, matrix memory, lights and pixel constants are. Group 1 is the two
+constant buffers, bound once a pass; the TEV path's group 2 is an empty group. A draw sets its immediate data when
+its rows change, and no group is set again for a pipeline change (each group's object fixes its layout). The device
+now asks for four storage buffers a stage and the adapter's storage binding size (the in-between buffer reaches
+224 MB). `DOL_AURORA_IMMEDIATE_CONSTANTS=0`, or a device without immediate data, keeps the dynamic-offset binds.
+
+**Exact.** Smooth Motion dumps at the sea by the Fortress, Forest Haven, Dragon Roost, Hyrule, the Earth Temple's
+boss, the Forbidden Woods and Hyrule Castle's room identical against the same build on the old binds, real and
+in-between frames (the Deku Tree's glade: its spores, as between two runs of one build). gxcore_tests checks the
+rewrite: nothing of the four parts' reads or bindings left in the ubershader or the golden module, and known reads
+on their rows.
+
+**What it does** (encoding and submitting a game frame, Smooth Motion at 120, two E-cores, two runs each; the same
+exe with the old binds and with immediate data): Forest Haven 5.18 -> 3.62 ms (-30%), Hyrule Castle's room 3.31 ->
+2.46 (-26%), Outset 2.62 -> 2.09 (-20%), Dragon Roost 3.86 -> 3.33 (-14%). Binds a game frame at Forest Haven: 8
+constant groups and 8 pixel groups (from 5,300 and 1,867), and 6,405 immediate-data sets. The render worker's
+CPU, same exe on and off, two runs each, 120: Dragon Roost 6.80 -> 5.64 ms, Forest Haven 6.92 -> 6.18, the sea by
+the Fortress 5.61 -> 5.19, Hyrule 4.93 -> 4.58, Hyrule Castle's room 5.27 -> 4.83; at 60, Outset 3.62 -> 2.82,
+Forest Haven 3.99 -> 3.26, Dragon Roost 3.60 -> 3.31. The GX worker level (on and off within each other's spread).
+Against this morning's W-n12, Forest Haven's render worker at 120 is 7.50 -> 5.58 ms: below the day's start.
+
+**In the build** (the builder from the new pin, W-n13): Link's position at all 621 probes identical to W-n5, Smooth
+Motion dumps at the seven places identical to W-n12, and the log says `gxcore constants: storage rows in immediate
+data`. Two E-cores at 120, two runs each, the render worker a game frame W-n5 / W-n12 / W-n13: Outset 5.93 / 5.92 /
+4.96, Forest Haven 6.31 / 7.06 / 6.31, Dragon Roost 6.17 / 6.29 / 5.52, the sea by the Fortress 5.06 / 5.42 / 4.71,
+Hyrule 5.56 / 5.15 / 4.92, Hyrule Castle's room 4.83 / 5.71 / 5.16.
+
+**One E-core** (`0x00010000`, Smooth Motion at 60, two runs each; game frames a second, W-n5 / W-n12 / W-n13): the
+day's work shows as frames where one core is all there is. Outset 27.9 / 28.3 / 28.5, Forest Haven 28.0 / 29.2 /
+28.5, Dragon Roost 28.0 / 29.8 / 29.3, the sea by the Fortress 28.4 / 29.2 / 29.2; Hyrule and Hyrule Castle's room
+29.6-30.1 in all three. Between W-n12 and W-n13 the runs' spread is wider than the difference.
+
+**Also:**
+- Staging copies are few: 9-16 copy commands a frame (`DOL_AURORA_GPU_PROF`'s lines now count them, `copies=`, and
+  `gpu_summary.py` shows them). Joining the delta upload's ranges across 8 or 64 KB gaps changed nothing. The
+  copies' GPU time (0.4 ms at Dragon Roost for 1.6 MB) is mostly the wait for the frame before's draws, not the
+  bytes.
+- `smprof.ps1` takes `-Fps` and `-Mask`; `compare_apps_sm.ps1` takes `-Places` and `-Env`.
+- Not pursued: recording the in-between frames once as render bundles. Dawn's D3D12 back end replays a bundle's
+  commands one by one (the submit half stays), and the in-between data is laid out job by job, not as one block a
+  step that could be bound at one offset.
+
 ## 2026-10-05 The seventh natives set (leaf compute code) and the cache operations: exact, level in play
 
 **What went in.** The seventh natives set (docs/status/NATIVE_LEAF_2026-10-05.md, merged in 95f1db7): 19 natives in
