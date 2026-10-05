@@ -78,7 +78,14 @@ typedef struct GxRun {
     bool bad;         /* the translation would have left the path replayed here */
     unsigned depth;   /* calls entered and not yet returned from */
     NrFp fp;          /* the FPSCR as the run leaves it; fp.bad: an FP operation off its inline path */
+    u32 checkpoint;   /* the sixth set: the leader of the last checkpoint (0: none) */
 } GxRun;
+
+/* The sixth set's checkpoints: at a loop's head in the hook's chunk, a run
+ * whose logs are this full commits what it has (as a stop there would) and
+ * goes on with them empty; a later decline is then a stop at that head. */
+#define GX_CHECK_STORES 128u
+#define GX_CHECK_PIPE 512u
 
 /* --- Entry, and declining. ---------------------------------------------- */
 
@@ -101,6 +108,7 @@ GX_RUN bool gx_start(GxRun* s, GxLog* log, CPUState* cpu) {
     s->reserve = cpu->reserve_valid;
     s->bad = false;
     s->depth = 0u;
+    s->checkpoint = 0u;
     s->fp.fpscr = cpu->fpscr;
     s->fp.bad = false;
     return cpu->exception == 0u && g_mem_write_journal == NULL && !g_ppc_guest_aliases_overlap_mem1 &&
@@ -126,7 +134,9 @@ static __attribute__((noinline)) void gx_undo(const GxLog* log, u8* ram, u32 sto
 GX_RUN int gx_decline(GxRun* s) {
     if (s->stores != 0u)
         gx_undo(s->log, s->ram, s->stores);
-    return 0;
+    /* After a checkpoint (the sixth set's), everything up to its loop head is
+     * committed: the run stops there instead (pc that head, in the CPU state). */
+    return s->checkpoint != 0u ? 2 : 0;
 }
 
 /* Floating point available (the FP instructions' ppc_fp_available_inline). */
@@ -341,9 +351,13 @@ GX_RUN void gx_psq_l(GxRun* s, f64* first, f64* second, u32 address, bool w) {
 
 /* ppc_psq_store_inline (type 0): bw_mem_write32 of each half, flushed to zero. */
 GX_RUN void gx_psq_st(GxRun* s, u32 pc, f64 first, f64 second, u32 address, bool w) {
-    gx_stp32(s, pc, address, convert_to_single_ftz(f64_bits(first)));
+    /* The bits opaque (native_replay.h's nr_bits): on bits it sees came from a
+     * double, clang turns convert_to_single_ftz's zero test into a
+     * floating-point compare, which the host's denormals-are-zero mode (the
+     * guest's NI) answers differently - a denormal half then stored unflushed. */
+    gx_stp32(s, pc, address, convert_to_single_ftz(nr_bits(first)));
     if (!w)
-        gx_stp32(s, pc, address + 4u, convert_to_single_ftz(f64_bits(second)));
+        gx_stp32(s, pc, address + 4u, convert_to_single_ftz(nr_bits(second)));
 }
 
 /* --- Floating-point arithmetic. -----------------------------------------
@@ -436,6 +450,60 @@ static inline void gx_frsp(NrFp* f, f64* d, f64* d1, f64 b) {
     *d = g_gx_fp_scratch.fpr[0];
     *d1 = g_gx_fp_scratch.ps1[0];
 }
+
+/* --- The sixth set: paired-single arithmetic and fused multiply-adds. ----
+ *
+ * inline_fp.h's bw_fp_ps_* and bw_fp_fma on values: native_replay.h's
+ * nr_ps_* where it has the form, the others written out the same way. An
+ * operand the translation would hand the interpreter marks the run bad, and
+ * the native declines. */
+GX_RUN NrPair gx_pair(f64 first, f64 second) { return (NrPair){first, second}; }
+GX_RUN void gx_ps_set(f64* first, f64* second, NrPair value) {
+    *first = value.a;
+    *second = value.b;
+}
+
+/* ps_sum0 d, a, c, b: a0 + b1, then c1; the FPRF of the first half. */
+GX_RUN NrPair gx_ps_sum0(NrFp* f, f64 a0, f64 b1, f64 c1) {
+    if (!(nr_finite(a0) && nr_finite(b1))) {
+        f->bad = true;
+        return (NrPair){a0, c1};
+    }
+    const f32 s0 = nr_round(f, a0 + b1), s1 = nr_round(f, c1);
+    nr_fprf(f, nr_class32(s0));
+    return (NrPair){(f64)s0, (f64)s1};
+}
+
+/* ps_sum1 d, a, c, b: c0, then a0 + b1; the FPRF of the second half. */
+GX_RUN NrPair gx_ps_sum1(NrFp* f, f64 a0, f64 b1, f64 c0) {
+    if (!(nr_finite(a0) && nr_finite(b1))) {
+        f->bad = true;
+        return (NrPair){c0, a0};
+    }
+    const f32 s0 = nr_round(f, c0), s1 = nr_round(f, a0 + b1);
+    nr_fprf(f, nr_class32(s1));
+    return (NrPair){(f64)s0, (f64)s1};
+}
+
+/* bw_fp_fma: fmadd, fmsub, fnmadd, fnmsub and their single forms. */
+GX_RUN bool gx_fma(NrFp* f, f64 a, f64 c, f64 b, bool single, bool subtract, bool negative, f64* output) {
+    if (nr_finite(a) && nr_finite(c) && nr_finite(b)) {
+        const f64 addend = subtract ? -b : b;
+        f64 result = single ? nr_fma_single(a, nr_25bit_fma(c), addend) : fma(a, c, addend);
+        if (single)
+            result = (f64)(f32)result;
+        if (result == result) {
+            if (negative)
+                result = -result;
+            nr_fprf(f, single ? nr_class32((f32)result) : gx_class64(result));
+            *output = result;
+            return true;
+        }
+    }
+    f->bad = true;
+    return false;
+}
+/* --- end of the sixth set's arithmetic --- */
 
 /* --- The commit. ------------------------------------------------------- */
 

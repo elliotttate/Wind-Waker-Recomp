@@ -34,9 +34,14 @@ lean_memory.py) - or a block's main path where it has none - with:
   host would not be asked;
 - a call to anything not replayed here (or a jump the native does not know)
   declining (gx_decline puts back what the run stored); or, for a native that
-  `stops`, where the call leaves the chunk, the run ending there with pc and
-  LR as the translation leaves them for the chassis (and a `resumes` hook at
-  the return address taking the rest).
+  `stops` (the sixth set), where the call is in the hook's own chunk, the run
+  ending just before the call instruction - everything committed, the block
+  prepaid - and the hook going on with the translation at that instruction
+  (cycle_block_prepaid set, through the chunk's pc table), which makes the
+  call as it always does; a hook at the return address (a resume) runs the
+  rest natively. A branch to a block of the hook's chunk the native does not
+  replay, and a block it is told not to replay (`stop_leaders`), stop the
+  same way at the block's leader, before it is entered.
 
 Anything else in the text (an instruction form not listed here) stops the
 script, so a translator change cannot slip through unnoticed.
@@ -103,20 +108,25 @@ class Native:
     [(start, end)], and the expected targets of its indirect jumps and calls
     {site address: [targets]}."""
 
-    def __init__(self, name, entry, ranges, indirect=None, stops=False, resumes=()):
+    def __init__(self, name, entry, ranges, indirect=None, stops=False, resumes=(), stop_leaders=()):
         self.name, self.entry, self.ranges = name, entry, ranges
         self.indirect = indirect or {}
-        # stops: at a call into another chunk to code not replayed here, the
-        # run ends where the translation leaves its chunk for the chassis
-        # (pc the callee, LR the return address), instead of declining.
-        # resumes: return addresses where a hook runs the rest natively.
+        # stops: where the path reaches code not replayed here from the hook's
+        # own chunk, the run ends there and the translation takes over (the
+        # module docstring); instead of declining. resumes: further entries
+        # (block leaders of the hook's chunk), each hooked, where the native
+        # takes over again - the return addresses of the calls it stops at
+        # are added to them. stop_leaders: blocks of the hook's chunk left to
+        # the translation.
         self.stops, self.resumes = stops, tuple(resumes)
+        self.stop_leaders = set(stop_leaders)
 
 
 class Gen:
-    def __init__(self, root):
+    def __init__(self, root, prefix="gxn_"):
         self.root = root
         self.chunks = {}
+        self.prefix = prefix
 
     def chunk(self, address):
         start = 0x800016E0 + ((address - 0x800016E0) // 0x4000) * 0x4000
@@ -130,7 +140,7 @@ class Gen:
     # --- Text transforms --------------------------------------------------
 
     def transform(self, native, chunk, leader, text, from_copy):
-        out = self.inline_gpr(text)
+        out = self.inline_gpr(text) if not native.stops else self.inline_gpr_stops(native, chunk, text)
         # Nothing after an unconditional transfer (blr, b, bctr) runs; the
         # copies chain the next block's text after it all the same.
         m = re.search(r"\n    // [0-9A-F]{8}: (?:blr|b +0x[0-9A-F]{8}|bctr)\n    \{\n(?:        [^\n]*\n)*    \}\n", out)
@@ -141,6 +151,8 @@ class Gen:
         out = re.sub(r"    if \(bluewake_native_\w+_enabled &&[^\n]*\n(?:        [^\n]*\n)*?"
                      r"        goto return_dispatch_[0-9A-F]{8};\n", "", out)
         out = re.sub(r"(?m)^    /\* bluewake: recovered J3D matrix [^\n]*\*/\n", "", out)
+        # The sixth set's hooks (native_entries.py's DRAW_HOOK).
+        out = re.sub(r"    if \(bluewake_native_draw_enabled\) \{\n(?:        [^\n]*\n)*?    \}\n", "", out)
         # A leader inside the text (a block fast_blocks.py did not make a copy
         # for, chained into the copy before it, or the next block on the main
         # path): its own start, as gx_block.
@@ -205,6 +217,10 @@ class Gen:
             return f"gx_psq_st(&s, 0x{pc}u, F{reg}, P{reg}, ea, {w});"
         out = re.sub(r"ppc_psq_store_inline\(ctx, (\d+)u, ea, (true|false), (\d+)u, (true|false), 0x([0-9A-F]{8})u\);",
                      psq_st, out)
+        paired = self.paired(out)
+        if paired != out:
+            native.fp_arith = True
+        out = paired
         for a, b in (("dolrecomp_f32_from_bits", "gx_f32_from_bits"), ("dolrecomp_f32_to_bits", "gx_f32_to_bits"),
                      ("dolrecomp_f64_from_bits", "gx_f64_from_bits"), ("dolrecomp_f64_to_bits", "gx_f64_to_bits"),
                      ("dolrecomp_rotl32", "gx_rotl32")):
@@ -257,6 +273,37 @@ class Gen:
                 raise SystemExit(f"{native.name}: block {leader:08X}: unhandled `{bad}`: {line.strip()}")
         return out
 
+    def paired(self, text):
+        """The paired-single arithmetic and the fused multiply-adds (inline_fp.h's
+        bw_fp_ps_*, bw_fp_fma) as native_gx_run.h's forms on the registers'
+        locals."""
+        pair = lambda r: f"gx_pair(F{r}, P{r})"
+        def two(m):  # ps_mul, ps_add, ps_sub: d, a, c|b
+            op, d, a, b = m.group(1), m.group(2), m.group(3), m.group(4)
+            fn = {"mul_op": "nr_ps_mul", "add_op": "nr_ps_add", "sub_op": "nr_ps_sub"}[op]
+            return f"gx_ps_set(&F{d}, &P{d}, {fn}(&s.fp, {pair(a)}, {pair(b)}));"
+        text = re.sub(r"ppc_ps_(mul_op|add_op|sub_op)\(ctx, (\d+), (\d+), (\d+)\);", two, text)
+        def scalar(m):  # ps_muls0, ps_muls1: c's first or second half
+            half, d, a, c = m.group(1), m.group(2), m.group(3), m.group(4)
+            return f"gx_ps_set(&F{d}, &P{d}, nr_ps_muls0(&s.fp, {pair(a)}, {'F' if half == '0' else 'P'}{c}));"
+        text = re.sub(r"ppc_ps_muls([01])\(ctx, (\d+), (\d+), (\d+)\);", scalar, text)
+        def madd(m):
+            d, a, c, b, sub, neg = m.groups()
+            return f"gx_ps_set(&F{d}, &P{d}, nr_ps_madd(&s.fp, {pair(a)}, {pair(c)}, {pair(b)}, {sub}, {neg}));"
+        text = re.sub(r"ppc_ps_madd_op\(ctx, (\d+), (\d+), (\d+), (\d+), (true|false), (true|false)\);", madd, text)
+        def madds(m):  # ps_madds0, ps_madds1: c's one half for both
+            half, d, a, c, b = m.groups()
+            h = f"{'F' if half == '0' else 'P'}{c}"
+            return f"gx_ps_set(&F{d}, &P{d}, nr_ps_madd(&s.fp, {pair(a)}, gx_pair({h}, {h}), {pair(b)}, false, false));"
+        text = re.sub(r"ppc_ps_madds([01])\(ctx, (\d+), (\d+), (\d+), (\d+)\);", madds, text)
+        def sums(m):
+            half, d, a, c, b = m.groups()
+            third = f"P{c}" if half == "0" else f"F{c}"
+            return f"gx_ps_set(&F{d}, &P{d}, gx_ps_sum{half}(&s.fp, F{a}, P{b}, {third}));"
+        text = re.sub(r"ppc_ps_sum([01])\(ctx, (\d+), (\d+), (\d+), (\d+)\);", sums, text)
+        text = text.replace("ppc_fma(ctx, ", "gx_fma(&s.fp, ")
+        return text
+
     def plain_stores(self, text):
         """mem_writeN(ctx, ea, value) -> gx_stpN(&s, pc, ea, value), pc the
         instruction's (its comment above)."""
@@ -275,8 +322,13 @@ class Gen:
     def goto(self, native, chunk, target):
         if target is None:
             raise SystemExit(f"{native.name}: a fall-through past the end of a chunk")
-        if not self.in_ranges(native, target):
+        if not self.in_ranges(native, target) or target in native.stop_leaders:
+            if native.stops and chunk is self.chunk(native.entry) and target in chunk.blocks:
+                native.stops_at.add(target)
+                return f"{{ gx_t = 0x{target:08X}u; goto GX_STOP; }} /* {target:08X}: the translation's */"
             return f"return 0; /* {target:08X}: not replayed here */"
+        if target in native.stop_leaders:
+            raise SystemExit(f"{native.name}: a stop at {target:08X} outside the hook's chunk")
         native.reach.add(target)
         return f"goto B_{target:08X};"
 
@@ -285,6 +337,8 @@ class Gen:
         next chunk): the chassis loop dispatches the target."""
         if not self.in_ranges(native, target):
             return f"return 0; /* {target:08X}: not replayed here */"
+        if native.stops and target not in self.chunk(target).blocks:
+            return f"return 0; /* {target:08X}: not a block leader there (the translation charges it instruction by instruction) */"
         native.reach.add(target)
         native.boundaries.add(target)
         return f"if (!gx_silent(&s, 0x{target:08X}u))\n        return 0;\n    goto B_{target:08X};"
@@ -312,6 +366,60 @@ class Gen:
             r"                ctx->downcount -= (\d+);\n"
             r"((?:                (?!ctx->cycle_observation_suffix)[^\n]*\n)*?)"
             r"                ctx->cycle_observation_suffix = 0u;\n"
+            r"                ctx->pc = 0x\1u;\n"
+            r"                if \(ctx->downcount <= -\(s64\)DOLRECOMP_C_LOOP_CYCLE_BUDGET \|\| ctx->exception != 0u \|\|\n"
+            r"                    \(ctx->cycle_budget > 0 && ctx->downcount <= -ctx->cycle_budget\)\)\n"
+            r"                    return;\n"
+            r"                goto label_\1;\n"
+            r"            \}\n"
+            r"            ctx->pc = 0x[0-9A-F]{8}u;\n"
+            r"            return;\n", save_restore, text)
+
+    def inline_gpr_stops(self, native, chunk, text):
+        """The inline _savegpr_N/_restgpr_N for a native that stops (both of
+        inline_save_restore_gpr.py's forms): where the translation would run
+        the routine itself through the chassis, a stop before the call; where
+        the turn ends after it, a stop at the return address's leader, before
+        it is entered (the translation returns to the chassis there, and a
+        dispatch to that leader returns at its budget test alike)."""
+        def save_restore(m):
+            ret, form, cycles, body, suffix = (int(m.group(1), 16), m.group(2), m.group(3), m.group(4),
+                                              m.group(5))
+            short = re.match(r"ctx->downcount - (\d+) > -\(s64\)DOLRECOMP_C_LOOP_CYCLE_BUDGET$", form)
+            if short:
+                cond = f"s.downcount - {short.group(1)} > -s.budget"
+            else:
+                full = re.match(r"ctx->downcount > -\(s64\)DOLRECOMP_C_LOOP_CYCLE_BUDGET &&\n"
+                                r" +\(ctx->cycle_deadline_budget <= 0 \|\|\n"
+                                r" +\(ctx->cycle_deadline_budget >= (\d+) &&\n"
+                                r" +dolrecomp_block_can_precharge\(ctx, (\d+)u\)\)\)$", form)
+                if not full:
+                    raise SystemExit(f"{native.name}: an inline register save of an unknown form: {form}")
+                cond = (f"s.downcount > -s.budget && (s.deadline <= 0 || (s.deadline >= {full.group(1)} && "
+                        f"s.deadline + s.downcount >= 0 && s.deadline + s.downcount >= {full.group(2)}))")
+            before = self.stop_before(native, chunk, ret - 4)
+            fail = ("\n".join("    " + l for l in before.rstrip("\n").split("\n")) if before
+                    else "                return 0; /* the routine itself, through the chassis */")
+            after = (f"{{ gx_t = 0x{ret:08X}u; goto GX_STOP; }} /* the turn ends: the translation's */"
+                     if native.stops and chunk is self.chunk(native.entry) and ret in chunk.blocks
+                     else "return 0;")
+            if after != "return 0;":
+                native.stops_at.add(ret)
+            return (f"            if (!({cond})) {{\n{fail}\n            }}\n"
+                    f"            lr = 0x{ret:08X}u;\n"
+                    f"            s.downcount -= {cycles};\n"
+                    + body.replace("                ", "            ") +
+                    f"            s.suffix = {suffix}u;\n"
+                    "            if (!gx_live(&s))\n"
+                    f"                {after}\n"
+                    f"            goto label_{ret:08X};\n")
+        return re.sub(
+            r"            ctx->lr = 0x([0-9A-F]{8})u;\n"
+            r"            /\* bluewake: _savegpr/_restgpr inline \(scripts/windows/inline_save_restore_gpr\.py\) \*/\n"
+            r"            if \(((?:[^{\n]|\n(?! +ctx->downcount -=))*)\) \{\n"
+            r"                ctx->downcount -= (\d+);\n"
+            r"((?:                (?!ctx->cycle_observation_suffix)[^\n]*\n)*?)"
+            r"                ctx->cycle_observation_suffix = (\d+)u;\n"
             r"                ctx->pc = 0x\1u;\n"
             r"                if \(ctx->downcount <= -\(s64\)DOLRECOMP_C_LOOP_CYCLE_BUDGET \|\| ctx->exception != 0u \|\|\n"
             r"                    \(ctx->cycle_budget > 0 && ctx->downcount <= -ctx->cycle_budget\)\)\n"
@@ -389,17 +497,23 @@ class Gen:
     def call(self, native, chunk, target, ret, boundary):
         native.returns.add(ret)
         native.reach.add(ret) if self.in_ranges(native, ret) else None
-        if not self.in_ranges(native, target):
-            entry = self.chunk(native.entry)
-            if native.stops and ((boundary and not entry.owns(target)) or
-                                 (not boundary and chunk is entry and target in entry.returns)):
-                native.stops_at.add(target)
-                return (f"            lr = 0x{ret:08X}u;\n"
-                        f"            gx_t = 0x{target:08X}u;\n"
-                        f"            goto GX_DONE; /* a stop: {target:08X} runs as the translation's call runs it */\n")
+        if not self.in_ranges(native, target) or target in native.stop_leaders:
+            stop = self.stop_before(native, chunk, ret - 4)
+            if stop:
+                return stop
             return f"            return 0; /* a call to {target:08X}: not replayed here */\n"
         native.reach.add(target)
         native.reach.add(ret)
+        stop = self.stop_before(native, chunk, ret - 4) if native.stops else None
+        if stop:
+            # Where the host would be asked or the budget is spent, the translation's call.
+            fail = "\n".join("    " + l for l in stop.rstrip("\n").split("\n"))
+            checks = ["!gx_live(&s)"]
+            if boundary:
+                native.boundaries |= {target, ret}
+                checks += [f"!gx_silent(&s, 0x{target:08X}u)", f"!gx_silent(&s, 0x{ret:08X}u)"]
+            return (f"            if ({' || '.join(checks)}) {{\n{fail}\n            }}\n"
+                    f"            lr = 0x{ret:08X}u;\n            s.depth++;\n            goto B_{target:08X};\n")
         lines = [f"            lr = 0x{ret:08X}u;", "            s.depth++;"]
         if boundary:
             native.boundaries |= {target, ret}
@@ -411,27 +525,36 @@ class Gen:
         lines.append(f"            goto B_{target:08X};")
         return "\n".join(lines) + "\n"
 
+    def stop_before(self, native, chunk, site):
+        """A stop just before the instruction at `site` (a call in the hook's
+        own chunk): the run ends with everything as the translation has it
+        there, the block prepaid; the hook goes on with the translation at
+        that instruction. A call that is its block's first instruction stops
+        before the block is entered (its cycles given back)."""
+        if not native.stops or chunk is not self.chunk(native.entry):
+            return None
+        native.stops_at.add(site)
+        native.call_stops.add(site)
+        undo = f"            s.downcount += {chunk.blocks[site]['cycles']};\n" if site in chunk.blocks else ""
+        return (undo + f"            gx_t = 0x{site:08X}u;\n"
+                "            goto GX_STOP; /* the translation makes this call */\n")
+
     def indirect(self, native, chunk, site, ret):
         """A transfer to `target` (the register's value): a call when `ret`
         is set (LR = ret), else a bctr. The targets the native knows are its
         `indirect` list for the site (or, for a bctr, every block leader in its
         ranges); anything else declines."""
-        entry = self.chunk(native.entry)
         stop = ""
         if ret is not None:
             targets = native.indirect.get(site)
-            if native.stops:
-                # Any other target, in neither the hook's chunk nor this one: a stop.
-                stop = (f"            if (target - 0x{entry.start:08X}u < 0x4000u || target - 0x{chunk.start:08X}u < 0x4000u)\n"
-                        "                return 0;\n"
-                        f"            lr = 0x{ret:08X}u;\n"
-                        "            gx_t = target;\n"
-                        "            goto GX_DONE; /* a stop: the target runs as the translation's call runs it */\n")
-                native.stops_at.add(None)
+            # Any other target: a stop before the call, where the native may stop.
+            stop = self.stop_before(native, chunk, site) or ""
             if targets is None:
                 return stop or "            return 0; /* a call through a register: not replayed here */\n"
             native.returns.add(ret)
             native.reach.add(ret)
+            if stop:
+                return self.indirect_or_stop(native, chunk, targets, ret, stop)
         else:
             targets = None
         lines = []
@@ -457,11 +580,32 @@ class Gen:
             native.reach.add(t)
             lines.append(f"                goto B_{t:08X};")
         lines += ["            default:", "                break;", "            }"]
-        if stop:
-            lines.append("            s.depth--;")
-            lines.append(stop.rstrip("\n"))
-        else:
-            lines.append("            return 0;")
+        lines.append("            return 0;")
+        return "\n".join(lines) + "\n"
+
+    def indirect_or_stop(self, native, chunk, targets, ret, stop):
+        """A call through a register where the native may stop: each known
+        target replayed where its boundaries pass without the host and the
+        budget allows the call; anything else - another target, the host to
+        be asked, the budget spent - a stop before the call (LR and the depth
+        untouched), and the translation makes it."""
+        fail = "\n".join("    " + l for l in stop.rstrip("\n").split("\n"))
+        lines = ["            switch (target) {"]
+        for t in sorted(targets):
+            same = chunk.owns(t) and t in chunk.returns
+            lines.append(f"            case 0x{t:08X}u:")
+            checks = ["!gx_live(&s)"]
+            if not same:
+                checks += [f"!gx_silent(&s, 0x{t:08X}u)", f"!gx_silent(&s, 0x{ret:08X}u)"]
+                native.boundaries |= {t, ret}
+            lines.append(f"                if ({' || '.join(checks)}) {{")
+            lines.append(fail)
+            lines.append("                }")
+            lines.append(f"                lr = 0x{ret:08X}u;")
+            lines.append("                s.depth++;")
+            native.reach.add(t)
+            lines.append(f"                goto B_{t:08X};")
+        lines += ["            default:", "                break;", "            }", stop.rstrip("\n")]
         return "\n".join(lines) + "\n"
 
     def all_leaders(self, native):
@@ -477,9 +621,31 @@ class Gen:
     # --- One native -------------------------------------------------------
 
     def generate(self, native):
+        if not native.stops:
+            return self.generate_once(native)
+        # A native that stops: once to find its stops, then again with a
+        # resume at each stopped call's return address (a block leader of the
+        # hook's chunk, where the hook takes over again).
+        explicit = tuple(native.resumes)
+        self.generate_once(native)
+        entry = self.chunk(native.entry)
+        # (Only in its own function, the first range: a stop inside a callee it
+        # replays returns to its caller translated, and it resumes there.)
+        own = native.ranges[0]
+        found = {s + 4 for s in native.call_stops if s + 4 in entry.blocks and own[0] <= s < own[1]}
+        native.resumes = tuple(sorted((set(explicit) | found) - {native.entry}))
+        for r in native.resumes:
+            if r not in entry.blocks:
+                raise SystemExit(f"{native.name}: a resume at {r:08X}, not a block leader of the hook's chunk")
+        out = self.generate_once(native)
+        native.resumes_explicit = explicit
+        return out
+
+    def generate_once(self, native):
         native.reach = {native.entry} | set(native.resumes)
         native.returns = set()
         native.stops_at = set()
+        native.call_stops = set()
         native.boundaries = set()
         native.fp = False
         native.fp_arith = False
@@ -494,6 +660,12 @@ class Gen:
             block = chunk.blocks.get(address)
             if block is None:
                 raise SystemExit(f"{native.name}: {address:08X} is not a block leader")
+            if address in native.stop_leaders:
+                if not native.stops or chunk is not self.chunk(native.entry):
+                    raise SystemExit(f"{native.name}: a stop at {address:08X} outside the hook's chunk")
+                native.stops_at.add(address)
+                blocks.append((address, None, f"    gx_t = 0x{address:08X}u;\n    goto GX_STOP;", chunk))
+                continue
             if block["copy"]:
                 text = chunk.copies[block["copy"]]
                 body = self.transform(native, chunk, address, text, True)
@@ -510,9 +682,32 @@ class Gen:
                     value = int(k[0] or k[1])
                     if value > limit:
                         raise SystemExit(f"{native.name}: block {address:08X}: a suffix of {value} in {limit} cycles")
-        blocks.sort()
-        code = "\n".join(f"B_{a:08X}: /* {c} cycles{'' if ch.blocks[a]['copy'] else ', main path'} */\n"
-                         f"    if (!gx_block(&s, {c}u))\n        return 0;\n{b.rstrip()}" for a, c, b, ch in blocks)
+        blocks.sort(key=lambda x: x[0])
+        # Checkpoints (natives that stop): at each loop head in the hook's
+        # chunk (a block a later block of the chunk branches back to), a run
+        # whose logs are filling commits and goes on (native_gx_run.h).
+        entry_chunk = self.chunk(native.entry)
+        heads = set()
+        if native.stops:
+            for a, c, b, ch in blocks:
+                if c is None or ch is not entry_chunk:
+                    continue
+                for m in re.finditer(r"goto B_([0-9A-F]{8});", b):
+                    target = int(m.group(1), 16)
+                    if target <= a and entry_chunk.owns(target):
+                        heads.add(target)
+        native.heads = heads
+
+        def emit(a, c, b, ch):
+            if c is None:
+                return f"B_{a:08X}: /* left to the translation, before it is entered */\n{b}"
+            check = ""
+            if a in heads:
+                check = (f"    if (s.stores > GX_CHECK_STORES || s.pipe_length > GX_CHECK_PIPE) {{\n"
+                         f"        gx_t = 0x{a:08X}u;\n        goto GX_CHECKPOINT;\n    }}\nC_{a:08X}:\n")
+            return (f"B_{a:08X}: /* {c} cycles{'' if ch.blocks[a]['copy'] else ', main path'} */\n{check}"
+                    f"    if (!gx_block(&s, {c}u))\n        return 0;\n{b.rstrip()}")
+        code = "\n".join(emit(a, c, b, ch) for a, c, b, ch in blocks)
         gprs = sorted({int(x) for x in re.findall(r"\bg(\d+)\b", code)})
         fprs = sorted({int(x) for x in re.findall(r"\bF(\d+)\b", code)})
         pss = sorted({int(x) for x in re.findall(r"\bP(\d+)\b", code)})
@@ -524,7 +719,7 @@ class Gen:
         returns = sorted(native.returns)
         lines = [f"/* {native.name} ({native.entry:08X}): "
                  + ", ".join(f"{a:08X}..{b:08X}" for a, b in native.ranges) + " */",
-                 f"static int gxn_{native.entry:08X}(CPUState* cpu, u32 at) {{",
+                 f"static int {self.prefix}{native.entry:08X}(CPUState* cpu, u32 at) {{",
                  "    GxRun s;",
                  "    if (!gx_start(&s, &s_gx_log, cpu))",
                  "        return 0;"]
@@ -546,6 +741,8 @@ class Gen:
                 lines.append(f"    u32 {r} = cpu->{r};")
         lines.append("    u32 lr = cpu->lr;")
         lines.append("    u32 gx_t = 0;")
+        if native.stops:
+            lines.append("    int gx_r = 1; /* 1: done (pc the return address); 2: stopped (pc the translation's) */")
         if native.resumes:
             lines.append("    switch (at) {")
             for r in (native.entry,) + native.resumes:
@@ -571,6 +768,29 @@ class Gen:
             lines.append("    }")
         else:
             lines.append("    return 0;")
+        if native.stops and heads:
+            # A checkpoint: everything so far committed (as a stop at gx_t
+            # would leave it), the logs emptied, on from the loop's head.
+            lines.append("GX_CHECKPOINT:")
+            lines.append("    if (s.bad || s.fp.bad)")
+            lines.append("        return 0;")
+            lines.append("    gx_commit(&s);")
+            lines += [f"    cpu->gpr[{r}] = g{r};" for r in gw]
+            lines += [f"    cpu->fpr[{r}] = F{r};" for r in fw]
+            lines += [f"    cpu->ps1[{r}] = P{r};" for r in pw]
+            lines += [f"    cpu->{r} = {r};" for r in special_w if r != "lr"]
+            lines.append("    cpu->lr = lr;")
+            lines.append("    cpu->pc = gx_t;")
+            lines.append("    s.stores = s.pipe_length = 0u;")
+            lines.append("    s.checkpoint = gx_t;")
+            lines.append("    switch (gx_t) {")
+            for h in sorted(heads):
+                lines.append(f"    case 0x{h:08X}u: goto C_{h:08X};")
+            lines.append("    default: return 0;")
+            lines.append("    }")
+        if native.stops:
+            lines.append("GX_STOP:")
+            lines.append("    gx_r = 2;")
         lines.append("GX_DONE:")
         lines.append("    if (s.bad || s.fp.bad)")
         lines.append("        return 0;")
@@ -586,7 +806,7 @@ class Gen:
                 lines.append(f"    cpu->{r} = {r};")
         lines.append("    cpu->lr = lr;")
         lines.append("    cpu->pc = gx_t;")
-        lines.append("    return 1;")
+        lines.append("    return gx_r;" if native.stops else "    return 1;")
         lines.append("}")
         out = "\n".join(lines) + "\n"
         # Unused locals and labels.

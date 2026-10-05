@@ -1,0 +1,1744 @@
+--- a/chunks_dol/chunk_0038_text1_800996E0.c
++++ b/chunks_dol/chunk_0038_text1_800996E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_draw.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -12377,4 +12379,13 @@
+ 
+ label_8009A094:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A094(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 15u);
+     if (ctx->downcount <= -(s64)DOLRECOMP_C_LOOP_CYCLE_BUDGET) {
+@@ -12625,4 +12636,13 @@
+ 
+ label_8009A0D0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A0D0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A0D0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -12980,4 +13000,13 @@
+ 
+ label_8009A148:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A148(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A148u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -13153,4 +13182,13 @@
+ 
+ label_8009A178:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A178(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A178u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -13557,4 +13595,13 @@
+ 
+ label_8009A1F4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A1F4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A1F4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 16u);
+@@ -14142,4 +14189,13 @@
+ 
+ label_8009A298:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A298(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A298u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 20u);
+@@ -14451,4 +14507,13 @@
+ 
+ label_8009A2E8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A2E8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A2E8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 21u);
+@@ -14767,4 +14832,13 @@
+ 
+ label_8009A33C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A33C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A33Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 28u);
+@@ -15388,4 +15462,13 @@
+ 
+ label_8009A3DC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A3DC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A3DCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 14u);
+@@ -15601,4 +15684,13 @@
+ 
+ label_8009A414:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A414(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A414u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 14u);
+@@ -15814,4 +15906,13 @@
+ 
+ label_8009A44C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A44C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A44Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 14u);
+@@ -16027,4 +16128,13 @@
+ 
+ label_8009A484:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A484(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+     if (ctx->downcount <= -(s64)DOLRECOMP_C_LOOP_CYCLE_BUDGET) {
+@@ -16093,4 +16203,13 @@
+ 
+ label_8009A49C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A49C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 38u);
+     if (ctx->downcount <= -(s64)DOLRECOMP_C_LOOP_CYCLE_BUDGET) {
+@@ -17240,4 +17359,13 @@
+ 
+ label_8009A5C4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8009A5C4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_800996E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_800996E0[(ctx->pc - 0x800996E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8009A5C4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+--- a/chunks_dol/chunk_0151_text1_8025D6E0.c
++++ b/chunks_dol/chunk_0151_text1_8025D6E0.c
+@@ -5,4 +5,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_draw.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -45953,4 +45955,13 @@
+ 
+ label_802605FC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802605FC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802605FCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 94u);
+@@ -46827,4 +46838,13 @@
+ 
+ label_80260704:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260704(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260704u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -46897,4 +46917,13 @@
+ 
+ label_80260718:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260718(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260718u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -46955,4 +46984,13 @@
+ 
+ label_80260728:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260728(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260728u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 95u);
+@@ -47846,4 +47884,13 @@
+ 
+ label_80260834:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260834(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260834u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -47916,4 +47963,13 @@
+ 
+ label_80260848:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260848(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260848u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -51125,4 +51181,13 @@
+ 
+ label_80260BAC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260BAC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260BACu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 14u);
+@@ -51737,4 +51802,13 @@
+ 
+ label_80260C48:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260C48(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260C48u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -51779,4 +51853,13 @@
+ 
+ label_80260C58:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260C58(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260C58u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 39u);
+@@ -52636,4 +52719,13 @@
+ 
+ label_80260D24:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260D24(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260D24u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 18u);
+@@ -53472,4 +53564,13 @@
+ 
+ label_80260DF8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260DF8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260DF8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -53514,4 +53615,13 @@
+ 
+ label_80260E08:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260E08(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260E08u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 57u);
+@@ -54571,4 +54681,13 @@
+ 
+ label_80260F2C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260F2C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260F2Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -55191,4 +55310,13 @@
+ 
+ label_80260FD8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80260FD8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80260FD8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 11u);
+@@ -55377,4 +55505,13 @@
+ 
+ label_80261004:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261004(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261004u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -55419,4 +55556,13 @@
+ 
+ label_80261014:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261014(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261014u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 57u);
+@@ -56427,4 +56573,13 @@
+ 
+ label_8026110C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8026110C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8026110Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -57295,4 +57450,13 @@
+ 
+ label_80261218:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261218(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261218u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 11u);
+@@ -57481,4 +57645,13 @@
+ 
+ label_80261244:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261244(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261244u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -57523,4 +57696,13 @@
+ 
+ label_80261254:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261254(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_8025D6E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_8025D6E0[(ctx->pc - 0x8025D6E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261254u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 57u);
+--- a/chunks_dol/chunk_0152_text1_802616E0.c
++++ b/chunks_dol/chunk_0152_text1_802616E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_draw.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -7635,4 +7637,13 @@
+ 
+ label_80261AD0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261AD0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261AD0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 16u);
+@@ -8301,4 +8312,13 @@
+ 
+ label_80261B84:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261B84(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261B84u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -8394,4 +8414,13 @@
+ 
+ label_80261BA0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261BA0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261BA0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -8498,4 +8527,13 @@
+ 
+ label_80261BBC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261BBC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261BBCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -10550,4 +10588,13 @@
+ 
+ label_80261E28:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261E28(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261E28u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -10602,4 +10649,13 @@
+ 
+ label_80261E3C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261E3C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261E3Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -10704,4 +10760,13 @@
+ 
+ label_80261E58:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261E58(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261E58u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 54u);
+@@ -11780,4 +11845,13 @@
+ 
+ label_80261F60:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80261F60(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80261F60u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 14u);
+@@ -12824,4 +12898,13 @@
+ 
+ label_80262074:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262074(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262074u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -14884,4 +14967,13 @@
+ 
+ label_802622E4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802622E4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802622E4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -14986,4 +15078,13 @@
+ 
+ label_80262300:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262300(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262300u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 106u);
+@@ -16889,4 +16990,13 @@
+ 
+ label_802624D4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802624D4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802624D4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 16u);
+@@ -18069,4 +18179,13 @@
+ 
+ label_80262608:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262608(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262608u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -18173,4 +18292,13 @@
+ 
+ label_80262624:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262624(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262624u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -20225,4 +20353,13 @@
+ 
+ label_80262890:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262890(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262890u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -20277,4 +20414,13 @@
+ 
+ label_802628A4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802628A4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802628A4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -20379,4 +20525,13 @@
+ 
+ label_802628C0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802628C0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802628C0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 106u);
+@@ -22299,4 +22454,13 @@
+ 
+ label_80262A98:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262A98(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262A98u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 24u);
+@@ -22824,4 +22988,13 @@
+ 
+ label_80262B14:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262B14(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262B14u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 29u);
+@@ -23608,4 +23781,13 @@
+ 
+ label_80262C04:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262C04(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262C04u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 45u);
+@@ -24138,4 +24320,13 @@
+ 
+ label_80262CB8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262CB8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262CB8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -24180,4 +24371,13 @@
+ 
+ label_80262CC8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262CC8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262CC8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 41u);
+@@ -25216,4 +25416,13 @@
+ 
+ label_80262DC0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262DC0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262DC0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 14u);
+@@ -25857,4 +26066,13 @@
+ 
+ label_80262E6C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262E6C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262E6Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -25950,4 +26168,13 @@
+ 
+ label_80262E88:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262E88(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262E88u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -26002,4 +26229,13 @@
+ 
+ label_80262E9C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262E9C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262E9Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -26104,4 +26340,13 @@
+ 
+ label_80262EB8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262EB8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262EB8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 54u);
+@@ -27163,4 +27408,13 @@
+ 
+ label_80262FBC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80262FBC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80262FBCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 14u);
+@@ -28318,4 +28572,13 @@
+ 
+ label_802630E8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802630E8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802630E8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -28370,4 +28633,13 @@
+ 
+ label_802630FC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802630FC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802630FCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -28472,4 +28744,13 @@
+ 
+ label_80263118:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263118(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263118u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 106u);
+@@ -30375,4 +30656,13 @@
+ 
+ label_802632EC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802632EC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802632ECu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -30688,4 +30978,13 @@
+ 
+ label_80263338:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263338(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263338u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -30999,4 +31298,13 @@
+ 
+ label_80263380:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263380(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263380u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 18u);
+@@ -31917,4 +32225,13 @@
+ 
+ label_8026348C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8026348C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8026348Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 15u);
+@@ -32545,4 +32862,13 @@
+ 
+ label_80263518:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263518(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263518u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 27u);
+@@ -33040,4 +33366,13 @@
+ 
+ label_80263584:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263584(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263584u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -33342,4 +33677,13 @@
+ 
+ label_802635D4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802635D4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802635D4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -33577,4 +33921,13 @@
+ 
+ label_80263620:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263620(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263620u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -34082,4 +34435,13 @@
+ 
+ label_802636B0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802636B0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802636B0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 11u);
+@@ -36631,4 +36993,13 @@
+ 
+ label_802639E8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802639E8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+     if (ctx->downcount <= -(s64)DOLRECOMP_C_LOOP_CYCLE_BUDGET) {
+@@ -37134,4 +37505,13 @@
+ 
+ label_80263A58:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263A58(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263A58u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -37192,4 +37572,13 @@
+ 
+ label_80263A68:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263A68(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263A68u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 29u);
+@@ -37726,4 +38115,13 @@
+ 
+ label_80263ADC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263ADC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263ADCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -38008,4 +38406,13 @@
+ 
+ label_80263B28:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263B28(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263B28u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -38285,4 +38692,13 @@
+ 
+ label_80263B84:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263B84(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263B84u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -38790,4 +39206,13 @@
+ 
+ label_80263C14:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263C14(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263C14u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 11u);
+@@ -41339,4 +41764,13 @@
+ 
+ label_80263F4C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263F4C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+     if (ctx->downcount <= -(s64)DOLRECOMP_C_LOOP_CYCLE_BUDGET) {
+@@ -41447,4 +41881,13 @@
+ 
+ label_80263F70:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80263F70(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80263F70u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -44470,4 +44913,13 @@
+ 
+ label_8026432C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_8026432C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x8026432Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 1u);
+@@ -45005,4 +45457,13 @@
+ 
+ label_802643A0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802643A0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802643A0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -45063,4 +45524,13 @@
+ 
+ label_802643B0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802643B0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802643B0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 84u);
+@@ -45802,4 +46272,13 @@
+ 
+ label_80264490:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264490(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264490u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -45872,4 +46351,13 @@
+ 
+ label_802644A4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802644A4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802644A4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -53425,4 +53913,13 @@
+ 
+ label_80264C88:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264C88(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264C88u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 15u);
+@@ -53651,4 +54148,13 @@
+ 
+ label_80264CC0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264CC0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264CC0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -53804,4 +54310,13 @@
+ 
+ label_80264CE4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264CE4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264CE4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -53901,4 +54416,13 @@
+ 
+ label_80264CFC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264CFC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264CFCu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -54102,4 +54626,13 @@
+ 
+ label_80264D30:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264D30(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264D30u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -54255,4 +54788,13 @@
+ 
+ label_80264D54:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264D54(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264D54u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -54389,4 +54931,13 @@
+ 
+ label_80264D74:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264D74(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264D74u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -54656,4 +55207,13 @@
+ 
+ label_80264DB8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264DB8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264DB8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 15u);
+@@ -54882,4 +55442,13 @@
+ 
+ label_80264DF0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264DF0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264DF0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -55035,4 +55604,13 @@
+ 
+ label_80264E14:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264E14(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264E14u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -55132,4 +55710,13 @@
+ 
+ label_80264E2C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264E2C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264E2Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -55333,4 +55920,13 @@
+ 
+ label_80264E60:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264E60(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264E60u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -55486,4 +56082,13 @@
+ 
+ label_80264E84:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264E84(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264E84u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -55620,4 +56225,13 @@
+ 
+ label_80264EA4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264EA4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264EA4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -55887,4 +56501,13 @@
+ 
+ label_80264EE8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264EE8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264EE8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 24u);
+@@ -56284,4 +56907,13 @@
+ 
+ label_80264F44:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264F44(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264F44u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -56437,4 +57069,13 @@
+ 
+ label_80264F68:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264F68(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264F68u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -56534,4 +57175,13 @@
+ 
+ label_80264F80:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264F80(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264F80u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -56735,4 +57385,13 @@
+ 
+ label_80264FB4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264FB4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264FB4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -56888,4 +57547,13 @@
+ 
+ label_80264FD8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264FD8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264FD8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -57022,4 +57690,13 @@
+ 
+ label_80264FF8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80264FF8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802616E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802616E0[(ctx->pc - 0x802616E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80264FF8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+--- a/chunks_dol/chunk_0153_text1_802656E0.c
++++ b/chunks_dol/chunk_0153_text1_802656E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_draw.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -8795,4 +8797,13 @@
+ 
+ label_80265B14:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265B14(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265B14u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 18u);
+@@ -9076,4 +9087,13 @@
+ 
+ label_80265B58:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265B58(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265B58u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -9191,4 +9211,13 @@
+ 
+ label_80265B74:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265B74(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265B74u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -9288,4 +9317,13 @@
+ 
+ label_80265B8C:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265B8C(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265B8Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 3u);
+@@ -9406,4 +9444,13 @@
+ 
+ label_80265BAC:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265BAC(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265BACu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -9521,4 +9568,13 @@
+ 
+ label_80265BC8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265BC8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265BC8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -9618,4 +9674,13 @@
+ 
+ label_80265BE0:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265BE0(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265BE0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -9715,4 +9780,13 @@
+ 
+ label_80265BF8:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265BF8(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265BF8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+@@ -9826,4 +9900,13 @@
+ 
+ label_80265C14:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80265C14(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80265C14u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -49768,4 +49851,13 @@
+ 
+ label_80268940:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80268940(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80268940u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -49855,4 +49947,13 @@
+ 
+ label_80268954:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80268954(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x80268954u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -50067,4 +50168,13 @@
+ 
+ label_80268998:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_80268998(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 2u);
+     if (ctx->downcount <= -(s64)DOLRECOMP_C_LOOP_CYCLE_BUDGET) {
+@@ -50175,4 +50285,13 @@
+ 
+ label_802689B4:
++    if (bluewake_native_draw_enabled) {
++        const int bw_native_run = bluewake_native_draw_802689B4(ctx);
++        if (bw_native_run == 1)
++            goto return_dispatch_802656E0;
++        if (bw_native_run == 2) {
++            cycle_block_prepaid = true;
++            goto *pc_table_802656E0[(ctx->pc - 0x802656E0u) >> 2];
++        }
++    }
+     ctx->pc = 0x802689B4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
