@@ -21,6 +21,7 @@ again when the app's hot code changes a lot: functions changed since are
 compiled without counts.
 """
 import argparse
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -43,7 +44,7 @@ def main():
 
     b = build.Builder(args)
     b.check_tools()
-    b.iso = args.disc.resolve()
+    b.disc()  # an .rvz or the like as the builder converted it (build/windows/disc), which the app reads
     module = args.out / "composite" / build.MODULE
     if not module.exists() or not (args.out / "game/main.dol").exists():
         build.die(f"run scripts/windows/build.py first: {module} or the game files are missing")
@@ -55,10 +56,10 @@ def main():
 
     build.step("the opening and the tour, in a window")
     run = args.out / "app-pgo-train"
+    # The last training's folder (its own card and recordings): training_run
+    # makes the folder anew, and failed when one was left from a run before.
     if run.exists():
-        for old in run.rglob("*"):
-            if old.is_file():
-                old.unlink()
+        shutil.rmtree(run)
     raw = b.training_run(exe, module, run, None, tour=True, headless=False)
 
     build.step("the profile")
