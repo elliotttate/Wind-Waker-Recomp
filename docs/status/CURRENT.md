@@ -67,6 +67,11 @@ day's work shows as frames where one core is all there is. Outset 27.9 / 28.3 / 
   copies' GPU time (0.4 ms at Dragon Roost for 1.6 MB) is mostly the wait for the frame before's draws, not the
   bytes.
 - `smprof.ps1` takes `-Fps` and `-Mask`; `compare_apps_sm.ps1` takes `-Places` and `-Env`.
+- The app's profile (windows/pgo/app.profdata) trained again on 400728a, so 0145's and 0146's functions have counts
+  (W-n14): Link's position at all 621 probes and Smooth Motion dumps at seven places identical to W-n13, and level
+  (four E-cores uncapped, three runs each: game thread and GX worker within the runs' spread at all five places).
+- Presents that block for 300-800 ms now and then, after the machine has sat idle for hours (the display asleep),
+  turned up in runs of W-n12, W-im2 and W-n13 alike: a run that shows one is run again, not counted.
 - Not pursued: recording the in-between frames once as render bundles. Dawn's D3D12 back end replays a bundle's
   commands one by one (the submit half stays), and the in-between data is laid out job by job, not as one block a
   step that could be bound at one offset.
