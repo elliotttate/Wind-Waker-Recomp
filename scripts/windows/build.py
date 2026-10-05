@@ -433,8 +433,18 @@ int main(void) {
             profile = link = "-fprofile-instr-generate"
         elif self.APP_PROFILE.exists() and not getattr(self.args, "no_app_pgo", False):
             # Functions changed since the profile was recorded are compiled
-            # without counts (the warnings say so; they are expected).
-            profile = (f"-fprofile-instr-use={self.APP_PROFILE.as_posix()} -Wno-profile-instr-unprofiled "
+            # without counts (the warnings say so; they are expected). The
+            # profile goes in under its hash: it is a compiler input but not a
+            # dependency, so a new one under the old name left every object
+            # already built on the old counts, and ThinLTO refuses to link
+            # objects made with two profiles (2026-10-05). A new name changes
+            # the flags, and CMake then builds everything again.
+            digest = hashlib.sha256(self.APP_PROFILE.read_bytes()).hexdigest()[:16]
+            hashed = self.out / f"pgo-app/app-{digest}.profdata"
+            if not hashed.exists():
+                hashed.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(self.APP_PROFILE, hashed)
+            profile = (f"-fprofile-instr-use={hashed.as_posix()} -Wno-profile-instr-unprofiled "
                        "-Wno-profile-instr-out-of-date -Wno-backend-plugin -flto=thin")
             link = "-flto=thin"
         # The app for the same CPU level as the game module: the FIFO worker's
