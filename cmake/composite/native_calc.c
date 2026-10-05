@@ -1,13 +1,13 @@
-/* The game's arc tangents (GZLE01 cM_atan2s with U_GetAtanTable, cM_atan2f),
- * native.
+/* The game's arc tangent (GZLE01 cM_atan2s with U_GetAtanTable), native.
  *
  * cM_atan2s takes a slope to a 16-bit angle by its octant and a 1025-entry
- * table (the quotient scaled and converted, fctiwz); cM_atan2f converts that
- * to radians. Actors, the camera and the wind call them throughout a frame
- * (0.5 percent of the game thread at Forest Haven with U_GetAtanTable).
- * cLib_addCalc and cLib_addCalc2, the easing beside them, are not here: they
- * are 60 Hz simulation sites (scripts/mods/prepare_simulation_60hz.py rewrites
- * them by frame-rate mode).
+ * table (the quotient scaled and converted, fctiwz). Actors, the camera and
+ * the wind call it throughout a frame (0.3 percent of the game thread at
+ * Forest Haven with U_GetAtanTable). cM_atan2f, its form in radians, was made
+ * and dropped (not 1.25 times faster through the hooked chunks in every
+ * run); cLib_addCalc and cLib_addCalc2, the easing beside them, are 60 Hz
+ * simulation sites (scripts/mods/prepare_simulation_60hz.py rewrites them by
+ * frame-rate mode) and stay translated.
  *
  * Each native is its function's translation, callees included, replayed on
  * local registers (scripts/windows/native_leaf_gen.py wrote

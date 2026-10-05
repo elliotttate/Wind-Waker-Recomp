@@ -93,7 +93,7 @@ static int native_jas(CPUState* cpu, u32 address) { return bluewake_native_jas(c
 
 enum {
     N_IEEE_FMOD, N_FMOD, N_RAD2S, N_RND, N_RNDF, N_RNDFX, N_SIN, N_COS, N_TAN, N_BLCK_MIN_MAX, N_BLCK_BND,
-    N_EULER_TO_QUAT, N_ATAN2S, N_ATAN2F, N_CALC_PLA, N_POLAR_VAL,
+    N_EULER_TO_QUAT, N_ATAN2S, N_CALC_PLA, N_POLAR_VAL,
     N_PNTWIND, N_OSC_OFFSET, N_OSC_CALC, N_EFFECTOR, NATIVE_COUNT
 };
 
@@ -111,7 +111,6 @@ static const Native k_natives[NATIVE_COUNT] = {
     {0x80247CD4u, "cBgW::MakeBlckBnd", 800, false, native_bgblk},
     {0x80301150u, "JMAEulerToQuat", 50, false, native_rot},
     {0x802460D0u, "cM_atan2s", 70, false, native_calc},
-    {0x80246270u, "cM_atan2f", 80, false, native_calc},
     {0x8024A6F0u, "cM3d_CalcPla", 110, true, native_geom},
     {0x80254214u, "cSPolar::Val", 250, true, native_geom},
     {0x8008A230u, "dKyw_pntwind_get_info", 200, false, native_geom},
@@ -453,7 +452,6 @@ static Case build(u8* ram, unsigned which, unsigned scenario) {
         break;
     }
     case N_ATAN2S:
-    case N_ATAN2F:
         for (unsigned r = 1; r <= 2u; ++r) {
             const u32 kind = below(16u);
             c->fpr[r] = kind == 0u   ? 0.0
@@ -744,7 +742,6 @@ static void bench_inputs(u8* ram, unsigned which, CPUState* c, unsigned variant)
         c->fpr[1] = variant ? 1234.5 : 0.75;
         break;
     case N_ATAN2S:
-    case N_ATAN2F:
         c->fpr[1] = 3.5;
         c->fpr[2] = -7.25;
         break;

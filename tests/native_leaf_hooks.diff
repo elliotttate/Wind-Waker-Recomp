@@ -17,7 +17,7 @@ index 18b755c..3e04154 100644
      ctx->pc = 0x8008A230u;
      cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
 diff --git a/chunks_dol/chunk_0145_text1_802456E0.c b/chunks_dol/chunk_0145_text1_802456E0.c
-index 22492d7..a2ecd05 100644
+index 22492d7..1965797 100644
 --- a/chunks_dol/chunk_0145_text1_802456E0.c
 +++ b/chunks_dol/chunk_0145_text1_802456E0.c
 @@ -4,4 +4,7 @@
@@ -42,42 +42,35 @@ index 22492d7..a2ecd05 100644
 +        goto return_dispatch_802456E0;
      ctx->pc = 0x802460D0u;
      cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
-@@ -14966,4 +14973,6 @@ bwend_125: ;
- 
- label_80246270:
-+    if (bluewake_native_calc_enabled && bluewake_native_calc_80246270(ctx))
-+        goto return_dispatch_802456E0;
-     ctx->pc = 0x80246270u;
-     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
-@@ -15289,4 +15298,6 @@ bwend_128: ;
+@@ -15289,4 +15296,6 @@ bwend_128: ;
  
  label_802462C8:
 +    if (bluewake_native_libm_enabled && bluewake_native_libm_802462C8(ctx))
 +        goto return_dispatch_802456E0;
      ctx->pc = 0x802462C8u;
      cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 234u);
-@@ -16004,4 +16015,6 @@ bwend_130: ;
+@@ -16004,4 +16013,6 @@ bwend_130: ;
  
  label_802463B0:
 +    if (bluewake_native_libm_enabled && bluewake_native_libm_802463B0(ctx))
 +        goto return_dispatch_802456E0;
      ctx->pc = 0x802463B0u;
      cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
-@@ -16219,4 +16232,6 @@ bwend_132: ;
+@@ -16219,4 +16230,6 @@ bwend_132: ;
  
  label_802463E8:
 +    if (bluewake_native_libm_enabled && bluewake_native_libm_802463E8(ctx))
 +        goto return_dispatch_802456E0;
      ctx->pc = 0x802463E8u;
      cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
-@@ -37578,4 +37593,6 @@ bwend_487: ;
+@@ -37578,4 +37591,6 @@ bwend_487: ;
  
  label_80247C4C:
 +    if (bluewake_native_bgblk_enabled && bluewake_native_bgblk_80247C4C(ctx))
 +        goto return_dispatch_802456E0;
      ctx->pc = 0x80247C4Cu;
      cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
-@@ -38169,4 +38186,6 @@ bwend_499: ;
+@@ -38169,4 +38184,6 @@ bwend_499: ;
  
  label_80247CD4:
 +    if (bluewake_native_bgblk_enabled && bluewake_native_bgblk_80247CD4(ctx))

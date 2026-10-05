@@ -201,7 +201,9 @@ def roomy(native):
 # (0.94x); cXyz::operator- (with PSVECSubtract) and mDoLib_project (with
 # PSMTXMultVec), 1.6-1.8x against a translation whose leaf runs translated but
 # 1.22-1.24x through the hooked chunks, where the leaf is native_vec.c's or
-# native_math.c's as in play. Left out unmade: cLib_addCalc and cLib_addCalc2 (60 Hz simulation
+# native_math.c's as in play; cM_atan2f (cM_atan2s and its conversion to
+# radians: 1.14-1.26x through the hooked chunks; cSPolar::Val still replays
+# it). Left out unmade: cLib_addCalc and cLib_addCalc2 (60 Hz simulation
 # sites, rewritten by frame-rate mode), dKyw_pntwind_get_vecpow (its
 # cXyz::operator* is a game-math entry whose hook sits before its leader).
 # (function ranges from tww's config/GZLE01/symbols.txt)
@@ -287,7 +289,6 @@ GROUPS = {
     # translated).
     "calc": [
         Native("cM_atan2s", 0x802460D0, [CM_ATAN2S, U_GET_ATAN_TABLE]),
-        Native("cM_atan2f", 0x80246270, [CM_ATAN2F, CM_ATAN2S, U_GET_ATAN_TABLE]),
     ],
     # Geometry on the SDK's vector leaves.
     "geom": [

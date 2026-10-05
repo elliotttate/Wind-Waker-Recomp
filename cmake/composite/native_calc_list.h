@@ -4,7 +4,6 @@
 #define BLUEWAKE_NATIVE_CALC_LIST_H
 
 #define CALC_NATIVES(X) \
-    X(0x802460D0u, lfn_802460D0, "cM_atan2s", 802460D0) \
-    X(0x80246270u, lfn_80246270, "cM_atan2f", 80246270)
+    X(0x802460D0u, lfn_802460D0, "cM_atan2s", 802460D0)
 
 #endif
