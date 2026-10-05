@@ -1,0 +1,1585 @@
+From 160224821dbef6d57fd1df4536a92b050885be10 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Sun, 4 Oct 2026 23:42:32 -0400
+Subject: [PATCH] gxcore: the vertex block as three uniform bindings, each
+ staged as far as read
+
+Every draw staged the whole 2832-byte VertexShaderConstants whenever any
+of it changed. At sea in Wind Waker a draw's own matrices change in 96
+percent of blocks, XF matrix memory in 97, the lights in 2, and most
+draws (lit, without matrix indices) read no matrix memory at all.
+
+The block is now three dynamic-offset bindings of group 1, each staged
+and de-duplicated on its own: the draw's own fields (vsc: its matrices,
+projection, texgen matrices, materials, cached N/B/T; 656 bytes), XF
+matrix memory (vsm: transformmatrices and the normal bank; 1536) and the
+lights (vsl; 640). The struct's fields are reordered into those parts.
+gxc::vertex_uniform_use says how far a key's shader reads each part
+(the WGSL declares that much); a part it does not bind is not staged
+and keeps any valid offset. The ubershader binds all three in full, so
+a draw it may draw stages them whole. In-between frames' blocks go the
+same way. gxcore_wgsl_test checks every field each tested shader reads
+against vertex_uniform_use.
+
+Uniform upload per frame, same tour: 4154 -> 1341 KB at the busiest
+point, 3279 -> 1027 at Dragon Roost, 1307 -> 653 in Hyrule's room
+(-50 to -69 percent).
+---
+ GXRuntime/graphics/aurora/lib/gfx/common.cpp  |  45 ++++
+ GXRuntime/graphics/aurora/lib/gfx/common.hpp  |  18 +-
+ .../graphics/aurora/lib/gfx/gxcore_draw.cpp   | 247 +++++++++++++-----
+ .../graphics/aurora/lib/gfx/gxcore_draw.hpp   |   4 +-
+ .../include/gxruntime/gxcore/shader.hpp       |  37 ++-
+ .../graphics/gxcore/src/gxcore_shader.cpp     | 187 ++++++++-----
+ GXRuntime/graphics/gxcore/src/gxcore_uber.cpp |  66 ++---
+ .../gxcore/tests/gxcore_wgsl_test.cpp         | 165 ++++++++----
+ 8 files changed, 547 insertions(+), 222 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.cpp b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+index c47d1e96..0799bafc 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+@@ -159,6 +159,25 @@ wgpu::BindGroupLayout g_staticBindGroupLayout;
+ wgpu::BindGroup g_staticBindGroup;
+ wgpu::BindGroupLayout g_uniformBindGroupLayout;
+ wgpu::BindGroup g_uniformBindGroup;
++wgpu::BindGroupLayout g_vertexUniformBindGroupLayout;
++wgpu::BindGroup g_vertexUniformBindGroup;
++
++// The gxcore vertex block's three bindings over `buffer`, each its part's size.
++static wgpu::BindGroup vertex_uniform_bind_group(const wgpu::Buffer& buffer, const char* label) {
++  namespace gxc = gxruntime::gxcore;
++  const std::array entries{
++      wgpu::BindGroupEntry{.binding = 0, .buffer = buffer, .size = gxc::kVertexBlockBytes},
++      wgpu::BindGroupEntry{.binding = 1, .buffer = buffer, .size = gxc::kVertexMatrixBytes},
++      wgpu::BindGroupEntry{.binding = 2, .buffer = buffer, .size = gxc::kVertexLightBytes},
++  };
++  const wgpu::BindGroupDescriptor descriptor{
++      .label = label,
++      .layout = g_vertexUniformBindGroupLayout,
++      .entryCount = entries.size(),
++      .entries = entries.data(),
++  };
++  return g_device.CreateBindGroup(&descriptor);
++}
+ 
+ // for imgui debug
+ AuroraStats g_stats{};
+@@ -324,6 +343,7 @@ static int g_replayStep = 0;          // render worker: which of its in-between
+ static uint64_t g_interpUniformOverflows = 0; // recording thread
+ static wgpu::Buffer g_interpUniformBuffer;
+ wgpu::BindGroup g_interpUniformBindGroup;
++wgpu::BindGroup g_interpVertexUniformBindGroup;
+ static FramePacket* g_recordingFrame = nullptr;
+ static size_t g_recordingFrameSlot = 0;
+ static uint64_t g_nextFrameId = 1;
+@@ -1263,6 +1283,26 @@ void initialize() {
+     };
+     g_uniformBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
+   }
++  {
++    std::array<wgpu::BindGroupLayoutEntry, 3> layoutEntries{};
++    for (uint32_t i = 0; i < layoutEntries.size(); ++i)
++      layoutEntries[i] = wgpu::BindGroupLayoutEntry{
++          .binding = i,
++          .visibility = wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment,
++          .buffer =
++              wgpu::BufferBindingLayout{
++                  .type = wgpu::BufferBindingType::Uniform,
++                  .hasDynamicOffset = true,
++              },
++      };
++    const wgpu::BindGroupLayoutDescriptor layoutDesc{
++        .label = "GXCore vertex uniform bind group layout",
++        .entryCount = layoutEntries.size(),
++        .entries = layoutEntries.data(),
++    };
++    g_vertexUniformBindGroupLayout = g_device.CreateBindGroupLayout(&layoutDesc);
++    g_vertexUniformBindGroup = vertex_uniform_bind_group(g_uniformBuffer, "GXCore vertex uniform bind group");
++  }
+ 
+   gx::initialize();
+ #ifdef AURORA_ENABLE_RMLUI
+@@ -1284,6 +1324,7 @@ void shutdown() {
+       held = {};
+   g_lastDue = {};
+   g_interpUniformBindGroup = {};
++  g_interpVertexUniformBindGroup = {};
+   g_interpUniformBuffer = {};
+   g_interpUniformBufferSize = 0;
+   g_interpVertexBuffer = {};
+@@ -1343,6 +1384,8 @@ void shutdown() {
+   g_staticBindGroupLayout = {};
+   g_uniformBindGroup = {};
+   g_uniformBindGroupLayout = {};
++  g_vertexUniformBindGroup = {};
++  g_vertexUniformBindGroupLayout = {};
+   g_inOffscreen = false;
+   g_frameIndex = UINT32_MAX;
+   g_frameSlots.reset();
+@@ -2170,6 +2213,8 @@ static void upload_interp_data(size_t frameSlot) {
+         .entries = entries.data(),
+     };
+     g_interpUniformBindGroup = g_device.CreateBindGroup(&bindGroupDescriptor);
++    g_interpVertexUniformBindGroup =
++        vertex_uniform_bind_group(g_interpUniformBuffer, "In-between frame vertex uniform bind group");
+   }
+   if (vertexBytes != 0 && (!g_interpVertexBuffer || g_interpVertexBufferSize < vertexBytes)) {
+     const uint64_t wanted = std::max(vertexBytes, InterpVertexStartSize);
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.hpp b/GXRuntime/graphics/aurora/lib/gfx/common.hpp
+index ec856ca8..c6cbd9f4 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.hpp
+@@ -199,6 +199,13 @@ extern wgpu::BindGroup g_uniformBindGroup;
+ // own area, filled while the frame records and uploaded once when it ends, so
+ // they never take room from (or split) the frame's staging.
+ extern wgpu::BindGroup g_interpUniformBindGroup;
++// A gxcore draw's vertex block is three dynamic-offset uniform bindings of
++// group 1 (gxruntime/gxcore/shader.hpp kVertexBlockBytes): the draw's own
++// fields, XF matrix memory and the lights. Over the frame's uniform buffer,
++// and over the in-between frames'.
++extern wgpu::BindGroupLayout g_vertexUniformBindGroupLayout;
++extern wgpu::BindGroup g_vertexUniformBindGroup;
++extern wgpu::BindGroup g_interpVertexUniformBindGroup;
+ 
+ using BindGroupRef = HashType;
+ using PipelineRef = HashType;
+@@ -334,8 +341,17 @@ Range push_interp_vertices(size_t slot, const uint8_t* data, size_t length);
+ // At most kInterpMaxSteps of each (frame_interp::kMaxSteps, which common.cpp
+ // checks it against).
+ constexpr int kInterpMaxSteps = 7;
++// A gxcore draw's vertex block as staged: its three parts' offsets (group 1's
++// dynamic offsets); size 0 when none was.
++struct VertexUniformRanges {
++  uint32_t block = 0;
++  uint32_t matrices = 0;
++  uint32_t lights = 0;
++  uint32_t size = 0;
++  bool operator==(const VertexUniformRanges&) const = default;
++};
+ struct InterpRanges {
+-  Range uniform[kInterpMaxSteps];
++  VertexUniformRanges uniform[kInterpMaxSteps];
+   Range verts[kInterpMaxSteps];
+   Range pixel[kInterpMaxSteps]; // a TEV draw's pixel constants with blended colours
+ };
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+index bb3d6ba8..77b2943b 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.cpp
+@@ -447,7 +447,8 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+   const auto module = g_device.CreateShaderModule(&moduleDescriptor);
+ 
+   // Group 0 keeps the pass preamble's static bind group compatible (the shader
+-  // never references it); 1 = shared dynamic VS uniform. On the TEV path (S14)
++  // never references it); 1 = the shared dynamic VS uniform's three parts
++  // (g_vertexUniformBindGroupLayout). On the TEV path (S14)
+   // 2 = shared dynamic PS uniform and 3 = texture; else 2 = texture. Putting
+   // the PS uniform before the texture keeps an untextured TEV draw gap-free.
+   const bool tev = key.shader.tev_valid != 0;
+@@ -458,7 +459,7 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+   const uint32_t tex_mask = uber ? 0xFFu : textured ? gxc::used_texmap_mask(key.shader) : 1u;
+   std::array<wgpu::BindGroupLayout, 4> bindGroupLayouts{
+       g_staticBindGroupLayout,
+-      g_uniformBindGroupLayout,
++      g_vertexUniformBindGroupLayout,
+       tev || uber ? g_uniformBindGroupLayout : texture_bind_group_layout(tex_mask),
+       texture_bind_group_layout(tex_mask),
+   };
+@@ -722,7 +723,7 @@ struct PassState {
+   bool indexBound = false;
+   PipelineRef pipeline = 0;
+   WGPUBindGroup group1 = nullptr;
+-  uint32_t offset1 = UINT32_MAX;
++  std::array<uint32_t, 3> offset1{UINT32_MAX, UINT32_MAX, UINT32_MAX};
+   WGPUBindGroup group2 = nullptr;
+   uint32_t offset2 = UINT32_MAX;
+   WGPUBindGroup group3 = nullptr;
+@@ -760,7 +761,7 @@ const wgpu::Buffer& vertex_extra_defaults() {
+ // own), its indices, and its first vertex from the batch's.
+ namespace {
+ struct DrawPart {
+-  Range uniform;
++  VertexUniformRanges uniform;
+   Range verts;
+   Range pixel;
+   uint32_t firstIndex;
+@@ -803,8 +804,9 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   // traced frame's own, matched while recording, are one step's).
+   const bool interpolated = frame_interp::encoding_interpolated();
+   const int step = interpolated ? interp_replay_step() : 0;
+-  const auto job_ranges = [&](uint32_t job, Range& uniform, Range& verts, Range& pixel) {
+-    uniform = verts = pixel = {};
++  const auto job_ranges = [&](uint32_t job, VertexUniformRanges& uniform, Range& verts, Range& pixel) {
++    uniform = {};
++    verts = pixel = {};
+     if (!interpolated)
+       return;
+     if (data.interpJob != UINT32_MAX) {
+@@ -832,10 +834,11 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   bool asOne = true;
+   if (interpolated && data.batchSize > 1 && data.interpJob != UINT32_MAX) {
+     for (uint32_t i = 1; i < data.batchSize && asOne; ++i) {
+-      Range uniform, verts, pixel;
++      VertexUniformRanges uniform;
++      Range verts, pixel;
+       job_ranges(data.interpJob + i, uniform, verts, pixel);
+       const uint32_t first = batch_draw(data.batch + i).firstVertex;
+-      asOne = uniform.offset == whole.uniform.offset && uniform.size == whole.uniform.size &&
++      asOne = uniform == whole.uniform &&
+               pixel.offset == whole.pixel.offset && pixel.size == whole.pixel.size &&
+               (whole.verts.size == 0 ? verts.size == 0
+                                      : verts.size != 0 && verts.offset == whole.verts.offset +
+@@ -857,12 +860,13 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+ 
+   const auto setGroup1 = [&](const DrawPart& part) {
+     const bool blended = part.uniform.size != 0;
+-    const auto& vsGroup = blended ? g_interpUniformBindGroup : g_uniformBindGroup;
+-    const uint32_t vsOffset = blended ? part.uniform.offset : data.uniformRange.offset;
+-    if (vsGroup.Get() != g_pass.group1 || vsOffset != g_pass.offset1) {
+-      pass.SetBindGroup(1, vsGroup, 1, &vsOffset);
++    const auto& vsGroup = blended ? g_interpVertexUniformBindGroup : g_vertexUniformBindGroup;
++    const VertexUniformRanges& vs = blended ? part.uniform : data.uniformRange;
++    const std::array<uint32_t, 3> offsets{vs.block, vs.matrices, vs.lights};
++    if (vsGroup.Get() != g_pass.group1 || offsets != g_pass.offset1) {
++      pass.SetBindGroup(1, vsGroup, offsets.size(), offsets.data());
+       g_pass.group1 = vsGroup.Get();
+-      g_pass.offset1 = vsOffset;
++      g_pass.offset1 = offsets;
+     }
+   };
+   // The vertices: from the whole buffer at the draw's (or batch's) base
+@@ -1105,13 +1109,18 @@ struct UniformCache {
+   std::vector<uint8_t> bytes; // the block range holds
+ #endif
+ };
+-static UniformCache g_vertexUniformCache;
+-// The constants_id of the plan whose constants g_vertexUniformCache holds the bytes of (0: none).
+-static uint64_t g_pushedConstantsId = 0;
+-static UniformCache g_interpUniformCache;
+ static UniformCache g_pixelUniformCache;
+ static UniformCache g_uberPixelUniformCache;
+ 
++// DOL_AURORA_UNIFORM_DEDUP=0: every draw stages its blocks (debug).
++static bool uniform_dedup_enabled() {
++  static const bool enabled = [] {
++    const char* env = std::getenv("DOL_AURORA_UNIFORM_DEDUP");
++    return env == nullptr || env[0] != '0';
++  }();
++  return enabled;
++}
++
+ // The ubershader's texture for a texmap slot no TEV stage samples: one white
+ // texel, made once per device (the ubershader's bind group has all eight).
+ static const wgpu::TextureView& empty_texmap_view() {
+@@ -1163,14 +1172,6 @@ static void keep_cached(UniformCache& cache, const uint8_t* data, size_t length)
+ #endif
+ }
+ 
+-// Whether `data` is the block the cache last took, in this frame packet.
+-static bool repeats_cached(const UniformCache& cache, const uint8_t* data, size_t length) {
+-  const uint64_t frameId = current_frame_id();
+-  return frameId != 0 && cache.frameId == frameId && cache.range.size == length &&
+-         std::memcmp(cached_bytes(cache, AURORA_UNIFORM_COMPARE_STAGED ? uniform_bytes(cache.range) : nullptr), data,
+-                     length) == 0;
+-}
+-
+ // The in-between frame's blocks, de-duplicated the same way. repeated: the
+ // in-between frame made this block the way
+ // it made the last one, from the same constants (frame_interp::last_blend_repeated),
+@@ -1192,6 +1193,105 @@ static Range push_interp_uniform_dedup(UniformCache& cache, uint64_t frameId, si
+   return cache.range;
+ }
+ 
++// The vertex block's three parts (gxc::kVertexBlockBytes), each de-duplicated
++// on its own against the one it last staged in this frame packet: a draw's own
++// fields change nearly every draw, matrix memory with them, the lights rarely.
++// A part is staged from its first field as far as the draw's shader reads it
++// (gxc::vertex_uniform_use); a part the shader does not bind is not staged,
++// and its binding keeps any valid offset (the part's last).
++namespace {
++struct VertexPartCache {
++  Range range{};
++  size_t staged = 0;    // the leading bytes staged at range.offset
++  uint64_t frameId = 0;
++  uint64_t serial = 0;  // the last draw that bound this part (in its frame packet)
++  size_t matched = 0;   // the leading bytes known to be that draw's
++#if !AURORA_UNIFORM_COMPARE_STAGED
++  std::vector<uint8_t> bytes; // the staged bytes
++#endif
++};
++struct VertexPartCaches {
++  VertexPartCache part[3];
++  uint64_t serial = 0; // draws staged through these caches
++};
++// Where a draw's parts go: the frame's uniform area, or an in-between frame's
++// (push_interp_uniform's slot).
++constexpr size_t kFrameUniforms = SIZE_MAX;
++} // namespace
++
++static const uint8_t* cached_bytes_of(const VertexPartCache& cache, const uint8_t* staged) {
++#if AURORA_UNIFORM_COMPARE_STAGED
++  (void)cache;
++  return staged;
++#else
++  (void)staged;
++  return cache.bytes.data();
++#endif
++}
++
++// The parts of `constants` a draw whose shader reads `use` of them binds, into
++// `out`. repeats: the constants are those of the draw before through these
++// caches (repeatsLast, or frame_interp::last_blend_repeated), so a part that
++// draw bound, known the same as far as this one reads, needs no comparison.
++// False when an in-between frame's area is full.
++static bool stage_vertex_parts(VertexPartCaches& caches, uint64_t frameId, size_t slot,
++                               const gxc::VertexShaderConstants& constants, const gxc::VertexUniformUse& use,
++                               bool repeats, VertexUniformRanges& out) {
++  const auto* base = reinterpret_cast<const uint8_t*>(&constants);
++  const size_t starts[3] = {0, gxc::kVertexMatrixOffset, gxc::kVertexLightOffset};
++  const size_t reads[3] = {use.block, use.matrices, use.lights};
++  const uint64_t serial = ++caches.serial;
++  uint32_t offsets[3];
++  for (int i = 0; i < 3; ++i) {
++    VertexPartCache& cache = caches.part[i];
++    const uint8_t* data = base + starts[i];
++    const bool current = frameId != 0 && cache.frameId == frameId && cache.range.size != 0;
++    if (reads[i] == 0) {
++      offsets[i] = current ? cache.range.offset : 0u;
++      continue;
++    }
++    if (current && cache.staged >= reads[i] && uniform_dedup_enabled()) {
++      const uint8_t* staged = AURORA_UNIFORM_COMPARE_STAGED
++                                  ? (slot == kFrameUniforms ? uniform_bytes(cache.range)
++                                                            : interp_uniform_bytes(slot, cache.range))
++                                  : nullptr;
++      if (repeats && cache.serial == serial - 1 && cache.matched >= reads[i]) {
++        cache.serial = serial;
++        offsets[i] = cache.range.offset;
++        continue;
++      }
++      if (std::memcmp(cached_bytes_of(cache, staged), data, reads[i]) == 0) {
++        cache.serial = serial;
++        cache.matched = reads[i];
++        offsets[i] = cache.range.offset;
++        continue;
++      }
++    }
++    const Range range = slot == kFrameUniforms ? push_uniform(data, reads[i]) : push_interp_uniform(slot, data, reads[i]);
++    if (range.size == 0)
++      return false;
++    cache.range = range;
++    cache.staged = cache.matched = reads[i];
++    cache.frameId = frameId;
++    cache.serial = serial;
++#if !AURORA_UNIFORM_COMPARE_STAGED
++    cache.bytes.assign(data, data + reads[i]);
++#endif
++    offsets[i] = range.offset;
++  }
++  out = VertexUniformRanges{.block = offsets[0], .matrices = offsets[1], .lights = offsets[2], .size = 1u};
++  return true;
++}
++
++// The frame's vertex blocks as staged, and a traced frame's in-between ones.
++static VertexPartCaches g_vertexParts;
++static VertexPartCaches g_interpParts;
++// The constants of the draw before in this frame packet, which a draw's are
++// compared with (repeatsLast), and that draw's constants_id.
++static gxc::VertexShaderConstants g_lastConstants;
++static uint64_t g_lastConstantsFrame = 0;
++static uint64_t g_lastConstantsId = 0;
++
+ // --- In-between frames on a helper thread -----------------------------------
+ //
+ // Matching each draw to its counterpart in the frame before and blending its
+@@ -1210,7 +1310,8 @@ struct InterpJob {
+   uint32_t vertexFloats = gxc::kCompactVertexFloats; // and their layout's
+   uint64_t frameId;
+   size_t slot;
+-  bool repeatsLastDraw; // the constants are the draw before's (repeats_cached)
++  gxc::VertexUniformUse uniformUse; // what its shader reads of the vertex block's parts
++  bool repeatsLastDraw; // the constants are the draw before's (repeatsLast)
+   // The constants, copied only where they differ from the job before's
+   // (constantsCopied); a job that repeats them leaves the 2.8 KB copy to the
+   // helper, which keeps the last it was given (InterpHelper::constants).
+@@ -1267,7 +1368,7 @@ struct InterpHelper {
+   uint32_t jobs = 0;
+   bool pixelCarried = false;
+   // Helper thread: the last block it staged per step, and a particle's vertices.
+-  UniformCache cache[frame_interp::kMaxSteps];
++  VertexPartCaches cache[frame_interp::kMaxSteps];
+   UniformCache pixelCache[frame_interp::kMaxSteps];
+   std::vector<float> vertices;
+   // Helper thread: the constants of the last job that carried them, which the
+@@ -1321,10 +1422,9 @@ void interp_helper_main(InterpHelper* h) {
+         nullptr) {
+       const bool repeated = frame_interp::last_blend_repeated();
+       for (int step = 0; step < steps; ++step)
+-        ranges.uniform[step] =
+-            push_interp_uniform_dedup(h->cache[step], job.frameId, job.slot,
+-                                      reinterpret_cast<const uint8_t*>(frame_interp::blended_step(step)),
+-                                      sizeof(gxc::VertexShaderConstants), repeated);
++        if (!stage_vertex_parts(h->cache[step], job.frameId, job.slot, *frame_interp::blended_step(step),
++                                job.uniformUse, repeated, ranges.uniform[step]))
++          ranges.uniform[step] = {};
+     }
+     for (int step = 0; step < steps; ++step) {
+       const float* positions = frame_interp::blended_positions(step);
+@@ -1415,7 +1515,7 @@ bool positions_written(const gxc::DrawPlan& plan) {
+ }
+ 
+ uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw, bool tev, bool pixelRepeats,
+-                          bool positionsWritten) {
++                          bool positionsWritten, const gxc::VertexUniformUse& uniformUse) {
+   InterpHelper* h = g_interpHelper.load(std::memory_order_acquire);
+   if (h == nullptr) {
+     h = new InterpHelper;
+@@ -1440,6 +1540,7 @@ uint32_t queue_interp_job(const gxc::DrawPlan& plan, bool repeatsLastDraw, bool
+   job.vertexFloats = plan.vertex_floats;
+   job.frameId = frameId;
+   job.slot = recording_frame_slot();
++  job.uniformUse = uniformUse;
+   job.repeatsLastDraw = repeatsLastDraw;
+   // repeatsLastDraw: the constants are those last pushed in this frame packet,
+   // and every push while frames are interpolated here queues a job, so they
+@@ -1493,19 +1594,11 @@ void wait_interp_jobs() {
+   });
+ }
+ 
+-// known: 1 or 0 when the caller has already compared `data` with the cache's
+-// block (repeats_cached), -1 to compare here.
+-static Range push_uniform_dedup(UniformCache& cache, const uint8_t* data,
+-                                size_t length, int known = -1) {
+-  static const bool enabled = [] {
+-    const char* env = std::getenv("DOL_AURORA_UNIFORM_DEDUP");
+-    return env == nullptr || env[0] != '0';
+-  }();
++static Range push_uniform_dedup(UniformCache& cache, const uint8_t* data, size_t length) {
+   const uint64_t frameId = current_frame_id();
+-  if (enabled && frameId != 0 && cache.frameId == frameId && cache.range.size == length &&
+-      (known >= 0 ? known == 1
+-                  : std::memcmp(cached_bytes(cache, AURORA_UNIFORM_COMPARE_STAGED ? uniform_bytes(cache.range) : nullptr),
+-                                data, length) == 0)) {
++  if (uniform_dedup_enabled() && frameId != 0 && cache.frameId == frameId && cache.range.size == length &&
++      std::memcmp(cached_bytes(cache, AURORA_UNIFORM_COMPARE_STAGED ? uniform_bytes(cache.range) : nullptr), data,
++                  length) == 0) {
+     ++cache.hits;
+     return cache.range;
+   }
+@@ -1967,14 +2060,14 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   // the draw before them, 96 percent of the Forsaken Fortress's 17,500 a frame,
+   // and each comparison of equal blocks reads all 2.8 KB of both.
+   // A plan whose constants were kept from the draw before (constants_id, set
+-  // by GxCoreState::build_draw_plan_into) is known to repeat the block last
+-  // pushed in this frame packet without comparing them; constants made anew
+-  // are compared (they may still be the same bytes).
++  // by GxCoreState::build_draw_plan_into) is known to repeat them without
++  // comparing; constants made anew are compared with a copy of the last
++  // (they may still be the same bytes).
+   const uint64_t frameId = current_frame_id();
+   const bool repeatsLast =
+-      (plan.constants_id != 0 && frameId != 0 && plan.constants_id == g_pushedConstantsId &&
+-       g_vertexUniformCache.frameId == frameId && g_vertexUniformCache.range.size == sizeof(plan.constants)) ||
+-      repeats_cached(g_vertexUniformCache, reinterpret_cast<const uint8_t*>(&plan.constants), sizeof(plan.constants));
++      frameId != 0 && g_lastConstantsFrame == frameId &&
++      ((plan.constants_id != 0 && plan.constants_id == g_lastConstantsId) ||
++       std::memcmp(&g_lastConstants, &plan.constants, sizeof(plan.constants)) == 0);
+   // In-between frames: matched on the helper thread (queued below), or here
+   // while a traced frame reports each draw's outcome. Here it is matched
+   // before a staging segment can split the frame; a split frame is not
+@@ -2042,20 +2135,6 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+     }
+   }
+ 
+-  const auto uniformRange = push_uniform_dedup(
+-      g_vertexUniformCache, reinterpret_cast<const uint8_t*>(&plan.constants),
+-      sizeof(plan.constants), repeatsLast ? 1 : 0);
+-  g_pushedConstantsId = plan.constants_id;
+-  Range pixelUniformRange{};
+-  bool pixelRepeats = false;
+-  if (tev) {
+-    const uint64_t hits = g_pixelUniformCache.hits;
+-    pixelUniformRange = push_uniform_dedup(
+-        g_pixelUniformCache,
+-        reinterpret_cast<const uint8_t*>(&plan.pixel_constants),
+-        sizeof(plan.pixel_constants));
+-    pixelRepeats = g_pixelUniformCache.hits != hits;
+-  }
+   const PipelineConfig colorConfig{
+       .version = GXCorePipelineConfigVersion,
+       .key = plan.pipeline,
+@@ -2157,6 +2236,29 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+     }
+   }
+ 
++  // The vertex block's parts, each as far as the draw's shader reads it (all
++  // of each for a draw the ubershader may draw, which reads by the key).
++  const gxc::VertexUniformUse uniformUse =
++      uberPipeline != 0
++          ? gxc::VertexUniformUse{gxc::kVertexBlockBytes, gxc::kVertexMatrixBytes, gxc::kVertexLightBytes}
++          : gxc::vertex_uniform_use(plan.pipeline.shader);
++  VertexUniformRanges uniformRange{};
++  stage_vertex_parts(g_vertexParts, frameId, kFrameUniforms, plan.constants, uniformUse, repeatsLast, uniformRange);
++  if (!repeatsLast)
++    std::memcpy(&g_lastConstants, &plan.constants, sizeof(plan.constants));
++  g_lastConstantsFrame = frameId;
++  g_lastConstantsId = plan.constants_id;
++  Range pixelUniformRange{};
++  bool pixelRepeats = false;
++  if (tev) {
++    const uint64_t hits = g_pixelUniformCache.hits;
++    pixelUniformRange = push_uniform_dedup(
++        g_pixelUniformCache,
++        reinterpret_cast<const uint8_t*>(&plan.pixel_constants),
++        sizeof(plan.pixel_constants));
++    pixelRepeats = g_pixelUniformCache.hits != hits;
++  }
++
+   // Batching: a draw of the state of the pass's last command (pipeline,
+   // constants, pixel constants, textures), with nothing between them, whose
+   // vertices and indices follow its, extends it, its indices counted from the
+@@ -2179,7 +2281,7 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+     DrawData* last = last_recorded_draw();
+     if (last != nullptr && uberPipeline == 0 && last->uberPipeline == 0 && last->pipeline == pipeline &&
+         last->depthPipeline == depthPipeline &&
+-        last->uniformRange.offset == uniformRange.offset && last->tev == tev &&
++        last->uniformRange == uniformRange && last->tev == tev &&
+         (!tev || last->pixelUniformRange.offset == pixelUniformRange.offset) &&
+         last->textureBindGroup == textureBindGroup && last->ownVertices == ownVertices &&
+         last->interpUniformRange.size == 0 && last->interpVertRange.size == 0 &&
+@@ -2210,14 +2312,15 @@ bool submit_draw_plan(const gxc::DrawPlan& plan) {
+   } else {
+     idxRange = push_indices(reinterpret_cast<const uint8_t*>(plan.indices.data()), indexBytes, 2);
+   }
+-  Range interpUniformRange{};
++  VertexUniformRanges interpUniformRange{};
+   uint32_t interpJob = UINT32_MAX;
+-  if (interpConstants != nullptr)
+-    interpUniformRange = push_interp_uniform_dedup(
+-        g_interpUniformCache, current_frame_id(), recording_frame_slot(), reinterpret_cast<const uint8_t*>(interpConstants),
+-        sizeof(*interpConstants), frame_interp::last_blend_repeated());
+-  else if (interpolating && !matchHere)
+-    interpJob = queue_interp_job(plan, repeatsLast, tev, pixelRepeats, positionsWritten);
++  if (interpConstants != nullptr) {
++    if (!stage_vertex_parts(g_interpParts, current_frame_id(), recording_frame_slot(), *interpConstants, uniformUse,
++                            frame_interp::last_blend_repeated(), interpUniformRange))
++      interpUniformRange = {};
++  } else if (interpolating && !matchHere) {
++    interpJob = queue_interp_job(plan, repeatsLast, tev, pixelRepeats, positionsWritten, uniformUse);
++  }
+ 
+   const auto indexCount = static_cast<uint32_t>(plan.indices.size());
+   if (batch != nullptr) {
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp
+index 20e01058..105b5992 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/gxcore_draw.hpp
+@@ -33,10 +33,10 @@ struct DrawData {
+   PipelineRef depthPipeline; // early-Z depth-only pass, 0 when unnecessary
+   Range vertRange;
+   Range idxRange;
+-  Range uniformRange;       // VertexShaderConstants (group 1)
++  VertexUniformRanges uniformRange; // VertexShaderConstants' parts (group 1)
+   // The constants blended toward the previous frame, used while the
+   // in-between frame is encoded (frame_interp.hpp); uniformRange otherwise.
+-  Range interpUniformRange;
++  VertexUniformRanges interpUniformRange;
+   // And its vertices, for a particle whose positions came in its payload,
+   // blended toward the previous frame's (in the in-between vertex area);
+   // vertRange otherwise.
+diff --git a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+index 3b51a9c2..128a64bd 100644
+--- a/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
++++ b/GXRuntime/graphics/gxcore/include/gxruntime/gxcore/shader.hpp
+@@ -11,6 +11,7 @@
+ // types here — the fork's gxcore_draw module and the headless tests both
+ // include this file.
+ 
++#include <cstddef>
+ #include <cstdint>
+ #include <string>
+ #include <type_traits>
+@@ -305,15 +306,16 @@ struct GpuLight {
+ };
+ static_assert(sizeof(GpuLight) == 5 * 16);
+ 
++// Three parts, each a uniform binding of group 1 (kVertexBlockBytes below):
++// the draw's own fields (vsc), XF matrix memory (vsm) and the lights (vsl).
+ struct VertexShaderConstants {
++  // --- The draw's own (binding 0, vsc) ---
+   float posnormalmatrix[6][4]{};    // rows 0-2 current pos mtx, 3-5 normal
+   float projection[4][4]{};         // row-dot form (VertexShaderGen o.pos)
+   float texmatrices[24][4]{};       // hardware max 8 texgens * 3 matrix rows
+-  float transformmatrices[64][4]{}; // raw XF matrix memory rows
+-  // Lighting (S15): the 8 XF lights and the four material/ambient registers
+-  // (Dolphin I_MATERIALS: [0]=ambient0, [1]=ambient1, [2]=material0,
+-  // [3]=material1, integer RGBA 0..255). Only read on the lit path.
+-  GpuLight lights[8]{};
++  // Lighting (S15): the four material/ambient registers (Dolphin I_MATERIALS:
++  // [0]=ambient0, [1]=ambient1, [2]=material0, [3]=material1, integer RGBA
++  // 0..255). Only read on the lit path, as are the lights below.
+   std::int32_t materials[4][4]{};
+   // Cached vertex attributes (Dolphin ConstantManager cached_normal/tangent/
+   // binormal): the last-decoded vertex's RAW object-space N/B/T, substituted
+@@ -322,14 +324,28 @@ struct VertexShaderConstants {
+   float cached_normal[4]{0.f, 0.f, 0.f, 0.f};
+   float cached_tangent[4]{0.f, 0.f, 0.f, 0.f};
+   float cached_binormal[4]{0.f, 0.f, 0.f, 0.f};
++  // --- XF matrix memory (binding 1, vsm) ---
++  float transformmatrices[64][4]{}; // raw XF matrix memory rows
+   // Dolphin I_NORMALMATRICES: 32 vec4-aligned rows containing the packed XF
+   // 3x3 normal-matrix bank. Per-vertex PNMTXIDX addresses this with
+   // (posidx & 31), independently of the draw-wide current matrix above.
+   float normalmatrices[32][4]{};
++  // --- The 8 XF lights (binding 2, vsl) ---
++  GpuLight lights[8]{};
+ };
+ static_assert(sizeof(VertexShaderConstants) ==
+               (6 + 4 + 24 + 64) * 16 + 8 * (5 * 16) + 4 * 16 + 3 * 16 +
+                   32 * 16);
++// Each part is staged and de-duplicated on its own, from its first field: a
++// draw's own fields change nearly every draw, matrix memory with them, the
++// lights rarely (Wind Waker at sea: 96, 97 and 2 percent of blocks), and most
++// draws read no matrix memory. As one block, every draw staged all 2832 bytes.
++inline constexpr std::uint32_t kVertexBlockBytes = offsetof(VertexShaderConstants, transformmatrices);
++inline constexpr std::uint32_t kVertexMatrixOffset = offsetof(VertexShaderConstants, transformmatrices);
++inline constexpr std::uint32_t kVertexMatrixBytes =
++    offsetof(VertexShaderConstants, lights) - offsetof(VertexShaderConstants, transformmatrices);
++inline constexpr std::uint32_t kVertexLightOffset = offsetof(VertexShaderConstants, lights);
++inline constexpr std::uint32_t kVertexLightBytes = sizeof(VertexShaderConstants) - kVertexLightOffset;
+ 
+ // Pixel-shader uniforms (Dolphin PixelShaderConstants subset): the four TEV
+ // color registers (I_COLORS: [0] prev seed, [1..3] c0/c1/c2), the four konst
+@@ -644,6 +660,17 @@ struct EfbCopyCommand {
+ // group(1)=dynamic uniform, group(2)=texture+sampler.
+ std::string generate_wgsl(const ShaderKey& key);
+ bool channel_lit_path(const ShaderKey& k, unsigned j);
++// How many leading bytes of each part of VertexShaderConstants
++// generate_wgsl(key) declares (0: it binds none of that part): a draw stages
++// no more. An unlit draw without matrix indices reads its matrix, projection
++// and texgen rows only. gxcore_wgsl_test checks each shader's reads against
++// them.
++struct VertexUniformUse {
++  std::uint32_t block;    // of the draw's own fields (binding 0)
++  std::uint32_t matrices; // of matrix memory (binding 1)
++  std::uint32_t lights;   // of the lights (binding 2)
++};
++VertexUniformUse vertex_uniform_use(const ShaderKey& key);
+ 
+ // The ubershader (gxcore_uber.cpp): one module for any key, which it reads
+ // from the pixel uniform (UberPixelConstants), for a draw whose own pipeline
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore_shader.cpp b/GXRuntime/graphics/gxcore/src/gxcore_shader.cpp
+index 469b497e..3e7b9be1 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore_shader.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore_shader.cpp
+@@ -1,7 +1,9 @@
+ // SPDX-License-Identifier: GPL-3.0-or-later
+ #include "gxruntime/gxcore/shader.hpp"
+ 
++#include <algorithm>
+ #include <cstdarg>
++#include <cstddef>
+ #include <cstdio>
+ #include <cstring>
+ #include <limits>
+@@ -601,34 +603,34 @@ void emit_light(std::string& out, const LightChanKey& ch, int i, bool alpha) {
+   switch (attn) {
+   case AttenuationFunc::None:
+   case AttenuationFunc::Dir:
+-    emitf(out, "            ldir = normalize(vsc.lights[%d].pos.xyz - pos);\n", i);
++    emitf(out, "            ldir = normalize(vsl.lights[%d].pos.xyz - pos);\n", i);
+     emit(out, "            attn = 1.0;\n"
+               "            if (length(ldir) == 0.0) { ldir = _normal; }\n");
+     break;
+   case AttenuationFunc::Spec:
+-    emitf(out, "            ldir = normalize(vsc.lights[%d].pos.xyz - pos);\n", i);
++    emitf(out, "            ldir = normalize(vsl.lights[%d].pos.xyz - pos);\n", i);
+     emitf(out,
+           "            attn = select(0.0, max(0.0, dot(_normal, "
+-          "vsc.lights[%d].dir.xyz)), dot(_normal, ldir) >= 0.0);\n",
++          "vsl.lights[%d].dir.xyz)), dot(_normal, ldir) >= 0.0);\n",
+           i);
+-    emitf(out, "            cosAttn = vsc.lights[%d].cosatt.xyz;\n", i);
++    emitf(out, "            cosAttn = vsl.lights[%d].cosatt.xyz;\n", i);
+     if (diff == DiffuseFunc::None)
+-      emitf(out, "            distAttn = vsc.lights[%d].distatt.xyz;\n", i);
++      emitf(out, "            distAttn = vsl.lights[%d].distatt.xyz;\n", i);
+     else
+-      emitf(out, "            distAttn = normalize(vsc.lights[%d].distatt.xyz);\n", i);
++      emitf(out, "            distAttn = normalize(vsl.lights[%d].distatt.xyz);\n", i);
+     emit(out, "            attn = max(0.0, dot(cosAttn, vec3f(1.0, attn, "
+               "attn*attn))) / dot(distAttn, vec3f(1.0, attn, attn*attn));\n");
+     break;
+   case AttenuationFunc::Spot:
+-    emitf(out, "            ldir = vsc.lights[%d].pos.xyz - pos;\n", i);
++    emitf(out, "            ldir = vsl.lights[%d].pos.xyz - pos;\n", i);
+     emit(out, "            dist2 = dot(ldir, ldir);\n"
+               "            dist = sqrt(dist2);\n"
+               "            ldir = ldir / dist;\n");
+-    emitf(out, "            attn = max(0.0, dot(ldir, vsc.lights[%d].dir.xyz));\n", i);
++    emitf(out, "            attn = max(0.0, dot(ldir, vsl.lights[%d].dir.xyz));\n", i);
+     emitf(out,
+-          "            attn = max(0.0, vsc.lights[%d].cosatt.x + "
+-          "vsc.lights[%d].cosatt.y*attn + vsc.lights[%d].cosatt.z*attn*attn) / "
+-          "dot(vsc.lights[%d].distatt.xyz, vec3f(1.0, dist, dist2));\n",
++          "            attn = max(0.0, vsl.lights[%d].cosatt.x + "
++          "vsl.lights[%d].cosatt.y*attn + vsl.lights[%d].cosatt.z*attn*attn) / "
++          "dot(vsl.lights[%d].distatt.xyz, vec3f(1.0, dist, dist2));\n",
+           i, i, i, i);
+     break;
+   }
+@@ -640,12 +642,12 @@ void emit_light(std::string& out, const LightChanKey& ch, int i, bool alpha) {
+   if (!alpha) {
+     emitf(out,
+           "            lacc = lacc + vec4i(vec3i(round(attn * %svec3f("
+-          "vsc.lights[%d].color.rgb))), 0);\n",
++          "vsl.lights[%d].color.rgb))), 0);\n",
+           dterm, i);
+   } else {
+     emitf(out,
+           "            lacc.a = lacc.a + i32(round(attn * %sf32("
+-          "vsc.lights[%d].color.a)));\n",
++          "vsl.lights[%d].color.a)));\n",
+           dterm, i);
+   }
+   emit(out, "        }\n");
+@@ -734,6 +736,65 @@ bool channel_lit_path(const ShaderKey& k, unsigned j) {
+          static_cast<MatSource>(alp.matsource) == MatSource::Register;
+ }
+ 
++namespace {
++// What a key's shader declares of the three uniform parts (generate_wgsl's
++// conditions, decided once for the WGSL and vertex_uniform_use).
++struct UniformDecl {
++  bool materials = false;   // vsc.materials (and before cached_*)
++  bool cached = false;      // vsc.cached_normal/tangent/binormal
++  bool matrices = false;    // the vsm binding: transformmatrices
++  bool normal_bank = false; // and vsm.normalmatrices
++  bool lights = false;      // the vsl binding
++};
++
++UniformDecl uniform_decl(const ShaderKey& key) {
++  const bool lit = key.lit_valid != 0;
++  bool needs_color1 = false;
++  bool has_emboss = false;
++  bool per_vertex_texmtx = false;
++  for (std::uint32_t i = 0; i < key.num_tex_gens; ++i) {
++    const auto t = static_cast<TexGenType>(key.tex_gens[i].texgentype);
++    if (t == TexGenType::Color1)
++      needs_color1 = true;
++    else if (t == TexGenType::EmbossMap)
++      has_emboss = true;
++    else if (t == TexGenType::Regular && key.has_tex_mtx_idx != 0 &&
++             (key.tex_mtx_idx_mask & (1u << i)) != 0u)
++      per_vertex_texmtx = true;
++  }
++  const bool emit_color1 = key.tev_valid != 0 || needs_color1;
++  const bool chan0_lit = channel_lit_path(key, 0u);
++  const bool chan1_lit = emit_color1 && channel_lit_path(key, 1u);
++  UniformDecl d;
++  d.cached = ((chan0_lit || chan1_lit) && lit && key.has_vertex_normal == 0) ||
++             (has_emboss && (key.has_vertex_tangent == 0 || key.has_vertex_binormal == 0));
++  // cached_* follow materials in the block, so declaring them declares it.
++  d.materials = chan0_lit || chan1_lit || d.cached;
++  d.normal_bank = key.has_pos_mtx_idx != 0 && (lit || has_emboss);
++  d.matrices = key.has_pos_mtx_idx != 0 || per_vertex_texmtx;
++  d.lights = lit || has_emboss || chan0_lit || chan1_lit;
++  return d;
++}
++} // namespace
++
++VertexUniformUse vertex_uniform_use(const ShaderKey& key) {
++  const UniformDecl d = uniform_decl(key);
++  VertexUniformUse use{};
++  if (d.cached)
++    use.block = offsetof(VertexShaderConstants, cached_binormal) + sizeof(VertexShaderConstants::cached_binormal);
++  else if (d.materials)
++    use.block = offsetof(VertexShaderConstants, cached_normal);
++  else // A texgen's static matrix: texmatrices rows 3i to 3i + 2.
++    use.block = static_cast<std::uint32_t>(
++        offsetof(VertexShaderConstants, texmatrices) +
++        std::min<std::uint32_t>(key.num_tex_gens, 8u) * 3u * sizeof(VertexShaderConstants::texmatrices[0]));
++  if (d.matrices)
++    use.matrices = d.normal_bank ? kVertexMatrixBytes : sizeof(VertexShaderConstants::transformmatrices);
++  if (d.lights)
++    use.lights = kVertexLightBytes;
++  return use;
++}
++
+ std::string generate_wgsl(const ShaderKey& key) {
+ 
+   std::string out;
+@@ -761,8 +822,8 @@ std::string generate_wgsl(const ShaderKey& key) {
+       has_normal_source = true;
+   }
+   // Emboss transforms the light dir into tangent space, so the lights uniform +
+-  // the NBT binormal/tangent vertex attrs must be present even on an unlit draw.
+-  const bool emit_lights = lit || has_emboss;
++  // the NBT binormal/tangent vertex attrs must be present even on an unlit draw
++  // (uniform_decl).
+   const bool emit_nbt = has_emboss; // binormal/tangent vertex inputs required
+   // color1 occupies @location(1) whenever it is emitted; texcoords shift up one.
+   const bool emit_color1 = tev || needs_color1;
+@@ -773,12 +834,9 @@ std::string generate_wgsl(const ShaderKey& key) {
+   const bool chan1_lit = emit_color1 && channel_lit_path(key, 1u);
+   const bool needs_normal_bank =
+       key.has_pos_mtx_idx != 0 && (lit || has_emboss);
+-  // The lit path reads vsc.materials (register material/ambient) and, when a
+-  // light is enabled, vsc.lights. Whenever either the light path or a
+-  // register-material channel is active we must expose the full uniform view
+-  // (both fields, in the fixed C struct order) so offsets line up.
+-  const bool needs_uniform_full =
+-      emit_lights || chan0_lit || chan1_lit || needs_normal_bank;
++  // The uniform parts this shader declares: the lit path reads vsc.materials
++  // (register material/ambient) and, when a light is enabled, vsl.lights.
++  const UniformDecl decl = uniform_decl(key);
+   // Vertex-format N/B/T presence. A lit/emboss draw whose format omits an
+   // attribute substitutes the cross-draw cached value from the uniform
+   // (Dolphin I_CACHED_NORMAL fallback, VertexShaderGen.cpp:607-632) instead of
+@@ -799,41 +857,46 @@ std::string generate_wgsl(const ShaderKey& key) {
+   // laid out normal, tangent, binormal — skipping one mid-run would misplace a
+   // later one). Only emitted when actually used, so formats that carry the
+   // attribute keep byte-identical goldens.
+-  const bool uses_cached =
+-      uses_cached_normal || uses_cached_tangent || uses_cached_binormal;
+-  // normalmatrices is the final C-uniform field. A shader that declares it
+-  // must also retain every preceding field so its WGSL offset stays identical.
+-  const bool declare_cached_fields = uses_cached || needs_normal_bank;
++  (void)uses_cached_normal;
++  (void)uses_cached_tangent;
++  (void)uses_cached_binormal;
+ 
++  // Each part declares its leading fields only (a smaller WGSL struct over the
++  // same binding is valid), in the C struct's order so offsets line up; the
++  // matrix-memory and light parts are bound only when read.
+   emit(out, "// gxcore generated shader (Dolphin VertexShaderGen shape)\n");
+-  if (needs_uniform_full)
+-    emit(out, "struct Light {\n"
+-              "    color: vec4i,\n"
+-              "    cosatt: vec4f,\n"
+-              "    distatt: vec4f,\n"
+-              "    pos: vec4f,\n"
+-              "    dir: vec4f,\n"
+-              "};\n");
+   emit(out, "struct VertexShaderConstants {\n"
+             "    posnormalmatrix: array<vec4f, 6>,\n"
+             "    projection: array<vec4f, 4>,\n"
+-            "    texmatrices: array<vec4f, 24>,\n"
+-            "    transformmatrices: array<vec4f, 64>,\n");
+-  // The lit/emboss/register-material path binds the full uniform buffer (lights
+-  // + materials); the plain path declares only the leading fields (a smaller
+-  // WGSL struct over the same buffer is valid), keeping every existing golden
+-  // byte-identical.
+-  if (needs_uniform_full)
+-    emit(out, "    lights: array<Light, 8>,\n"
+-              "    materials: array<vec4i, 4>,\n");
+-  if (declare_cached_fields)
++            "    texmatrices: array<vec4f, 24>,\n");
++  if (decl.materials)
++    emit(out, "    materials: array<vec4i, 4>,\n");
++  if (decl.cached)
+     emit(out, "    cached_normal: vec4f,\n"
+               "    cached_tangent: vec4f,\n"
+               "    cached_binormal: vec4f,\n");
+-  if (needs_normal_bank)
+-    emit(out, "    normalmatrices: array<vec4f, 32>,\n");
+   emit(out, "};\n"
+             "@group(1) @binding(0) var<uniform> vsc: VertexShaderConstants;\n");
++  if (decl.matrices) {
++    emit(out, "struct VertexMatrices {\n"
++              "    transformmatrices: array<vec4f, 64>,\n");
++    if (decl.normal_bank)
++      emit(out, "    normalmatrices: array<vec4f, 32>,\n");
++    emit(out, "};\n"
++              "@group(1) @binding(1) var<uniform> vsm: VertexMatrices;\n");
++  }
++  if (decl.lights)
++    emit(out, "struct Light {\n"
++              "    color: vec4i,\n"
++              "    cosatt: vec4f,\n"
++              "    distatt: vec4f,\n"
++              "    pos: vec4f,\n"
++              "    dir: vec4f,\n"
++              "};\n"
++              "struct VertexLights {\n"
++              "    lights: array<Light, 8>,\n"
++              "};\n"
++              "@group(1) @binding(2) var<uniform> vsl: VertexLights;\n");
+   if (tev) {
+     // PixelShaderConstants (Dolphin I_COLORS/I_KCOLORS/I_ALPHA). Integer TEV.
+     // group(2) here (texture shifts to group(3)) so an untextured TEV draw
+@@ -929,9 +992,9 @@ std::string generate_wgsl(const ShaderKey& key) {
+             "    var o: VertexOut;\n");
+   if (key.has_pos_mtx_idx != 0) {
+     emit(out, "    let posidx = i32(in.posmtx);\n"
+-              "    let p0 = vsc.transformmatrices[posidx];\n"
+-              "    let p1 = vsc.transformmatrices[posidx + 1];\n"
+-              "    let p2 = vsc.transformmatrices[posidx + 2];\n");
++              "    let p0 = vsm.transformmatrices[posidx];\n"
++              "    let p1 = vsm.transformmatrices[posidx + 1];\n"
++              "    let p2 = vsm.transformmatrices[posidx + 2];\n");
+     if (needs_normal_bank)
+       emit(out, "    let normidx = posidx & 31;\n");
+   } else {
+@@ -969,9 +1032,9 @@ std::string generate_wgsl(const ShaderKey& key) {
+     // there are none, leaving the material term intact.
+     if (lit && needs_normal_bank)
+       emitf(out, "    let _normal = normalize(vec3f("
+-                 "dot(vsc.normalmatrices[normidx].xyz, %s), "
+-                 "dot(vsc.normalmatrices[normidx + 1].xyz, %s), "
+-                 "dot(vsc.normalmatrices[normidx + 2].xyz, %s)));\n",
++                 "dot(vsm.normalmatrices[normidx].xyz, %s), "
++                 "dot(vsm.normalmatrices[normidx + 1].xyz, %s), "
++                 "dot(vsm.normalmatrices[normidx + 2].xyz, %s)));\n",
+             normal_in, normal_in, normal_in);
+     else if (lit)
+       emitf(out, "    let _normal = normalize(vec3f("
+@@ -1048,9 +1111,9 @@ std::string generate_wgsl(const ShaderKey& key) {
+           emitf(out,
+                 "        let ti%u = (in.texmtxidx_hi >> (8u * %uu)) & 0xFFu;\n",
+                 i, i - 4u);
+-        emitf(out, "        let m%u0 = vsc.transformmatrices[ti%u];\n", i, i);
+-        emitf(out, "        let m%u1 = vsc.transformmatrices[ti%u + 1u];\n", i, i);
+-        emitf(out, "        let m%u2 = vsc.transformmatrices[ti%u + 2u];\n", i, i);
++        emitf(out, "        let m%u0 = vsm.transformmatrices[ti%u];\n", i, i);
++        emitf(out, "        let m%u1 = vsm.transformmatrices[ti%u + 1u];\n", i, i);
++        emitf(out, "        let m%u2 = vsm.transformmatrices[ti%u + 2u];\n", i, i);
+         if (tg.projection != 0u)
+           emitf(out, "        var uv = vec3f(dot(coord, m%u0), dot(coord, m%u1), "
+                      "dot(coord, m%u2));\n",
+@@ -1087,14 +1150,14 @@ std::string generate_wgsl(const ShaderKey& key) {
+       // Tangent/binormal go to view space via the normal matrix (rows 3-5).
+       if (needs_normal_bank) {
+         emitf(out, "        let tn%u = vec3f("
+-                   "dot(vsc.normalmatrices[normidx].xyz, %s), "
+-                   "dot(vsc.normalmatrices[normidx + 1].xyz, %s), "
+-                   "dot(vsc.normalmatrices[normidx + 2].xyz, %s));\n",
++                   "dot(vsm.normalmatrices[normidx].xyz, %s), "
++                   "dot(vsm.normalmatrices[normidx + 1].xyz, %s), "
++                   "dot(vsm.normalmatrices[normidx + 2].xyz, %s));\n",
+               i, tangent_in, tangent_in, tangent_in);
+         emitf(out, "        let bn%u = vec3f("
+-                   "dot(vsc.normalmatrices[normidx].xyz, %s), "
+-                   "dot(vsc.normalmatrices[normidx + 1].xyz, %s), "
+-                   "dot(vsc.normalmatrices[normidx + 2].xyz, %s));\n",
++                   "dot(vsm.normalmatrices[normidx].xyz, %s), "
++                   "dot(vsm.normalmatrices[normidx + 1].xyz, %s), "
++                   "dot(vsm.normalmatrices[normidx + 2].xyz, %s));\n",
+               i, binormal_in, binormal_in, binormal_in);
+       } else {
+         emitf(out, "        let tn%u = vec3f("
+@@ -1108,7 +1171,7 @@ std::string generate_wgsl(const ShaderKey& key) {
+                    "dot(vsc.posnormalmatrix[5].xyz, %s));\n",
+               i, binormal_in, binormal_in, binormal_in);
+       }
+-      emitf(out, "        let ld%u = normalize(vsc.lights[%uu].pos.xyz - "
++      emitf(out, "        let ld%u = normalize(vsl.lights[%uu].pos.xyz - "
+                  "viewpos.xyz);\n",
+             i, static_cast<unsigned>(tg.embosslightshift));
+       emitf(out, "        o.uv%u = o.uv%u + vec3f(dot(ld%u, tn%u), "
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore_uber.cpp b/GXRuntime/graphics/gxcore/src/gxcore_uber.cpp
+index 7bf54ab6..f4756aa6 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore_uber.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore_uber.cpp
+@@ -135,15 +135,21 @@ struct VertexShaderConstants {
+     posnormalmatrix: array<vec4f, 6>,
+     projection: array<vec4f, 4>,
+     texmatrices: array<vec4f, 24>,
+-    transformmatrices: array<vec4f, 64>,
+-    lights: array<Light, 8>,
+     materials: array<vec4i, 4>,
+     cached_normal: vec4f,
+     cached_tangent: vec4f,
+     cached_binormal: vec4f,
+-    normalmatrices: array<vec4f, 32>,
+ };
+ @group(1) @binding(0) var<uniform> vsc: VertexShaderConstants;
++struct VertexMatrices {
++    transformmatrices: array<vec4f, 64>,
++    normalmatrices: array<vec4f, 32>,
++};
++@group(1) @binding(1) var<uniform> vsm: VertexMatrices;
++struct VertexLights {
++    lights: array<Light, 8>,
++};
++@group(1) @binding(2) var<uniform> vsl: VertexLights;
+ // The pixel constants, then the draw's shader key and what the CPU derived
+ // from it (extra.x: more than one texmap, sampled where each is bound).
+ struct PixelShaderConstants {
+@@ -268,24 +274,24 @@ fn light_term(i: u32, ch: u32, pos: vec3f, _normal: vec3f) -> f32 {
+     var ldir: vec3f;
+     var attn: f32;
+     if (attnfn == 0u || attnfn == 2u) {
+-        ldir = normalize(vsc.lights[i].pos.xyz - pos);
++        ldir = normalize(vsl.lights[i].pos.xyz - pos);
+         attn = 1.0;
+         if (length(ldir) == 0.0) { ldir = _normal; }
+     } else if (attnfn == 1u) {
+-        ldir = normalize(vsc.lights[i].pos.xyz - pos);
+-        attn = select(0.0, max(0.0, dot(_normal, vsc.lights[i].dir.xyz)), dot(_normal, ldir) >= 0.0);
+-        let cosAttn = vsc.lights[i].cosatt.xyz;
++        ldir = normalize(vsl.lights[i].pos.xyz - pos);
++        attn = select(0.0, max(0.0, dot(_normal, vsl.lights[i].dir.xyz)), dot(_normal, ldir) >= 0.0);
++        let cosAttn = vsl.lights[i].cosatt.xyz;
+         var distAttn: vec3f;
+-        if (diff == 0u) { distAttn = vsc.lights[i].distatt.xyz; } else { distAttn = normalize(vsc.lights[i].distatt.xyz); }
++        if (diff == 0u) { distAttn = vsl.lights[i].distatt.xyz; } else { distAttn = normalize(vsl.lights[i].distatt.xyz); }
+         attn = max(0.0, dot(cosAttn, vec3f(1.0, attn, attn*attn))) / dot(distAttn, vec3f(1.0, attn, attn*attn));
+     } else {
+-        ldir = vsc.lights[i].pos.xyz - pos;
++        ldir = vsl.lights[i].pos.xyz - pos;
+         let dist2 = dot(ldir, ldir);
+         let dist = sqrt(dist2);
+         ldir = ldir / dist;
+-        attn = max(0.0, dot(ldir, vsc.lights[i].dir.xyz));
+-        attn = max(0.0, vsc.lights[i].cosatt.x + vsc.lights[i].cosatt.y*attn + vsc.lights[i].cosatt.z*attn*attn) /
+-               dot(vsc.lights[i].distatt.xyz, vec3f(1.0, dist, dist2));
++        attn = max(0.0, dot(ldir, vsl.lights[i].dir.xyz));
++        attn = max(0.0, vsl.lights[i].cosatt.x + vsl.lights[i].cosatt.y*attn + vsl.lights[i].cosatt.z*attn*attn) /
++               dot(vsl.lights[i].distatt.xyz, vec3f(1.0, dist, dist2));
+     }
+     if (diff == 1u) { return attn * (dot(ldir, _normal)); }
+     if (diff == 2u) { return attn * max(0.0, dot(ldir, _normal)); }
+@@ -321,7 +327,7 @@ fn calc_lighting(j: u32, base_color: vec4f, pos: vec3f, _normal: vec3f) -> vec4f
+         for (var i = 0u; i < 8u; i++) {
+             if (((mask >> i) & 1u) != 0u) {
+                 let t = light_term(i, col, pos, _normal);
+-                lacc = lacc + vec4i(vec3i(round(t * vec3f(vsc.lights[i].color.rgb))), 0);
++                lacc = lacc + vec4i(vec3i(round(t * vec3f(vsl.lights[i].color.rgb))), 0);
+             }
+         }
+     }
+@@ -330,7 +336,7 @@ fn calc_lighting(j: u32, base_color: vec4f, pos: vec3f, _normal: vec3f) -> vec4f
+         for (var i = 0u; i < 8u; i++) {
+             if (((mask >> i) & 1u) != 0u) {
+                 let t = light_term(i, alp, pos, _normal);
+-                lacc.a = lacc.a + i32(round(t * f32(vsc.lights[i].color.a)));
++                lacc.a = lacc.a + i32(round(t * f32(vsl.lights[i].color.a)));
+             }
+         }
+     }
+@@ -356,9 +362,9 @@ fn vs_main(in: VertexIn) -> VertexOut {
+     var p2: vec4f;
+     if (has_posidx) {
+         posidx = i32(in.posmtx);
+-        p0 = vsc.transformmatrices[posidx];
+-        p1 = vsc.transformmatrices[posidx + 1];
+-        p2 = vsc.transformmatrices[posidx + 2];
++        p0 = vsm.transformmatrices[posidx];
++        p1 = vsm.transformmatrices[posidx + 1];
++        p2 = vsm.transformmatrices[posidx + 2];
+         normidx = posidx & 31;
+     } else {
+         p0 = vsc.posnormalmatrix[0];
+@@ -390,9 +396,9 @@ fn vs_main(in: VertexIn) -> VertexOut {
+     var _normal = vec3f(0.0, 0.0, 1.0);
+     if ((lit0 || lit1) && lit) {
+         if (needs_normal_bank) {
+-            _normal = normalize(vec3f(dot(vsc.normalmatrices[normidx].xyz, normal_in),
+-                                      dot(vsc.normalmatrices[normidx + 1].xyz, normal_in),
+-                                      dot(vsc.normalmatrices[normidx + 2].xyz, normal_in)));
++            _normal = normalize(vec3f(dot(vsm.normalmatrices[normidx].xyz, normal_in),
++                                      dot(vsm.normalmatrices[normidx + 1].xyz, normal_in),
++                                      dot(vsm.normalmatrices[normidx + 2].xyz, normal_in)));
+         } else {
+             _normal = normalize(vec3f(dot(vsc.posnormalmatrix[3].xyz, normal_in),
+                                       dot(vsc.posnormalmatrix[4].xyz, normal_in),
+@@ -433,9 +439,9 @@ fn vs_main(in: VertexIn) -> VertexOut {
+                 var ti: u32;
+                 if (i < 4u) { ti = (in.texmtxidx >> (8u * i)) & 0xFFu; }
+                 else { ti = (in.texmtxidx_hi >> (8u * (i - 4u))) & 0xFFu; }
+-                let m0 = vsc.transformmatrices[ti];
+-                let m1 = vsc.transformmatrices[ti + 1u];
+-                let m2 = vsc.transformmatrices[ti + 2u];
++                let m0 = vsm.transformmatrices[ti];
++                let m1 = vsm.transformmatrices[ti + 1u];
++                let m2 = vsm.transformmatrices[ti + 2u];
+                 if (proj) { uv = vec3f(dot(coord, m0), dot(coord, m1), dot(coord, m2)); }
+                 else { uv = vec3f(dot(coord, m0), dot(coord, m1), 1.0); }
+             } else if (proj) {
+@@ -454,19 +460,19 @@ fn vs_main(in: VertexIn) -> VertexOut {
+             var tn: vec3f;
+             var bn: vec3f;
+             if (needs_normal_bank) {
+-                tn = vec3f(dot(vsc.normalmatrices[normidx].xyz, tangent_in),
+-                           dot(vsc.normalmatrices[normidx + 1].xyz, tangent_in),
+-                           dot(vsc.normalmatrices[normidx + 2].xyz, tangent_in));
+-                bn = vec3f(dot(vsc.normalmatrices[normidx].xyz, binormal_in),
+-                           dot(vsc.normalmatrices[normidx + 1].xyz, binormal_in),
+-                           dot(vsc.normalmatrices[normidx + 2].xyz, binormal_in));
++                tn = vec3f(dot(vsm.normalmatrices[normidx].xyz, tangent_in),
++                           dot(vsm.normalmatrices[normidx + 1].xyz, tangent_in),
++                           dot(vsm.normalmatrices[normidx + 2].xyz, tangent_in));
++                bn = vec3f(dot(vsm.normalmatrices[normidx].xyz, binormal_in),
++                           dot(vsm.normalmatrices[normidx + 1].xyz, binormal_in),
++                           dot(vsm.normalmatrices[normidx + 2].xyz, binormal_in));
+             } else {
+                 tn = vec3f(dot(vsc.posnormalmatrix[3].xyz, tangent_in), dot(vsc.posnormalmatrix[4].xyz, tangent_in),
+                            dot(vsc.posnormalmatrix[5].xyz, tangent_in));
+                 bn = vec3f(dot(vsc.posnormalmatrix[3].xyz, binormal_in), dot(vsc.posnormalmatrix[4].xyz, binormal_in),
+                            dot(vsc.posnormalmatrix[5].xyz, binormal_in));
+             }
+-            let ld = normalize(vsc.lights[kb(tg + TG_embosslightshift)].pos.xyz - viewpos.xyz);
++            let ld = normalize(vsl.lights[kb(tg + TG_embosslightshift)].pos.xyz - viewpos.xyz);
+             uvs[i] = uvs[min(kb(tg + TG_embosssourceshift), 4u)] + vec3f(dot(ld, tn), dot(ld, bn), 0.0);
+         }
+     }
+diff --git a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+index 0a17835d..c6e379db 100644
+--- a/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
++++ b/GXRuntime/graphics/gxcore/tests/gxcore_wgsl_test.cpp
+@@ -6,8 +6,11 @@
+ 
+ #include "gxruntime/gxcore/gxcore.hpp"
+ 
++#include <cctype>
+ #include <cmath>
++#include <cstddef>
+ #include <cstdio>
++#include <cstdlib>
+ #include <cstring>
+ #include <string>
+ #include <vector>
+@@ -44,6 +47,68 @@ ar::RenderStatePacket bp(std::uint32_t reg, std::uint32_t value) {
+   return {.kind = ar::RenderStateKind::BpReg, .index = reg, .value = value};
+ }
+ 
++// Every field of the three vertex uniform parts the shader reads lies within
++// the bytes vertex_uniform_use says a draw stages of that part: a literal index
++// reads up to that element, any other the whole field.
++void check_vertex_uniform_reads(const gxc::ShaderKey& key, const std::string& wgsl) {
++  struct Field {
++    const char* binding;
++    const char* name;
++    std::size_t offset, size, stride;
++  };
++  using C = gxc::VertexShaderConstants;
++  const std::size_t m = gxc::kVertexMatrixOffset;
++  const std::size_t l = gxc::kVertexLightOffset;
++  static const Field fields[] = {
++      {"vsc", "posnormalmatrix", offsetof(C, posnormalmatrix), sizeof(C::posnormalmatrix), 16},
++      {"vsc", "projection", offsetof(C, projection), sizeof(C::projection), 16},
++      {"vsc", "texmatrices", offsetof(C, texmatrices), sizeof(C::texmatrices), 16},
++      {"vsc", "materials", offsetof(C, materials), sizeof(C::materials), 16},
++      {"vsc", "cached_normal", offsetof(C, cached_normal), 16, 16},
++      {"vsc", "cached_tangent", offsetof(C, cached_tangent), 16, 16},
++      {"vsc", "cached_binormal", offsetof(C, cached_binormal), 16, 16},
++      {"vsm", "transformmatrices", offsetof(C, transformmatrices) - m, sizeof(C::transformmatrices), 16},
++      {"vsm", "normalmatrices", offsetof(C, normalmatrices) - m, sizeof(C::normalmatrices), 16},
++      {"vsl", "lights", offsetof(C, lights) - l, sizeof(C::lights), sizeof(C::lights[0])},
++  };
++  const gxc::VertexUniformUse use = gxc::vertex_uniform_use(key);
++  for (const char* binding : {"vsc", "vsm", "vsl"}) {
++    const std::size_t staged = binding[2] == 'c' ? use.block : binding[2] == 'm' ? use.matrices : use.lights;
++    const std::string prefix = std::string(binding) + ".";
++    std::size_t at = 0;
++    while ((at = wgsl.find(prefix, at)) != std::string::npos) {
++      at += prefix.size();
++      std::size_t end = at;
++      while (end < wgsl.size() && (std::isalnum(static_cast<unsigned char>(wgsl[end])) || wgsl[end] == '_'))
++        ++end;
++      const std::string name = wgsl.substr(at, end - at);
++      const Field* field = nullptr;
++      for (const Field& f : fields)
++        if (name == f.name && std::strcmp(binding, f.binding) == 0)
++          field = &f;
++      CHECK(field != nullptr);
++      if (field == nullptr)
++        continue;
++      std::size_t read = field->offset + field->size;
++      if (end < wgsl.size() && wgsl[end] == '[') {
++        char* stop = nullptr;
++        const unsigned long index = std::strtoul(wgsl.c_str() + end + 1, &stop, 10);
++        if (stop != wgsl.c_str() + end + 1 && *stop == ']')
++          read = field->offset + (index + 1) * field->stride;
++      }
++      if (read > staged)
++        std::fprintf(stderr, "%s.%s read to byte %zu, staged %zu\n", binding, name.c_str(), read, staged);
++      CHECK(read <= staged);
++    }
++  }
++}
++
++std::string checked_wgsl(const gxc::ShaderKey& key) {
++  std::string wgsl = gxc::generate_wgsl(key);
++  check_vertex_uniform_reads(key, wgsl);
++  return wgsl;
++}
++
+ // The golden WGSL for the textured 1-texgen key below. Regenerate by running
+ // this test with GXCORE_PRINT_WGSL=1 in the environment and pasting stdout.
+ constexpr const char* kGoldenTexturedWgsl =
+@@ -52,7 +117,6 @@ struct VertexShaderConstants {
+     posnormalmatrix: array<vec4f, 6>,
+     projection: array<vec4f, 4>,
+     texmatrices: array<vec4f, 24>,
+-    transformmatrices: array<vec4f, 64>,
+ };
+ @group(1) @binding(0) var<uniform> vsc: VertexShaderConstants;
+ @group(2) @binding(0) var tex0: texture_2d<f32>;
+@@ -274,7 +338,7 @@ void test_state_to_plan_and_wgsl() {
+     CHECK(dst_plan.pipeline.shader.dst_alpha == 0x5Au);
+     CHECK(gaps.dst_alpha_active == 1u);
+     const std::string dst_wgsl =
+-        gxc::generate_wgsl(dst_plan.pipeline.shader);
++        checked_wgsl(dst_plan.pipeline.shader);
+     CHECK(dst_wgsl.find("@location(0) @blend_src(0) color") !=
+           std::string::npos);
+     CHECK(dst_wgsl.find("@location(0) @blend_src(1) blend") !=
+@@ -497,7 +561,7 @@ void test_state_to_plan_and_wgsl() {
+   CHECK(plan.viewport_valid);
+ 
+   // WGSL golden.
+-  const std::string wgsl = gxc::generate_wgsl(key);
++  const std::string wgsl = checked_wgsl(key);
+   if (std::getenv("GXCORE_PRINT_WGSL") != nullptr)
+     std::printf("%s", wgsl.c_str());
+   if (wgsl != kGoldenTexturedWgsl) {
+@@ -512,15 +576,15 @@ void test_untextured_defaults() {
+   gxc::ShaderKey key{};
+   key.num_tex_gens = 0;
+   key.has_color0 = 1;
+-  const std::string wgsl = gxc::generate_wgsl(key);
++  const std::string wgsl = checked_wgsl(key);
+   CHECK(wgsl.find("@group(2)") == std::string::npos);
+   CHECK(wgsl.find("o.color0 = in.rawcolor0;") != std::string::npos);
+   CHECK(wgsl.find("textureSample") == std::string::npos);
+   // Per-vertex position matrix variant.
+   gxc::ShaderKey pnkey{};
+   pnkey.has_pos_mtx_idx = 1;
+-  const std::string pn = gxc::generate_wgsl(pnkey);
+-  CHECK(pn.find("vsc.transformmatrices[posidx]") != std::string::npos);
++  const std::string pn = checked_wgsl(pnkey);
++  CHECK(pn.find("vsm.transformmatrices[posidx]") != std::string::npos);
+ }
+ 
+ // Item 5: the vertex decoder packs the per-vertex TEXMTXIDX byte into the fixed
+@@ -618,7 +682,7 @@ void test_texgen_color() {
+   key.tex_gens[0].texgentype = static_cast<std::uint8_t>(gxc::TexGenType::Color0);
+   key.tex_gens[1].enabled = 1;
+   key.tex_gens[1].texgentype = static_cast<std::uint8_t>(gxc::TexGenType::Color1);
+-  const std::string w = gxc::generate_wgsl(key);
++  const std::string w = checked_wgsl(key);
+   CHECK(w.find("@location(1) color1: vec4f,") != std::string::npos);
+   CHECK(w.find("o.uv0 = vec3f(o.color0.x, o.color0.y, 1.0);") !=
+         std::string::npos);
+@@ -638,14 +702,14 @@ void test_texgen_normal_source() {
+   key.tex_gens[0].texgentype = static_cast<std::uint8_t>(gxc::TexGenType::Regular);
+   key.tex_gens[0].sourcerow = static_cast<std::uint8_t>(gxc::TexSourceRow::Normal);
+   key.has_vertex_normal = 1;
+-  const std::string with_normal = gxc::generate_wgsl(key);
++  const std::string with_normal = checked_wgsl(key);
+   CHECK(with_normal.find("@location(8) rawnormal: vec3f") !=
+         std::string::npos);
+   CHECK(with_normal.find("coord = vec4f(in.rawnormal, 1.0);") !=
+         std::string::npos);
+ 
+   key.has_vertex_normal = 0;
+-  const std::string without_normal = gxc::generate_wgsl(key);
++  const std::string without_normal = checked_wgsl(key);
+   CHECK(without_normal.find("coord = vec4f(in.rawnormal, 1.0);") ==
+         std::string::npos);
+ }
+@@ -677,7 +741,7 @@ void test_five_texgens() {
+   key.tev_stages[0].tevorders_texmap = 0;
+   key.tev_stages[0].tevorders_texcoord = 4;
+ 
+-  const std::string w = gxc::generate_wgsl(key);
++  const std::string w = checked_wgsl(key);
+   CHECK(w.find("@location(12) rawtex4: vec2f") != std::string::npos);
+   CHECK(w.find("@location(13) texmtxidx_hi: u32") != std::string::npos);
+   CHECK(w.find("@location(6) uv4: vec3f") != std::string::npos);
+@@ -1004,13 +1068,13 @@ void test_texgen_emboss() {
+       static_cast<std::uint8_t>(gxc::TexGenType::EmbossMap);
+   key.tex_gens[1].embosssourceshift = 0; // source = texgen 0
+   key.tex_gens[1].embosslightshift = 2;  // light index 2
+-  const std::string w = gxc::generate_wgsl(key);
++  const std::string w = checked_wgsl(key);
+   CHECK(w.find("struct Light {") != std::string::npos); // emboss forces lights
+   CHECK(w.find("lights: array<Light, 8>,") != std::string::npos);
+   CHECK(w.find("@location(8) rawnormal: vec3f,") != std::string::npos);
+   CHECK(w.find("@location(10) rawbinormal: vec3f,") != std::string::npos);
+   CHECK(w.find("@location(11) rawtangent: vec3f,") != std::string::npos);
+-  CHECK(w.find("normalize(vsc.lights[2u].pos.xyz - viewpos.xyz)") !=
++  CHECK(w.find("normalize(vsl.lights[2u].pos.xyz - viewpos.xyz)") !=
+         std::string::npos);
+   // uv1 (emboss) offsets uv0 (its source texgen).
+   CHECK(w.find("o.uv1 = o.uv0 + vec3f(dot(ld1, tn1), dot(ld1, bn1), 0.0);") !=
+@@ -1026,17 +1090,17 @@ void test_texgen_per_vertex_mtx() {
+   key.tex_mtx_idx_mask = 0x1; // texgen 0 carries the attribute
+   key.tex_gens[0].enabled = 1;
+   key.tex_gens[0].texgentype = static_cast<std::uint8_t>(gxc::TexGenType::Regular);
+-  const std::string w = gxc::generate_wgsl(key);
++  const std::string w = checked_wgsl(key);
+   CHECK(w.find("@location(9) texmtxidx: u32,") != std::string::npos);
+   CHECK(w.find("(in.texmtxidx >> (8u * 0u)) & 0xFFu") != std::string::npos);
+-  CHECK(w.find("vsc.transformmatrices[ti0]") != std::string::npos);
++  CHECK(w.find("vsm.transformmatrices[ti0]") != std::string::npos);
+   // A texgen NOT in the mask keeps the static slot.
+   gxc::ShaderKey key2{};
+   key2.num_tex_gens = 1;
+   key2.has_tex_mtx_idx = 1;
+   key2.tex_mtx_idx_mask = 0x0; // texgen 0 does not carry it
+   key2.tex_gens[0].enabled = 1;
+-  const std::string w2 = gxc::generate_wgsl(key2);
++  const std::string w2 = checked_wgsl(key2);
+   CHECK(w2.find("vsc.texmatrices[0]") != std::string::npos);
+   CHECK(w2.find("in.texmtxidx") == std::string::npos);
+ }
+@@ -1058,7 +1122,7 @@ void test_tev_indirect_matrix() {
+   key.tev_stages[0].ind_matrix_index = 1;
+ 
+   CHECK(gxc::used_texmap_mask(key) == 0x3u);
+-  const std::string w = gxc::generate_wgsl(key);
++  const std::string w = checked_wgsl(key);
+   CHECK(w.find("indtexmtx: array<vec4i, 6>") != std::string::npos);
+   CHECK(w.find("textureSample(tex1, samp1, ind_uv0).abg") !=
+         std::string::npos);
+@@ -1078,7 +1142,7 @@ void test_tev_texcoord_scale() {
+   key.tev_stages[0].tevorders_texmap = 0;
+   key.tev_stages[0].tevorders_texcoord = 0;
+ 
+-  const std::string w = gxc::generate_wgsl(key);
++  const std::string w = checked_wgsl(key);
+   CHECK(w.find("texdims: array<vec4i, 8>") != std::string::npos);
+   CHECK(w.find("vec2i(in.uv0.xy * vec2f(psc.texdims[0].zw * 128))") !=
+         std::string::npos);
+@@ -1098,7 +1162,6 @@ struct VertexShaderConstants {
+     posnormalmatrix: array<vec4f, 6>,
+     projection: array<vec4f, 4>,
+     texmatrices: array<vec4f, 24>,
+-    transformmatrices: array<vec4f, 64>,
+ };
+ @group(1) @binding(0) var<uniform> vsc: VertexShaderConstants;
+ struct PixelShaderConstants {
+@@ -1337,7 +1400,7 @@ void test_tev_modulate() {
+   CHECK(plan.pixel_constants.kcolors[0][2] == 20);
+   CHECK(plan.pixel_constants.kcolors[0][3] == 40);
+ 
+-  const std::string wgsl = gxc::generate_wgsl(key);
++  const std::string wgsl = checked_wgsl(key);
+   if (std::getenv("GXCORE_PRINT_WGSL") != nullptr)
+     std::printf("%s", wgsl.c_str());
+   if (wgsl != kGoldenTevWgsl) {
+@@ -1360,7 +1423,7 @@ void test_tev_modulate() {
+   CHECK(ztex_plan.pixel_constants.zbias[3] == 0x1234);
+   CHECK(ztex_counters.ztexture_active == 1u);
+   CHECK(ztex_counters.ztexture_ignored == 0u);
+-  const std::string ztex_wgsl = gxc::generate_wgsl(ztex_plan.pipeline.shader);
++  const std::string ztex_wgsl = checked_wgsl(ztex_plan.pipeline.shader);
+   CHECK(ztex_wgsl.find("@builtin(frag_depth)") != std::string::npos);
+   CHECK(ztex_wgsl.find("rawtextemp.r * 65536") != std::string::npos);
+   CHECK(ztex_wgsl.find("+ psc.zbias.w") != std::string::npos);
+@@ -1389,7 +1452,7 @@ void test_tev_konst_and_alpha() {
+   s.ksel_kc = 0x0C; // K0 rgb
+   s.ksel_ka = 0x1C; // K0 a
+   s.tevorders_enable = 1;
+-  const std::string wgsl = gxc::generate_wgsl(key);
++  const std::string wgsl = checked_wgsl(key);
+   CHECK(wgsl.find("konsttemp = vec4i(psc.kcolors[0].rgb, psc.kcolors[0].a);") !=
+         std::string::npos);
+   CHECK(wgsl.find("if (!( (prev.a > psc.alpha_ref.x) && (true) )) { discard; }") !=
+@@ -1402,6 +1465,13 @@ void test_tev_konst_and_alpha() {
+ // no texgens, TEV off. Regenerate with GXCORE_PRINT_WGSL=1.
+ constexpr const char* kGoldenLitWgsl =
+     R"(// gxcore generated shader (Dolphin VertexShaderGen shape)
++struct VertexShaderConstants {
++    posnormalmatrix: array<vec4f, 6>,
++    projection: array<vec4f, 4>,
++    texmatrices: array<vec4f, 24>,
++    materials: array<vec4i, 4>,
++};
++@group(1) @binding(0) var<uniform> vsc: VertexShaderConstants;
+ struct Light {
+     color: vec4i,
+     cosatt: vec4f,
+@@ -1409,15 +1479,10 @@ struct Light {
+     pos: vec4f,
+     dir: vec4f,
+ };
+-struct VertexShaderConstants {
+-    posnormalmatrix: array<vec4f, 6>,
+-    projection: array<vec4f, 4>,
+-    texmatrices: array<vec4f, 24>,
+-    transformmatrices: array<vec4f, 64>,
++struct VertexLights {
+     lights: array<Light, 8>,
+-    materials: array<vec4i, 4>,
+ };
+-@group(1) @binding(0) var<uniform> vsc: VertexShaderConstants;
++@group(1) @binding(2) var<uniform> vsl: VertexLights;
+ struct VertexIn {
+     @location(0) rawpos: vec3f,
+     @location(1) posmtx: u32,
+@@ -1447,10 +1512,10 @@ fn calc_lighting_chn0(base_color: vec4f, pos: vec3f, _normal: vec3f) -> vec4f {
+     lacc = vsc.materials[0];
+     lacc.w = 255;
+         { // light 0
+-            ldir = normalize(vsc.lights[0].pos.xyz - pos);
++            ldir = normalize(vsl.lights[0].pos.xyz - pos);
+             attn = 1.0;
+             if (length(ldir) == 0.0) { ldir = _normal; }
+-            lacc = lacc + vec4i(vec3i(round(attn * max(0.0, dot(ldir, _normal)) * vec3f(vsc.lights[0].color.rgb))), 0);
++            lacc = lacc + vec4i(vec3i(round(attn * max(0.0, dot(ldir, _normal)) * vec3f(vsl.lights[0].color.rgb))), 0);
+         }
+     lacc = clamp(lacc, vec4<i32>(0), vec4<i32>(255));
+     return vec4f((mat * (lacc + (lacc >> vec4u(7)))) >> vec4u(8)) / 255.0;
+@@ -1615,7 +1680,7 @@ void test_lighting() {
+   CHECK(plan.constants.normalmatrices[8][2] == 28.f);
+   CHECK(plan.constants.normalmatrices[8][3] == 0.f);
+ 
+-  const std::string wgsl = gxc::generate_wgsl(key);
++  const std::string wgsl = checked_wgsl(key);
+   if (std::getenv("GXCORE_PRINT_WGSL") != nullptr)
+     std::printf("%s", wgsl.c_str());
+   // Structural checks (oracle-verifiable) in addition to the byte golden.
+@@ -1627,8 +1692,8 @@ void test_lighting() {
+   CHECK(wgsl.find("mat = vec4i(round(base_color * 255.0));") != std::string::npos);
+   CHECK(wgsl.find("lacc = vsc.materials[0];") != std::string::npos); // ambsource Register
+   CHECK(wgsl.find("lacc.w = 255;") != std::string::npos);            // alpha lighting off
+-  CHECK(wgsl.find("ldir = normalize(vsc.lights[0].pos.xyz - pos);") != std::string::npos);
+-  CHECK(wgsl.find("max(0.0, dot(ldir, _normal)) * vec3f(vsc.lights[0].color.rgb)") !=
++  CHECK(wgsl.find("ldir = normalize(vsl.lights[0].pos.xyz - pos);") != std::string::npos);
++  CHECK(wgsl.find("max(0.0, dot(ldir, _normal)) * vec3f(vsl.lights[0].color.rgb)") !=
+         std::string::npos);
+   CHECK(wgsl.find("o.color0 = calc_lighting_chn0(in.rawcolor0, viewpos.xyz, _normal);") !=
+         std::string::npos);
+@@ -1662,7 +1727,7 @@ void test_lighting_spot_and_matw() {
+   key.litchan[2].matsource = 1; // Vertex (differs from color -> mat.w override)
+   key.litchan[2].attnfunc = 1;  // Spec
+   key.litchan[2].light_mask = 0x1;
+-  const std::string wgsl = gxc::generate_wgsl(key);
++  const std::string wgsl = checked_wgsl(key);
+   // Channel 1 is unconfigured, so its lighting function is not emitted even with
+   // TEV on; o.color1 passes the vertex color through (identical to running the
+   // unlit lighting function). The spot/spec math below lives in chn0.
+@@ -1675,7 +1740,7 @@ void test_lighting_spot_and_matw() {
+   CHECK(wgsl.find("lacc = vec4i(round(base_color * 255.0));") != std::string::npos); // ambsource Vertex
+   CHECK(wgsl.find("(dot(ldir, _normal)) * vec3f") != std::string::npos); // Sign (no max)
+   // Spec alpha light: select() attenuation.
+-  CHECK(wgsl.find("attn = select(0.0, max(0.0, dot(_normal, vsc.lights[0].dir.xyz))") !=
++  CHECK(wgsl.find("attn = select(0.0, max(0.0, dot(_normal, vsl.lights[0].dir.xyz))") !=
+         std::string::npos);
+ }
+ 
+@@ -1696,14 +1761,14 @@ void test_lighting_completeness() {
+     key.litchan[0].enablelighting = 0;
+     key.litchan[0].matsource = 0; // Register
+     key.litchan[2].matsource = 0; // Register (alpha)
+-    const std::string wgsl = gxc::generate_wgsl(key);
++    const std::string wgsl = checked_wgsl(key);
+     CHECK(wgsl.find("fn calc_lighting_chn0(") != std::string::npos);
+     CHECK(wgsl.find("materials: array<vec4i, 4>,") != std::string::npos);
+     CHECK(wgsl.find("@location(8) rawnormal: vec3f,") == std::string::npos);
+     CHECK(wgsl.find("let _normal = vec3f(0.0, 0.0, 1.0);") != std::string::npos);
+     CHECK(wgsl.find("mat = vsc.materials[2];") != std::string::npos); // register mat
+     CHECK(wgsl.find("lacc = vec4i(255, 255, 255, 255);") != std::string::npos); // unlit seed
+-    CHECK(wgsl.find("vsc.lights[") == std::string::npos); // no light loop body
++    CHECK(wgsl.find("vsl.lights[") == std::string::npos); // no light loop body
+     CHECK(wgsl.find("o.color0 = calc_lighting_chn0(in.rawcolor0, viewpos.xyz, _normal);") !=
+           std::string::npos);
+   }
+@@ -1717,7 +1782,7 @@ void test_lighting_completeness() {
+     key.has_color1 = 1;
+     key.tev_valid = 1; // emit color1 varying
+     key.num_tev_stages = 1;
+-    const std::string wgsl = gxc::generate_wgsl(key);
++    const std::string wgsl = checked_wgsl(key);
+     CHECK(wgsl.find("fn calc_lighting_chn0(") == std::string::npos); // passthrough
+     CHECK(wgsl.find("o.color0 = in.rawcolor1;") != std::string::npos); // fallback
+     CHECK(wgsl.find("o.color1 = vec4f(1.0);") != std::string::npos);   // missing
+@@ -1728,7 +1793,7 @@ void test_lighting_completeness() {
+     gxc::ShaderKey key{};
+     key.num_color_chans = 0;
+     key.has_color0 = 1;
+-    const std::string wgsl = gxc::generate_wgsl(key);
++    const std::string wgsl = checked_wgsl(key);
+     CHECK(wgsl.find("o.color0 = in.rawcolor0;") != std::string::npos);
+     CHECK(wgsl.find("o.color0 = vec4f(0.0);") != std::string::npos);
+   }
+@@ -1750,7 +1815,7 @@ void test_cached_normal() {
+     key.litchan[0].attnfunc = 2; // Dir
+     key.litchan[0].diffusefunc = 2;
+     key.litchan[0].light_mask = 0x1;
+-    const std::string wgsl = gxc::generate_wgsl(key);
++    const std::string wgsl = checked_wgsl(key);
+     // No per-vertex normal input; the cached uniform field is declared instead.
+     CHECK(wgsl.find("@location(8) rawnormal: vec3f,") == std::string::npos);
+     CHECK(wgsl.find("cached_normal: vec4f,") != std::string::npos);
+@@ -1764,7 +1829,7 @@ void test_cached_normal() {
+     // field (existing goldens stay byte-identical).
+     gxc::ShaderKey key2 = key;
+     key2.has_vertex_normal = 1;
+-    const std::string wgsl2 = gxc::generate_wgsl(key2);
++    const std::string wgsl2 = checked_wgsl(key2);
+     CHECK(wgsl2.find("@location(8) rawnormal: vec3f,") != std::string::npos);
+     CHECK(wgsl2.find("cached_normal: vec4f,") == std::string::npos);
+     CHECK(wgsl2.find("dot(vsc.posnormalmatrix[3].xyz, in.rawnormal)") !=
+@@ -1774,12 +1839,12 @@ void test_cached_normal() {
+     // uses (posidx & 31) to address I_NORMALMATRICES; the draw-wide current
+     // normal matrix is only valid when PNMTXIDX is absent.
+     key2.has_pos_mtx_idx = 1;
+-    const std::string per_vertex_wgsl = gxc::generate_wgsl(key2);
++    const std::string per_vertex_wgsl = checked_wgsl(key2);
+     CHECK(per_vertex_wgsl.find("normalmatrices: array<vec4f, 32>,") !=
+           std::string::npos);
+     CHECK(per_vertex_wgsl.find("let normidx = posidx & 31;") !=
+           std::string::npos);
+-    CHECK(per_vertex_wgsl.find("dot(vsc.normalmatrices[normidx].xyz, in.rawnormal)") !=
++    CHECK(per_vertex_wgsl.find("dot(vsm.normalmatrices[normidx].xyz, in.rawnormal)") !=
+           std::string::npos);
+   }
+ 
+@@ -1883,7 +1948,7 @@ void test_cached_normal() {
+   CHECK(std::fabs(plan_b.constants.cached_normal[0] - 0.f) < 1e-4f);
+   CHECK(std::fabs(plan_b.constants.cached_normal[1] - 1.f) < 1e-4f);
+   CHECK(std::fabs(plan_b.constants.cached_normal[2] - 0.f) < 1e-4f);
+-  const std::string wgsl_b = gxc::generate_wgsl(plan_b.pipeline.shader);
++  const std::string wgsl_b = checked_wgsl(plan_b.pipeline.shader);
+   CHECK(wgsl_b.find("vsc.cached_normal.xyz") != std::string::npos);
+   CHECK(wgsl_b.find("in.rawnormal") == std::string::npos);
+ }
+@@ -1905,7 +1970,7 @@ void test_fog() {
+     k.fog_range = range ? 1 : 0;
+     return k;
+   };
+-  const std::string persp = gxc::generate_wgsl(
++  const std::string persp = checked_wgsl(
+       fog_key(gxc::FogType::BackwardsExpSq, gxc::FogProjection::Perspective, true));
+   // GC zCoord (reversed-Z) + perspective ze + range adjust + BackExpSq curve +
+   // integer fog blend — exactly Dolphin PixelShaderGen WriteFog.
+@@ -1921,7 +1986,7 @@ void test_fog() {
+                    "ifog) >> vec3u(8u), prev.a);") != std::string::npos);
+ 
+   // Orthographic ze, no range adjust.
+-  const std::string ortho = gxc::generate_wgsl(
++  const std::string ortho = checked_wgsl(
+       fog_key(gxc::FogType::Linear, gxc::FogProjection::Orthographic, false));
+   CHECK(ortho.find("var ze = psc.fogf.x * f32(zCoord) / 16777216.0;") !=
+         std::string::npos);
+@@ -1929,17 +1994,17 @@ void test_fog() {
+   CHECK(ortho.find("fogv = 1.0 - exp2") == std::string::npos); // linear: no curve
+ 
+   // Each remaining curve emits its Dolphin table line.
+-  CHECK(gxc::generate_wgsl(fog_key(gxc::FogType::Exp,
++  CHECK(checked_wgsl(fog_key(gxc::FogType::Exp,
+                                    gxc::FogProjection::Perspective, false))
+             .find("fogv = 1.0 - exp2(-8.0 * fogv);") != std::string::npos);
+-  CHECK(gxc::generate_wgsl(fog_key(gxc::FogType::ExpSq,
++  CHECK(checked_wgsl(fog_key(gxc::FogType::ExpSq,
+                                    gxc::FogProjection::Perspective, false))
+             .find("fogv = 1.0 - exp2(-8.0 * fogv * fogv);") != std::string::npos);
+-  CHECK(gxc::generate_wgsl(fog_key(gxc::FogType::BackwardsExp,
++  CHECK(checked_wgsl(fog_key(gxc::FogType::BackwardsExp,
+                                    gxc::FogProjection::Perspective, false))
+             .find("fogv = exp2(-8.0 * (1.0 - fogv));") != std::string::npos);
+   // Off => no fog fragment at all.
+-  CHECK(gxc::generate_wgsl(fog_key(gxc::FogType::Off,
++  CHECK(checked_wgsl(fog_key(gxc::FogType::Off,
+                                    gxc::FogProjection::Perspective, false))
+             .find("// Fog (Dolphin WriteFog)") == std::string::npos);
+ 
+-- 
+2.45.2.windows.1
+

@@ -1,0 +1,70 @@
+From 20e2bb96a778d80bb82a80720fc6a8d337fc718e Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Sun, 4 Oct 2026 23:42:32 -0400
+Subject: [PATCH] frame_interp_test: tex2 draws in the full vertex layout
+
+Two cases blend a direct tex2 channel but built their vertices in the
+compact layout, which has no uv2 (a format with tex2 decodes to the full
+one), so their uv2 landed on the normal and 74 checks failed after the
+compact layout. They now build full-layout plans; all checks pass.
+---
+ .../aurora/tests/frame_interp_test.cpp        | 22 ++++++++++++-------
+ 1 file changed, 14 insertions(+), 8 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+index 7a4507c9..4d510895 100644
+--- a/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
++++ b/GXRuntime/graphics/aurora/tests/frame_interp_test.cpp
+@@ -758,18 +758,21 @@ int main() {
+         plan.match_position_size = 2;
+         plan.match_direct_texcoord_mask = (1u << 0) | (1u << 2);
+         plan.vertex_count = 4;
+-        plan.vertices.assign(4 * gxc::kCompactVertexFloats, 0.f);
++        // A format with tex2 decodes to the full layout.
++        plan.vertex_floats = gxc::kFullVertexFloats;
++        plan.vertices.assign(4 * gxc::kFullVertexFloats, 0.f);
+         for (int v = 0; v < 4; ++v) {
+           const int index = strip * 2 + v;
+-          float* p = plan.vertices.data() + v * gxc::kCompactVertexFloats;
++          float* p = plan.vertices.data() + v * gxc::kFullVertexFloats;
+           p[0] = -200000.f + 800.f * (index / 2) + (movingCamera ? 20.f * frame : 0.f);
+           p[1] = float((index * index + 3) * frame); // non-rigid deformation
+           p[2] = -800.f * (index % 2);
+           float* uv = p + gxc::kVertexUv0Offset / sizeof(float);
+           uv[0] = p[0] * .0005f;
+           uv[1] = p[2] * .0005f;
+-          uv[4] = .02f * frame; // another direct channel, also animated
+-          uv[5] = .1f * index;
++          float* uv2 = p + gxc::vertex_uv_offset(2) / sizeof(float);
++          uv2[0] = .02f * frame; // another direct channel, also animated
++          uv2[1] = .1f * index;
+         }
+         const auto* got = blend_plan(plan, view);
+         if (frame == 2) {
+@@ -827,16 +830,19 @@ int main() {
+       plan.match_position_size = 2;
+       plan.match_direct_texcoord_mask = (1u << 0) | (1u << 2);
+       plan.vertex_count = 4;
+-      plan.vertices.assign(4 * gxc::kCompactVertexFloats, 0.f);
++      // A format with tex2 decodes to the full layout.
++      plan.vertex_floats = gxc::kFullVertexFloats;
++      plan.vertices.assign(4 * gxc::kFullVertexFloats, 0.f);
+       for (int v = 0; v < 4; ++v) {
+-        float* p = plan.vertices.data() + v * gxc::kCompactVertexFloats;
++        float* p = plan.vertices.data() + v * gxc::kFullVertexFloats;
+         p[0] = v * 20.f;
+         p[2] = -400.f;
+         float* uv = p + gxc::kVertexUv0Offset / sizeof(float);
+         uv[0] = wraps ? (frame == 0 ? .98f : .02f) : .1f + .04f * frame;
+         uv[1] = .2f;
+-        uv[4] = .3f + .02f * frame;
+-        uv[5] = .4f;
++        float* uv2 = p + gxc::vertex_uv_offset(2) / sizeof(float);
++        uv2[0] = .3f + .02f * frame;
++        uv2[1] = .4f;
+       }
+       blend_plan(plan, draw_at(0, 0, 0));
+       if (frame == 1) {
+-- 
+2.45.2.windows.1
+
