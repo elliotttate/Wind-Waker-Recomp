@@ -674,6 +674,8 @@ int main(void) {
         those copies' plain loads and stores into their out-of-line paths
         (scripts/windows/lean_memory.py), let a return into another chunk leave
         the return dispatch before its switch (scripts/windows/return_ranges.py),
+        step past the cache operations as the host's fallback would
+        (scripts/windows/cache_ops.py),
         run the certified recovered J3D
         transform matrices natively (scripts/mods/prepare_native_j3d.py),
         then the opt-in 60 Hz
@@ -691,6 +693,8 @@ int main(void) {
         # The copies' plain loads and stores without their pc and suffix stores.
         self.source_step("lean-memory", "scripts/windows/lean_memory.py", root)
         self.source_step("return-ranges", "scripts/windows/return_ranges.py", root)
+        # dcbf, dcbst, dcbi and icbi as the pc store the host's fallback makes.
+        self.source_step("cache-ops", "scripts/windows/cache_ops.py", root)
         self.source_step("native-j3d", "scripts/mods/prepare_native_j3d.py", root)
         # Certified native entries, the second set (FIFO matrix loads, collision
         # checks, PSMTXMultVecSR, joint matrix calculations): after the prepaid
@@ -701,7 +705,7 @@ int main(void) {
         self.source_step("native-math", "scripts/mods/prepare_native_math.py", root)
         print((self.logs / "native-game-math.log").read_text(errors="replace").strip().splitlines()[-1])
         for name in ("guest-cpu", "gpr-inline", "chunk-headers", "direct-calls", "native-skin", "fast-blocks",
-                     "lean-memory", "return-ranges", "native-j3d", "native-entries", "simulation-prepare",
+                     "lean-memory", "return-ranges", "cache-ops", "native-j3d", "native-entries", "simulation-prepare",
                      "native-math"):
             print((self.logs / f"{name}.log").read_text(errors="replace").strip().splitlines()[-1])
 
@@ -900,7 +904,7 @@ int main(void) {
         # chunk is one function, so a step that changes that shape leaves the
         # old counts matching nothing.
         for name in ("global_guest_cpu.py", "inline_save_restore_gpr.py", "chunk_headers.py", "direct_calls.py",
-                     "native_skin.py", "fast_blocks.py", "lean_memory.py", "return_ranges.py"):
+                     "native_skin.py", "fast_blocks.py", "lean_memory.py", "return_ranges.py", "cache_ops.py"):
             path = ROOT / "scripts/windows" / name
             key.update(path.relative_to(ROOT).as_posix().encode())
             key.update(path.read_bytes())
