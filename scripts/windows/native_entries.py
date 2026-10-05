@@ -651,6 +651,86 @@ ENTRIES[0x8009A484] = ("drawWave@8009A484", "draw", _DRAW_8009A094, "a8dbdca998f
 ENTRIES[0x8009A49C] = ("drawWave@8009A49C", "draw", _DRAW_8009A094, "a8dbdca998ff7631943dc18f2ca4c49db3918f385bfbc04eb21dfd8acc5985c7")
 ENTRIES[0x8009A5C4] = ("drawWave@8009A5C4", "draw", _DRAW_8009A094, "a8dbdca998ff7631943dc18f2ca4c49db3918f385bfbc04eb21dfd8acc5985c7")
 # --- end of the sixth set's entries ---
+# --- The seventh set (tests/native_leaf_test.c): leaf compute code, each
+# function's translation replayed on local registers (native_leaf_run.h,
+# scripts/windows/native_leaf_gen.py): libm's fmod and the random numbers and
+# angle built on it, the collision blocks' bounds, the Euler quaternions, the
+# planes, polar coordinates and point winds. A group per switch
+# (BLUEWAKE_NATIVE_<GROUP>=0). An entry's hash covers every function its
+# native replays, callees in other chunks included, and every loop the
+# translator extracted from them (below). ---
+SEVENTH_GROUPS = ("libm", "bgblk", "rot", "calc", "geom")
+for _group in SEVENTH_GROUPS:
+    GROUPS[_group] = (f"native_{_group}.h", f"bluewake_native_{_group}_enabled",
+                      f"bluewake_native_{_group}_{{entry:08X}}(ctx)")
+_N7_FMOD = [(0x8032D6E0, 0x8032EC1C, 0x8032EF58)]                                  # __ieee754_fmod
+_N7_FMOD_CALL = [(0x8032D6E0, 0x80330E34, 0x80330E54)] + _N7_FMOD                  # fmod
+_N7_RND = [(0x802456E0, 0x802462C8, 0x802463B0)] + _N7_FMOD_CALL                   # cM_rnd
+_N7_PSVEC_ADD = (0x8030D6E0, 0x8030DCE0, 0x8030DD04)
+_N7_BLCK_MIN_MAX = (0x802456E0, 0x80247C4C, 0x80247CD4)
+ENTRIES[0x8032EC1C] = ("__ieee754_fmod", "libm", _N7_FMOD, "9fa82fa48c28ac1ae46d1f01fc7c2cea2244f101825036a6d4e6b7e2a871bf63")
+ENTRIES[0x80330E34] = ("fmod", "libm", _N7_FMOD_CALL, "88aac1cf75d0b8f23cc05b650b1738be37ff04427240c4f30f3d58734a135d97")
+ENTRIES[0x80246044] = ("cM_rad2s", "libm", [(0x802456E0, 0x80246044, 0x8024609C)] + _N7_FMOD_CALL, "a71baceea7b9de408ffe2982473fd0b584d4a106e1726ec511f17c33cbe45bae")
+ENTRIES[0x802462C8] = ("cM_rnd", "libm", _N7_RND, "1ff714bc3355e7e84057cc8e6b14c32d5ab8e1ae892adf964a77495dd046e1da")
+ENTRIES[0x802463B0] = ("cM_rndF", "libm", [(0x802456E0, 0x802463B0, 0x802463E8)] + _N7_RND, "1049f634ddc70f51b818f8ee76ac644b8293dc251869c87cf29cb60236fd6af3")
+ENTRIES[0x802463E8] = ("cM_rndFX", "libm", [(0x802456E0, 0x802463E8, 0x80246430)] + _N7_RND, "12457a9d276c6375dc52b646061e3ad555909e0a3b0dde90a494ea0236bc843e")
+_N7_REM_PIO2 = (0x8032D6E0, 0x8032EF58, 0x8032F2F8)
+_N7_KERNEL_SIN = (0x8032D6E0, 0x80330240, 0x803302E0)
+_N7_KERNEL_COS = (0x8032D6E0, 0x8032F2F8, 0x8032F3EC)
+ENTRIES[0x80330C84] = ("sin", "libm", [(0x8032D6E0, 0x80330C84, 0x80330D5C), _N7_REM_PIO2, _N7_KERNEL_SIN,
+                                       _N7_KERNEL_COS], "3e9404ebf0aedb59d93c0998804bd1e1e03a8f67a57791ceb9c7599a509a5b93")
+ENTRIES[0x8033071C] = ("cos", "libm", [(0x8032D6E0, 0x8033071C, 0x803307F0), _N7_REM_PIO2, _N7_KERNEL_SIN,
+                                       _N7_KERNEL_COS], "4fb8c6e625079ee7f1d50fd8b8edc11e667bfbce70ecaf7d17b9a16fbbb211a5")
+ENTRIES[0x80330D5C] = ("tan", "libm", [(0x8032D6E0, 0x80330D5C, 0x80330DD4), _N7_REM_PIO2,
+                                       (0x8032D6E0, 0x803302E0, 0x803304F4)], "56399d3612830daa0ea4a10b212df2ff9680d88901cd4fd2504570d87fdec2c0")
+ENTRIES[0x80247C4C] = ("cBgW::MakeBlckMinMax", "bgblk", [_N7_BLCK_MIN_MAX], "5d51b4f4def170de0682b2546457867909a4a157db2e3520781b8ca79a9be7ed")
+ENTRIES[0x80247CD4] = ("cBgW::MakeBlckBnd", "bgblk",
+                       [(0x802456E0, 0x80247CD4, 0x80247E48), _N7_BLCK_MIN_MAX,
+                        (0x802456E0, 0x80247BF8, 0x80247C4C), _N7_PSVEC_ADD], "3383bcf326f463846d93f442f26758a917757bbf993186d6a66597887135d138")
+ENTRIES[0x80301150] = ("JMAEulerToQuat", "rot", [(0x802FD6E0, 0x80301150, 0x80301218)], "fe49d931e2e66a7620e394a3d7630ec358caa12022e51f2faaed524126d965df")
+_N7_ATAN2S = [(0x802456E0, 0x802460D0, 0x80246270), (0x802456E0, 0x8024609C, 0x802460D0)]
+ENTRIES[0x802460D0] = ("cM_atan2s", "calc", _N7_ATAN2S, "cc522d464d6d55a358b7694870d18ee081db110e1ca9e1fdd25f2b242db9b451")
+ENTRIES[0x80246270] = ("cM_atan2f", "calc", [(0x802456E0, 0x80246270, 0x802462B8)] + _N7_ATAN2S, "15046434222919d8f31b14f651c39ffb5af5aec859d09d8c3b6c58c27bb0ce8b")
+ENTRIES[0x8024A6F0] = ("cM3d_CalcPla", "geom",
+                       [(0x802496E0, 0x8024A6F0, 0x8024A7BC), (0x8030D6E0, 0x8030DD04, 0x8030DD28),
+                        (0x8030D6E0, 0x8030DECC, 0x8030DF08), (0x8030D6E0, 0x8030DE68, 0x8030DEAC),
+                        (0x8030D6E0, 0x8030DD28, 0x8030DD44), (0x8030D6E0, 0x8030DEAC, 0x8030DECC)], "495bbfcdbf608e71c6e8981b18f57e7ced99f4918354cb87aa1c444487f10db0")
+ENTRIES[0x80254214] = ("cSPolar::Val", "geom",
+                       [(0x802516E0, 0x80254214, 0x80254420), (0x802456E0, 0x80246270, 0x802462B8),
+                        (0x802456E0, 0x802460D0, 0x80246270), (0x802456E0, 0x8024609C, 0x802460D0),
+                        (0x802516E0, 0x80253C4C, 0x80253C54), (0x802516E0, 0x802540F0, 0x802541B0),
+                        (0x802516E0, 0x80253BE0, 0x80253C10), (0x802516E0, 0x80253E14, 0x80253E44),
+                        (0x802516E0, 0x80253C40, 0x80253C4C), (0x802516E0, 0x80253D30, 0x80253D40),
+                        (0x802516E0, 0x80253DB8, 0x80253DE4)], "10ed8d8c91c5162d739aff6eca07c213709d6a355c7ac1f96de007832e6aa8d0")
+ENTRIES[0x8008A230] = ("dKyw_pntwind_get_info", "geom",
+                       [(0x800896E0, 0x8008A230, 0x8008A4C8), (0x800896E0, 0x8008AB94, 0x8008ABB4),
+                        (0x800896E0, 0x8008AB3C, 0x8008AB94), (0x800896E0, 0x8008AA30, 0x8008AB3C),
+                        (0x8030D6E0, 0x8030E0B4, 0x8030E0DC)], "75a157aa0ed5da750247a1ffa39350fa1a0458d6a6946f34fed0ec9c23ca0931")
+_entry_hash_sixth = entry_hash
+
+
+def entry_hash(texts, entry):  # noqa: F811 (the seventh set's: the extracted loops too)
+    """A seventh-set native also replays the loops the translator extracted
+    from its functions: each `static void loop_X` a fragment or its prepaid
+    copies call (`label_X: loop_X(ctx); ...`) sits outside the chunk's
+    function, so the fragments alone would not see it change. Their text is
+    hashed after the fragments'."""
+    digest, named = _entry_hash_sixth(texts, entry)
+    _, group, fragments, _ = ENTRIES[entry]
+    if digest is None or group not in SEVENTH_GROUPS:
+        return digest, named
+    loops = []
+    for chunk, start, end in fragments:
+        body, copies = fragment(main_function(texts[chunk], chunk), start, end)
+        for head in sorted(set(re.findall(r"\bloop_([0-9A-F]{8})\(ctx\);", body + "".join(copies)))):
+            m = re.search(rf"\nstatic void loop_{head}\(CPUState\* ctx_param\) \{{\n.*?\n\}}\n", texts[chunk], re.S)
+            if m is None:
+                return None, named
+            loops.append(canonical(m.group(0)))
+    if loops:
+        digest = hashlib.sha256("\n".join([digest] + loops).encode()).hexdigest()
+    return digest, named
+# --- end of the seventh set's entries ---
 
 
 def certify(root, watched, report=False):

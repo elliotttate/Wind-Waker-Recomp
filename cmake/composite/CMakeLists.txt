@@ -85,6 +85,12 @@ add_library(${MODULE_NAME} SHARED
   native_gx.c
   # Certified native entries, the sixth set: the particle draws and the sea's waves, with stops.
   native_draw.c
+  # Certified native entries, the seventh set: leaf compute code.
+  native_libm.c
+  native_bgblk.c
+  native_rot.c
+  native_calc.c
+  native_geom.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c

@@ -25,6 +25,13 @@
 /* Certified native entries, the sixth set: the particle draws and the sea's waves, with stops
  * (native_draw.c). */
 #include "native_draw.h"
+/* Certified native entries, the seventh set: leaf compute code (native_libm.c, native_bgblk.c,
+ * native_rot.c, native_geom.c). */
+#include "native_libm.h"
+#include "native_bgblk.h"
+#include "native_rot.h"
+#include "native_calc.h"
+#include "native_geom.h"
 #include <stdlib.h>
 #include <stdio.h>
 static int s_native_math;
@@ -293,6 +300,34 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
             bluewake_native_draw_enabled = on && draw && strcmp(draw, "1") == 0;
             if (bluewake_native_draw_enabled)
                 atexit(bluewake_native_draw_report);
+            /* The seventh set: leaf compute code - libm's fmod with the
+             * random numbers and angle built on it, and its sin, cos and
+             * tan; the collision blocks' bounds; the Euler quaternions; the
+             * arc tangents; the planes, polar coordinates and point winds -
+             * with the same switch, and one per group:
+             * BLUEWAKE_NATIVE_LIBM=0, BLUEWAKE_NATIVE_BGBLK=0,
+             * BLUEWAKE_NATIVE_ROT=0, BLUEWAKE_NATIVE_CALC=0,
+             * BLUEWAKE_NATIVE_GEOM=0 leave that group
+             * to the translation. */
+            {
+                static const struct {
+                    const char* name;
+                    int* enabled;
+                    void (*report)(void);
+                } groups[] = {
+                    {"BLUEWAKE_NATIVE_LIBM", &bluewake_native_libm_enabled, bluewake_native_libm_report},
+                    {"BLUEWAKE_NATIVE_BGBLK", &bluewake_native_bgblk_enabled, bluewake_native_bgblk_report},
+                    {"BLUEWAKE_NATIVE_ROT", &bluewake_native_rot_enabled, bluewake_native_rot_report},
+                    {"BLUEWAKE_NATIVE_CALC", &bluewake_native_calc_enabled, bluewake_native_calc_report},
+                    {"BLUEWAKE_NATIVE_GEOM", &bluewake_native_geom_enabled, bluewake_native_geom_report},
+                };
+                for (unsigned g = 0; g < sizeof groups / sizeof groups[0]; ++g) {
+                    const char* value = getenv(groups[g].name);
+                    *groups[g].enabled = on && !(value && strcmp(value, "0") == 0);
+                    if (*groups[g].enabled)
+                        atexit(groups[g].report);
+                }
+            }
         }
         if (s_native_math) {
             atexit(bluewake_native_skin_report);
