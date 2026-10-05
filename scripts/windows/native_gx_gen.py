@@ -869,7 +869,7 @@ NATIVES = [
 
 # Made, tested exact (60,000 cases each, no mismatch) and dropped: through the
 # hooked chunks none was faster than its translation by 15 percent or more in
-# every run (NATIVES5_REPORT.md). Each is a setter of a few instructions that
+# every run (docs/status/NATIVE_GX_2026-10-04.md). Each is a setter of a few instructions that
 # stores to RAM (__GXData, a GD list) more than to the pipe: there the
 # translation's inline RAM stores are as fast as a native's, whose undo log
 # and entry cost what the pipe stores it saves would have. Not generated.
