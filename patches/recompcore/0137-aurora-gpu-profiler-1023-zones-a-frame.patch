@@ -1,0 +1,26 @@
+From 126eee1ba46ca831c74a485a2e05fe2d6a3869b1 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Sun, 4 Oct 2026 21:29:28 -0400
+Subject: [PATCH 137/138] gpu_prof: 1023 zones a frame (Forest Haven's frames
+ had more than 127, and the rest went unmeasured)
+
+---
+ GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp b/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp
+index 43995d7a..bc1db2dd 100644
+--- a/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp
++++ b/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp
+@@ -31,7 +31,7 @@ Module Log("aurora::webgpu::gpu_prof");
+ 
+ // Each zone consumes a begin/end timestamp pair.
+ // The last pair is reserved for the frame zone.
+-constexpr uint32_t MaxZones = 127;
++constexpr uint32_t MaxZones = 1023;
+ constexpr uint32_t QueryCount = MaxZones * 2 + 2;
+ constexpr uint32_t FrameBeginQuery = MaxZones * 2;
+ constexpr uint32_t FrameEndQuery = MaxZones * 2 + 1;
+-- 
+2.45.2.windows.1
+

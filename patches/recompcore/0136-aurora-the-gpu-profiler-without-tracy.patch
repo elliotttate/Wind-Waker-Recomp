@@ -1,0 +1,278 @@
+From 48ad46f16e62f54302a760eced7ee3f4a9e9c406 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Sun, 4 Oct 2026 21:21:50 -0400
+Subject: [PATCH 136/138] Aurora: the GPU profiler without Tracy
+ (DOL_AURORA_GPU_PROF=1)
+
+The timestamp profiler (gpu_prof.cpp) was built only with Tracy. It is
+now always built, and DOL_AURORA_GPU_PROF=1 requests the timestamp
+feature and writes [gpu-prof] lines to stderr every 240 frames: the
+frames' GPU time, the top-level passes' busy time, each pass and zone
+kind's time per frame ("Render pass 12" counts as "Render pass"), and
+the KB the frame's staging copies move (vertices, uniforms, indices,
+storage, textures). Without the variable nothing changes: the feature is
+not requested and every pass_writes() is null, as before.
+---
+ GXRuntime/graphics/aurora/lib/gfx/common.cpp  |   7 ++
+ GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp  |  11 +-
+ .../graphics/aurora/lib/webgpu/gpu_prof.cpp   | 119 +++++++++++++++---
+ .../graphics/aurora/lib/webgpu/gpu_prof.hpp   |   5 +
+ 4 files changed, 124 insertions(+), 18 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.cpp b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+index fd4a202f..c47d1e96 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+@@ -1835,6 +1835,12 @@ static void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& f
+   }
+   const webgpu::gpu_prof::Zone zone{cmd, "Staging copies"};
+   const auto& highWater = op.highWater;
++  using webgpu::gpu_prof::CopyKind;
++  const auto delta = [](uint64_t highWater, uint64_t copied) { return highWater > copied ? highWater - copied : 0; };
++  webgpu::gpu_prof::count_copy(CopyKind::Vertices, delta(highWater.verts, frame.copied.verts));
++  webgpu::gpu_prof::count_copy(CopyKind::Uniforms, delta(highWater.uniforms, frame.copied.uniforms));
++  webgpu::gpu_prof::count_copy(CopyKind::Indices, delta(highWater.indices, frame.copied.indices));
++  webgpu::gpu_prof::count_copy(CopyKind::Storage, delta(highWater.storage, frame.copied.storage));
+   copy_staging_buffer_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset, g_vertexBuffer);
+   copy_staging_buffer_range(cmd, frame, frame.copied.uniforms, highWater.uniforms, UniformStagingOffset,
+                             g_uniformBuffer);
+@@ -1855,6 +1861,7 @@ static void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& f
+       };
+       cmd.CopyBufferToTexture(&buf, &item.tex, &item.size);
+     }
++    webgpu::gpu_prof::count_copy(CopyKind::Textures, delta(highWater.textureUpload, frame.copied.textureUpload));
+     frame.copied.textureUpload = highWater.textureUpload;
+     frame.copied.textureUploadCount = op.textureUploads.size();
+   }
+diff --git a/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp b/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
+index 23628e7d..fcb50a80 100644
+--- a/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
++++ b/GXRuntime/graphics/aurora/lib/webgpu/gpu.cpp
+@@ -951,11 +951,18 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+         }
+       }
+ #endif
+-#ifdef TRACY_ENABLE
++      // Timestamps for the GPU profiler (gpu_prof.cpp): Tracy builds, and
++      // DOL_AURORA_GPU_PROF=1, which logs each pass's GPU time to stderr.
+       if (feature == wgpu::FeatureName::TimestampQuery) {
++#ifdef TRACY_ENABLE
+         requiredFeatures.push_back(feature);
+-      }
++#else
++        const char* profEnv = std::getenv("DOL_AURORA_GPU_PROF");
++        if (profEnv != nullptr && profEnv[0] == '1') {
++          requiredFeatures.push_back(feature);
++        }
+ #endif
++      }
+     }
+     std::string featureList;
+     for (auto featureName : requiredFeatures) {
+diff --git a/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp b/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp
+index c8c9549c..43995d7a 100644
+--- a/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp
++++ b/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.cpp
+@@ -6,8 +6,11 @@
+ #include <tracy/Tracy.hpp>
+ 
+ #ifdef TRACY_ENABLE
+-
+ #include <tracy/TracyC.h>
++#endif
++
++#include <cstdio>
++#include <cstdlib>
+ 
+ #include <algorithm>
+ #include <array>
+@@ -107,6 +110,7 @@ const char* intern_name(std::string_view name) {
+   return stable;
+ }
+ 
++#ifdef TRACY_ENABLE
+ // tracy::GpuContextType not exposed through TracyC.h
+ uint8_t tracy_context_type(wgpu::BackendType backend) {
+   switch (backend) {
+@@ -162,6 +166,89 @@ void emit_zone_end(uint64_t gpuNs) {
+   ___tracy_emit_gpu_time_serial({.gpuTime = int64_t(gpuNs), .queryId = queryId, .context = ContextId});
+ }
+ 
++#endif
++
++// DOL_AURORA_GPU_PROF=1, without Tracy: each pass's and zone's GPU time, summed
++// by kind ("Render pass 12" counts as "Render pass") over a window of
++// frames, and the frames' GPU time, written to stderr as [gpu-prof] lines.
++struct LogKind {
++  double ms = 0.0;
++  uint64_t count = 0;
++};
++constexpr uint32_t LogWindow = 240;
++bool g_log = false;
++uint32_t g_logFrames = 0;
++double g_logFrameMs = 0.0;
++double g_logFrameMax = 0.0;
++double g_logBusyMs = 0.0;
++absl::flat_hash_map<std::string, LogKind> g_logKinds;
++uint64_t g_logBytes[static_cast<size_t>(CopyKind::Count)] = {};
++
++std::string_view log_kind(std::string_view name) {
++  size_t end = name.size();
++  while (end > 0 && name[end - 1] >= '0' && name[end - 1] <= '9') {
++    --end;
++  }
++  while (end > 0 && name[end - 1] == ' ') {
++    --end;
++  }
++  return end == 0 ? name : name.substr(0, end);
++}
++
++void log_frame(const Slot& slot, const uint64_t* ts, uint64_t frameBegin, uint64_t frameEnd) {
++  double busy = 0.0;
++  uint32_t depth = 0;
++  for (const auto& event : slot.events) {
++    if (event.kind == EventKind::End) {
++      if (depth != 0) {
++        --depth;
++      }
++      continue;
++    }
++    const uint64_t begin = ts[event.query];
++    const uint64_t end = ts[event.query + 1];
++    if (begin != 0 && end > begin) {
++      const double ms = double(end - begin) * 1e-6;
++      auto& kind = g_logKinds[std::string(log_kind(event.name))];
++      kind.ms += ms;
++      ++kind.count;
++      if (depth == 0) {
++        busy += ms;
++      }
++    }
++    ++depth;
++  }
++  const double frameMs = double(frameEnd - frameBegin) * 1e-6;
++  g_logFrameMs += frameMs;
++  g_logFrameMax = std::max(g_logFrameMax, frameMs);
++  g_logBusyMs += busy;
++  if (++g_logFrames < LogWindow) {
++    return;
++  }
++  std::vector<std::pair<std::string, LogKind>> kinds(g_logKinds.begin(), g_logKinds.end());
++  std::sort(kinds.begin(), kinds.end(), [](const auto& a, const auto& b) { return a.second.ms > b.second.ms; });
++  const double frames = double(g_logFrames);
++  std::fprintf(stderr, "[gpu-prof] frames=%u frame_ms=%.3f max=%.3f busy_ms=%.3f", g_logFrames,
++               g_logFrameMs / frames, g_logFrameMax, g_logBusyMs / frames);
++  std::fprintf(stderr, " copy_kb verts=%.0f uniforms=%.0f indices=%.0f storage=%.0f textures=%.0f",
++               double(g_logBytes[0]) / 1024.0 / frames, double(g_logBytes[1]) / 1024.0 / frames,
++               double(g_logBytes[2]) / 1024.0 / frames, double(g_logBytes[3]) / 1024.0 / frames,
++               double(g_logBytes[4]) / 1024.0 / frames);
++  for (size_t i = 0; i < kinds.size() && i < 12; ++i) {
++    std::fprintf(stderr, " | %s %.3f x%.1f", kinds[i].first.c_str(), kinds[i].second.ms / frames,
++                 double(kinds[i].second.count) / frames);
++  }
++  std::fputc('\n', stderr);
++  g_logFrames = 0;
++  g_logFrameMs = 0.0;
++  g_logFrameMax = 0.0;
++  g_logBusyMs = 0.0;
++  g_logKinds.clear();
++  for (auto& bytes : g_logBytes) {
++    bytes = 0;
++  }
++}
++
+ TimestampBounds event_bounds(const Slot& slot, const uint64_t* ts) {
+   TimestampBounds bounds;
+   for (const auto& event : slot.events) {
+@@ -198,7 +285,11 @@ void emit_frame(Slot& slot) {
+   if (frameBegin == 0 || frameEnd <= frameBegin) {
+     return;
+   }
++  if (g_log) {
++    log_frame(slot, ts, frameBegin, frameEnd);
++  }
+ 
++#ifdef TRACY_ENABLE
+   const uint64_t lastFrameEnd = std::exchange(g_lastFrameEnd, frameEnd);
+   if (lastFrameEnd != 0) {
+     if (frameBegin < lastFrameEnd) {
+@@ -277,6 +368,7 @@ void emit_frame(Slot& slot) {
+   TracyPlot("aurora: gpuFrameMs", double(frameEnd - frameBegin) * 1e-6);
+   TracyPlot("aurora: gpuIdleMs", double(idleNs) * 1e-6);
+   TracyPlot("aurora: gpuPasses", int64_t(slot.passCount));
++#endif
+ }
+ 
+ Slot& record_slot() { return g_slots[g_recordSlot]; }
+@@ -296,6 +388,8 @@ void initialize() {
+     return;
+   }
+   g_timestampsEnabled = true; // TODO: check if allow_unsafe_apis enabled?
++  const char* logEnv = std::getenv("DOL_AURORA_GPU_PROF");
++  g_log = logEnv != nullptr && logEnv[0] == '1';
+   constexpr wgpu::QuerySetDescriptor querySetDescriptor{
+       .label = "GPU profiler timestamps",
+       .type = wgpu::QueryType::Timestamp,
+@@ -321,9 +415,11 @@ void initialize() {
+   g_recordSlot = 0;
+   g_emitSlot = 0;
+   g_framePending = false;
++#ifdef TRACY_ENABLE
+   TracyPlotConfig("aurora: gpuFrameMs", tracy::PlotFormatType::Number, false, true, 0);
+   TracyPlotConfig("aurora: gpuIdleMs", tracy::PlotFormatType::Number, false, true, 0);
+   TracyPlotConfig("aurora: gpuPasses", tracy::PlotFormatType::Number, true, true, 0);
++#endif
+   Log.info("GPU profiling enabled ({} zones max)", MaxZones);
+ }
+ 
+@@ -434,6 +530,12 @@ const wgpu::PassTimestampWrites* pass_writes(std::string_view name) {
+   return &out;
+ }
+ 
++void count_copy(CopyKind kind, uint64_t bytes) {
++  if (g_log) {
++    g_logBytes[static_cast<size_t>(kind)] += bytes;
++  }
++}
++
+ Zone::Zone(const wgpu::CommandEncoder& encoder, std::string_view name) {
+   if (!g_timestampsEnabled) {
+     return;
+@@ -457,18 +559,3 @@ Zone::~Zone() {
+ }
+ 
+ } // namespace aurora::webgpu::gpu_prof
+-
+-#else
+-
+-namespace aurora::webgpu::gpu_prof {
+-void initialize() {}
+-void shutdown() {}
+-void frame_begin(const wgpu::CommandEncoder&) {}
+-void frame_end(const wgpu::CommandEncoder&) {}
+-void after_submit() {}
+-const wgpu::PassTimestampWrites* pass_writes(std::string_view) { return nullptr; }
+-Zone::Zone(const wgpu::CommandEncoder&, std::string_view) {}
+-Zone::~Zone() = default;
+-} // namespace aurora::webgpu::gpu_prof
+-
+-#endif
+diff --git a/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.hpp b/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.hpp
+index 7861201f..ade3b817 100644
+--- a/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.hpp
++++ b/GXRuntime/graphics/aurora/lib/webgpu/gpu_prof.hpp
+@@ -14,6 +14,11 @@ void frame_end(const wgpu::CommandEncoder& encoder);
+ void after_submit();
+ const wgpu::PassTimestampWrites* pass_writes(std::string_view name);
+ 
++// Bytes the frame's staging copies move, by kind, for DOL_AURORA_GPU_PROF's
++// [gpu-prof] lines (KB per frame).
++enum class CopyKind : uint8_t { Vertices, Uniforms, Indices, Storage, Textures, Count };
++void count_copy(CopyKind kind, uint64_t bytes);
++
+ class Zone {
+ public:
+   Zone(const wgpu::CommandEncoder& encoder, std::string_view name);
+-- 
+2.45.2.windows.1
+
