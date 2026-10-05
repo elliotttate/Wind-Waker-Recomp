@@ -1,3 +1,25 @@
+## 2026-10-05 The seventh natives set (leaf compute code) and the cache operations: exact, level in play
+
+**What went in.** The seventh natives set (docs/status/NATIVE_LEAF_2026-10-05.md, merged in 95f1db7): 19 natives in
+six groups - libm's fmod, sin, cos and tan with the random numbers and angles built on them; the collision
+blocks' bounds; the Euler quaternions; the arc tangents; planes, polar coordinates and point winds; JASystem's
+envelope oscillators and effector parameters - each replayed from its translation, exact over 60,000 cases, and
+1.36-2.9x faster per call through the hooked chunks. `BLUEWAKE_NATIVE_<GROUP>=0` (LIBM, BGBLK, ROT, CALC, GEOM,
+JAS) turns a group off. And `scripts/windows/cache_ops.py` (a5ecd96): the translator left dcbf, dcbst, dcbi and
+icbi to the instruction fallback, a call through two pointers per 32-byte line, for an instruction the host only
+steps past; a source step writes that pc store in place of each call (32 sites in 5 chunks).
+
+**Exact.** Both builder passes certify native entries 201/201 (205 new hooks, then 0); Link's position at all 621
+probes identical to the module before this session's work (W-n5); Smooth Motion dumps at seven places identical.
+
+**What it does: level, within the runs' spread** (four E-cores, uncapped, three runs each; game thread per game
+frame): the Deku Tree's glade 15.71 -> 15.50 ms, Forest Haven 18.96 -> 19.41, Dragon Roost 20.57 -> 20.37, the sea by
+the Fortress 21.54 -> 21.31, Hyrule Castle's room 16.29 -> 16.03. The set's estimate (3.8 points at Forest Haven)
+counted the profile's shares; in play the natives run often (sin 2.2 million calls in the A/B's runs, the arc
+tangent 1.4 million, the quaternions 1.5 million) but each saves tens of nanoseconds, and fmod, the largest target,
+mostly declines: the turn's budget cannot hold its loop (`clock` declines), so the decline gate leaves it to the
+translation. A native that must finish inside the turn cannot take a function longer than the turn's slice.
+
 ## 2026-10-05 Vertices the GPU already holds are not sent again: the frame's upload 87-93 percent below this morning's
 
 **What repeats.** A diagnostic hashing each draw's decoded vertices found 94-98 percent of a frame's vertex bytes
