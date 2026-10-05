@@ -3773,7 +3773,7 @@ B_80246044: /* 5 cycles */
     {
             lr = 0x80246058u;
             s.depth++;
-            if (!gx_silent(&s, 0x80330E34u) || !gx_silent(&s, 0x80246058u))
+            if (!lf_silent(&s, 0x80330E34u) || !lf_silent(&s, 0x80246058u))
                 return lf_decline(&s, LF_HOST);
             goto B_80330E34;
     }
@@ -6075,7 +6075,7 @@ B_802462C8: /* 234 cycles */
     {
             lr = 0x80246394u;
             s.depth++;
-            if (!gx_silent(&s, 0x80330E34u) || !gx_silent(&s, 0x80246394u))
+            if (!lf_silent(&s, 0x80330E34u) || !lf_silent(&s, 0x80246394u))
                 return lf_decline(&s, LF_HOST);
             goto B_80330E34;
     }
@@ -8301,7 +8301,7 @@ B_802462C8: /* 234 cycles */
     {
             lr = 0x80246394u;
             s.depth++;
-            if (!gx_silent(&s, 0x80330E34u) || !gx_silent(&s, 0x80246394u))
+            if (!lf_silent(&s, 0x80330E34u) || !lf_silent(&s, 0x80246394u))
                 return lf_decline(&s, LF_HOST);
             goto B_80330E34;
     }
@@ -10619,7 +10619,7 @@ B_802462C8: /* 234 cycles */
     {
             lr = 0x80246394u;
             s.depth++;
-            if (!gx_silent(&s, 0x80330E34u) || !gx_silent(&s, 0x80246394u))
+            if (!lf_silent(&s, 0x80330E34u) || !lf_silent(&s, 0x80246394u))
                 return lf_decline(&s, LF_HOST);
             goto B_80330E34;
     }

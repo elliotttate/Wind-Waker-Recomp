@@ -135,7 +135,7 @@ B_8024A704: /* 8 cycles */
     {
             lr = 0x8024A724u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DD04u) || !gx_silent(&s, 0x8024A724u))
+            if (!lf_silent(&s, 0x8030DD04u) || !lf_silent(&s, 0x8024A724u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DD04;
     }
@@ -160,7 +160,7 @@ B_8024A724: /* 4 cycles */
     {
             lr = 0x8024A734u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DD04u) || !gx_silent(&s, 0x8024A734u))
+            if (!lf_silent(&s, 0x8030DD04u) || !lf_silent(&s, 0x8024A734u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DD04;
     }
@@ -183,7 +183,7 @@ B_8024A734: /* 4 cycles */
     {
             lr = 0x8024A744u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DECCu) || !gx_silent(&s, 0x8024A744u))
+            if (!lf_silent(&s, 0x8030DECCu) || !lf_silent(&s, 0x8024A744u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DECC;
     }
@@ -200,7 +200,7 @@ B_8024A744: /* 2 cycles */
     {
             lr = 0x8024A74Cu;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DE68u) || !gx_silent(&s, 0x8024A74Cu))
+            if (!lf_silent(&s, 0x8030DE68u) || !lf_silent(&s, 0x8024A74Cu))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DE68;
     }
@@ -273,7 +273,7 @@ B_8024A764: /* 21 cycles */
     {
             lr = 0x8024A778u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DD28u) || !gx_silent(&s, 0x8024A778u))
+            if (!lf_silent(&s, 0x8030DD28u) || !lf_silent(&s, 0x8024A778u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DD28;
     }
@@ -295,7 +295,7 @@ B_8024A778: /* 3 cycles */
     {
             lr = 0x8024A784u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DEACu) || !gx_silent(&s, 0x8024A784u))
+            if (!lf_silent(&s, 0x8030DEACu) || !lf_silent(&s, 0x8024A784u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DEAC;
     }
@@ -2874,7 +2874,7 @@ B_802543A8: /* 2 cycles */
     {
             lr = 0x802543B0u;
             s.depth++;
-            if (!gx_silent(&s, 0x80246270u) || !gx_silent(&s, 0x802543B0u))
+            if (!lf_silent(&s, 0x80246270u) || !lf_silent(&s, 0x802543B0u))
                 return lf_decline(&s, LF_HOST);
             goto B_80246270;
     }
@@ -2935,7 +2935,7 @@ B_802543CC: /* 3 cycles */
     {
             lr = 0x802543D8u;
             s.depth++;
-            if (!gx_silent(&s, 0x80246270u) || !gx_silent(&s, 0x802543D8u))
+            if (!lf_silent(&s, 0x80246270u) || !lf_silent(&s, 0x802543D8u))
                 return lf_decline(&s, LF_HOST);
             goto B_80246270;
     }
@@ -3334,7 +3334,7 @@ B_8008A284: /* 3 cycles */
     {
             lr = 0x8008A290u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030E0B4u) || !gx_silent(&s, 0x8008A290u))
+            if (!lf_silent(&s, 0x8030E0B4u) || !lf_silent(&s, 0x8008A290u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030E0B4;
     }
@@ -3767,7 +3767,7 @@ B_8008A3A8: /* 3 cycles */
     {
             lr = 0x8008A3B4u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030E0B4u) || !gx_silent(&s, 0x8008A3B4u))
+            if (!lf_silent(&s, 0x8030E0B4u) || !lf_silent(&s, 0x8008A3B4u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030E0B4;
     }

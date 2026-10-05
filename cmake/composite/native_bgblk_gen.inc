@@ -449,7 +449,7 @@ B_80247BF8: /* 11 cycles */
     {
             lr = 0x80247C24u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DCE0u) || !gx_silent(&s, 0x80247C24u))
+            if (!lf_silent(&s, 0x8030DCE0u) || !lf_silent(&s, 0x80247C24u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DCE0;
     }
@@ -474,7 +474,7 @@ B_80247C24: /* 4 cycles */
     {
             lr = 0x80247C34u;
             s.depth++;
-            if (!gx_silent(&s, 0x8030DCE0u) || !gx_silent(&s, 0x80247C34u))
+            if (!lf_silent(&s, 0x8030DCE0u) || !lf_silent(&s, 0x80247C34u))
                 return lf_decline(&s, LF_HOST);
             goto B_8030DCE0;
     }

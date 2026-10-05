@@ -711,6 +711,13 @@ _N7_OSC_CALC = [(0x8028D6E0, 0x8028E238, 0x8028E5EC), (0x802896E0, 0x8028AAE4, 0
 ENTRIES[0x8028DF2C] = ("JASystem::TOscillator::getOffset", "jas",
                        [(0x8028D6E0, 0x8028DF2C, 0x8028E070)] + _N7_OSC_CALC, "7cb77832418511d9ad74d93d9d9657cb8c7c6040f215e6193208099688495c3f")
 ENTRIES[0x8028E238] = ("JASystem::TOscillator::calc", "jas", _N7_OSC_CALC, "da25f5b3a551431910c890ed98403ad4064be6e8b563ff40961e1dee7f78f280")
+ENTRIES[0x8028C3A8] = ("JASystem::TChannel::updateEffectorParam", "jas",
+                       [(0x802896E0, 0x8028C3A8, 0x8028C62C), (0x802896E0, 0x8028CABC, 0x8028CB88),
+                        (0x802896E0, 0x8028CB88, 0x8028CC90), (0x802896E0, 0x8028CD90, 0x8028CEA8),
+                        (0x802896E0, 0x8028CEA8, 0x8028D128), (0x802796E0, 0x8027A9C8, 0x8027A9F4),
+                        (0x802796E0, 0x8027A9F4, 0x8027AA20), (0x802896E0, 0x8028A740, 0x8028A764),
+                        (0x802896E0, 0x8028AAC4, 0x8028AACC), (0x802896E0, 0x8028AACC, 0x8028AAD4),
+                        (0x802896E0, 0x8028AADC, 0x8028AAE4)], "47d638b4641fd2e7fa2b783e59a6d2fa9b7e310d2f7620322edd90255eebeeaf")
 _entry_hash_sixth = entry_hash
 
 

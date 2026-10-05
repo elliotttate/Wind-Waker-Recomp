@@ -1188,7 +1188,7 @@ B_8028E344: /* 2 cycles */
     {
             lr = 0x8028E34Cu;
             s.depth++;
-            if (!gx_silent(&s, 0x8028AAE4u) || !gx_silent(&s, 0x8028E34Cu))
+            if (!lf_silent(&s, 0x8028AAE4u) || !lf_silent(&s, 0x8028E34Cu))
                 return lf_decline(&s, LF_HOST);
             goto B_8028AAE4;
     }
@@ -2033,7 +2033,7 @@ B_8028E510: /* 2 cycles */
     {
             lr = 0x8028E518u;
             s.depth++;
-            if (!gx_silent(&s, 0x80328E10u) || !gx_silent(&s, 0x8028E518u))
+            if (!lf_silent(&s, 0x80328E10u) || !lf_silent(&s, 0x8028E518u))
                 return lf_decline(&s, LF_HOST);
             goto B_80328E10;
     }
@@ -3134,7 +3134,7 @@ B_8028E344: /* 2 cycles */
     {
             lr = 0x8028E34Cu;
             s.depth++;
-            if (!gx_silent(&s, 0x8028AAE4u) || !gx_silent(&s, 0x8028E34Cu))
+            if (!lf_silent(&s, 0x8028AAE4u) || !lf_silent(&s, 0x8028E34Cu))
                 return lf_decline(&s, LF_HOST);
             goto B_8028AAE4;
     }
@@ -3979,7 +3979,7 @@ B_8028E510: /* 2 cycles */
     {
             lr = 0x8028E518u;
             s.depth++;
-            if (!gx_silent(&s, 0x80328E10u) || !gx_silent(&s, 0x8028E518u))
+            if (!lf_silent(&s, 0x80328E10u) || !lf_silent(&s, 0x8028E518u))
                 return lf_decline(&s, LF_HOST);
             goto B_80328E10;
     }
@@ -4524,6 +4524,5256 @@ GX_DONE:
     cpu->ps1[30] = P30;
     cpu->ps1[31] = P31;
     cpu->cr = cr;
+    cpu->lr = lr;
+    cpu->pc = gx_t;
+    return 1;
+}
+
+/* JASystem::TChannel::updateEffectorParam (8028C3A8): 8028C3A8..8028C62C, 8028CABC..8028CB88, 8028CB88..8028CC90, 8028CD90..8028CEA8, 8028CEA8..8028D128, 8027A9C8..8027A9F4, 8027A9F4..8027AA20, 8028A740..8028A764, 8028AAC4..8028AACC, 8028AACC..8028AAD4, 8028AADC..8028AAE4 */
+static int lfn_8028C3A8(CPUState* cpu, u32 at) {
+    GxRun s;
+    if (!lf_start(&s, &s_lf_log, cpu))
+        return lf_decline(&s, LF_STATE);
+    const s64 lf_floor_ = lf_floor(&s);
+    if (!gx_fp_ready(cpu))
+        return lf_decline(&s, LF_STATE);
+    if (!gx_fp_arith_ready(cpu))
+        return lf_decline(&s, LF_STATE);
+    if (!gx_psq_ready(cpu, 0x01u, 0x01u))
+        return lf_decline(&s, LF_STATE);
+    u32 g0 = cpu->gpr[0];
+    u32 g1 = cpu->gpr[1];
+    u32 g2 = cpu->gpr[2];
+    u32 g3 = cpu->gpr[3];
+    u32 g4 = cpu->gpr[4];
+    u32 g5 = cpu->gpr[5];
+    u32 g6 = cpu->gpr[6];
+    u32 g7 = cpu->gpr[7];
+    u32 g8 = cpu->gpr[8];
+    u32 g11 = cpu->gpr[11];
+    u32 g13 = cpu->gpr[13];
+    u32 g28 = cpu->gpr[28];
+    u32 g29 = cpu->gpr[29];
+    u32 g30 = cpu->gpr[30];
+    u32 g31 = cpu->gpr[31];
+    f64 F0 = cpu->fpr[0];
+    f64 F1 = cpu->fpr[1];
+    f64 F2 = cpu->fpr[2];
+    f64 F3 = cpu->fpr[3];
+    f64 F4 = cpu->fpr[4];
+    f64 F5 = cpu->fpr[5];
+    f64 F6 = cpu->fpr[6];
+    f64 F7 = cpu->fpr[7];
+    f64 F22 = cpu->fpr[22];
+    f64 F23 = cpu->fpr[23];
+    f64 F24 = cpu->fpr[24];
+    f64 F25 = cpu->fpr[25];
+    f64 F26 = cpu->fpr[26];
+    f64 F27 = cpu->fpr[27];
+    f64 F28 = cpu->fpr[28];
+    f64 F29 = cpu->fpr[29];
+    f64 F30 = cpu->fpr[30];
+    f64 F31 = cpu->fpr[31];
+    f64 P0 = cpu->ps1[0];
+    f64 P1 = cpu->ps1[1];
+    f64 P2 = cpu->ps1[2];
+    f64 P3 = cpu->ps1[3];
+    f64 P4 = cpu->ps1[4];
+    f64 P5 = cpu->ps1[5];
+    f64 P6 = cpu->ps1[6];
+    f64 P7 = cpu->ps1[7];
+    f64 P22 = cpu->ps1[22];
+    f64 P23 = cpu->ps1[23];
+    f64 P24 = cpu->ps1[24];
+    f64 P25 = cpu->ps1[25];
+    f64 P26 = cpu->ps1[26];
+    f64 P27 = cpu->ps1[27];
+    f64 P28 = cpu->ps1[28];
+    f64 P29 = cpu->ps1[29];
+    f64 P30 = cpu->ps1[30];
+    f64 P31 = cpu->ps1[31];
+    u32 cr = cpu->cr;
+    u32 xer = cpu->xer;
+    u32 ctr = cpu->ctr;
+    u32 lr = cpu->lr;
+    u32 gx_t = 0;
+    (void)gx_t;
+    (void)at;
+    goto B_8028C3A8;
+B_8027A9C8: /* 11 cycles */
+    if (!lf_block(&s, lf_floor_, 11u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8027A9C8: stwu     r1, -16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-16);
+        lf_st32(&s, 0x8027A9C8u, 10u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    // 8027A9CC: lwz     r3, -27880(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-27880);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 8u;
+    // 8027A9D0: lfs     f0, -15472(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15472);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8027A9D4: fmuls   f0, f0, f1
+    F0 = P0 = nr_fmuls(&s.fp, F0, F1);
+
+    // 8027A9D8: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 5u;
+    // 8027A9DC: stfd     f0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        lf_stp64(&s, 0x8027A9DCu, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8027A9E0: lwz     r0, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 8027A9E4: rlwinm r0, r0, 2, 0, 29
+    {
+        g0 = gx_rotl32(g0, 2u) & 0xFFFFFFFCu;
+    }
+
+    s.suffix = 2u;
+    // 8027A9E8: lfsx    f1, r3, r0
+    {
+        u32 ea = g3 + g0;
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 8027A9EC: addi    r1, r1, 16
+    g1 = g1 + (u32)(s32)(16);
+
+    // 8027A9F0: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            if (s.depth == 0u && (gx_t - 0x802896E0u < 0x4000u || gx_t - 0x802796E0u < 0x4000u))
+                return lf_decline(&s, LF_PATH);
+            goto GX_RETURN;
+        }
+    }
+B_8027A9F4: /* 11 cycles */
+    if (!lf_block(&s, lf_floor_, 11u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8027A9F4: stwu     r1, -16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-16);
+        lf_st32(&s, 0x8027A9F4u, 10u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    // 8027A9F8: lwz     r3, -27876(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-27876);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 8u;
+    // 8027A9FC: lfs     f0, -15472(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15472);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8027AA00: fmuls   f0, f0, f1
+    F0 = P0 = nr_fmuls(&s.fp, F0, F1);
+
+    // 8027AA04: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 5u;
+    // 8027AA08: stfd     f0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        lf_stp64(&s, 0x8027AA08u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8027AA0C: lwz     r0, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 8027AA10: rlwinm r0, r0, 2, 0, 29
+    {
+        g0 = gx_rotl32(g0, 2u) & 0xFFFFFFFCu;
+    }
+
+    s.suffix = 2u;
+    // 8027AA14: lfsx    f1, r3, r0
+    {
+        u32 ea = g3 + g0;
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 8027AA18: addi    r1, r1, 16
+    g1 = g1 + (u32)(s32)(16);
+
+    // 8027AA1C: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            if (s.depth == 0u && (gx_t - 0x802896E0u < 0x4000u || gx_t - 0x802796E0u < 0x4000u))
+                return lf_decline(&s, LF_PATH);
+            goto GX_RETURN;
+        }
+    }
+B_8028A740: /* 9 cycles */
+    if (!lf_block(&s, lf_floor_, 9u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028A740: rlwinm r0, r6, 0, 24, 31
+    {
+        g0 = gx_rotl32(g6, 0u) & 0x000000FFu;
+    }
+
+    // 8028A744: rlwimi r0, r5, 8, 16, 23
+    {
+        u32 rot = gx_rotl32(g5, 8u);
+        g0 = (g0 & ~0x0000FF00u) | (rot & 0x0000FF00u);
+    }
+
+    // 8028A748: sth     r0, 80(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(80);
+        lf_st16(&s, 0x8028A748u, 6u, ea, (u16)g0);
+    }
+
+    // 8028A74C: rlwinm r0, r7, 8, 16, 23
+    {
+        g0 = gx_rotl32(g7, 8u) & 0x0000FF00u;
+    }
+
+    // 8028A750: sth     r0, 82(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(82);
+        lf_st16(&s, 0x8028A750u, 4u, ea, (u16)g0);
+    }
+
+    // 8028A754: sth     r4, 86(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(86);
+        lf_st16(&s, 0x8028A754u, 3u, ea, (u16)g4);
+    }
+
+    // 8028A758: li      r0, 1
+    g0 = (u32)(s32)(1);
+
+    // 8028A75C: sth     r0, 88(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(88);
+        lf_st16(&s, 0x8028A75Cu, 1u, ea, (u16)g0);
+    }
+
+    // 8028A760: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028AAC4: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028AAC4: lhz     r3, -31920(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-31920);
+        g3 = gx_ld16(&s, ea);
+    }
+
+    // 8028AAC8: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028AACC: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028AACC: lhz     r3, -31918(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-31918);
+        g3 = gx_ld16(&s, ea);
+    }
+
+    // 8028AAD0: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028AADC: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028AADC: lwz     r3, -31916(r13)
+    {
+        u32 ea = g13 + (u32)(s32)(-31916);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 8028AAE0: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028C3A8: /* 16 cycles */
+    if (!lf_block(&s, lf_floor_, 16u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C3A8: stwu     r1, -80(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-80);
+        lf_st32(&s, 0x8028C3A8u, 15u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    s.suffix = 14u;
+    // 8028C3AC: mflr    r0
+    g0 = lr;
+
+    // 8028C3B0: stw     r0, 84(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(84);
+        lf_st32(&s, 0x8028C3B0u, 13u, ea, (u32)g0);
+    }
+
+    s.suffix = 12u;
+    // 8028C3B4: stfd     f31, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        lf_stp64(&s, 0x8028C3B4u, ea, gx_f64_to_bits(F31));
+    }
+
+    s.suffix = 11u;
+    // 8028C3B8: psq_st   f31, 72(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(72);
+        lf_psq_st(&s, 0x8028C3B8u, F31, P31, ea, false);
+    }
+
+    s.suffix = 10u;
+    // 8028C3BC: stfd     f30, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        lf_stp64(&s, 0x8028C3BCu, ea, gx_f64_to_bits(F30));
+    }
+
+    s.suffix = 9u;
+    // 8028C3C0: psq_st   f30, 56(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(56);
+        lf_psq_st(&s, 0x8028C3C0u, F30, P30, ea, false);
+    }
+
+    s.suffix = 8u;
+    // 8028C3C4: stfd     f29, 32(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(32);
+        lf_stp64(&s, 0x8028C3C4u, ea, gx_f64_to_bits(F29));
+    }
+
+    s.suffix = 7u;
+    // 8028C3C8: psq_st   f29, 40(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(40);
+        lf_psq_st(&s, 0x8028C3C8u, F29, P29, ea, false);
+    }
+
+    // 8028C3CC: stw     r31, 28(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(28);
+        lf_st32(&s, 0x8028C3CCu, 6u, ea, (u32)g31);
+    }
+
+    // 8028C3D0: or   r31, r3, r3
+    {
+        g31 = g3 | g3;
+    }
+
+    s.suffix = 4u;
+    // 8028C3D4: lfs     f29, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F29 = value;
+        P29 = value;
+    }
+
+    // 8028C3D8: lwz     r0, 164(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(164);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 8028C3DC: lwz     r3, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 8028C3E0: cmplw   r0, r3
+    {
+        u32 val_a = (u32)(g0);
+        u32 val_b = (u32)(g3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028C3E4: bc    4, 2, 0x8028C448
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C448;
+        }
+    }
+    goto B_8028C3E8;
+B_8028C3E8: /* 18 cycles, main path */
+    if (!lf_block(&s, lf_floor_, 18u))
+        return lf_decline(&s, LF_BLOCK);
+    if (!gx_live(&s))
+        return lf_decline(&s, LF_CLOCK);
+    s.suffix = 17u;
+    // 8028C3E8: lfs     f0, 28(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(28);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    s.suffix = 16u;
+    // 8028C3EC: stfs     f0, 168(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(168);
+        lf_stp32(&s, 0x8028C3ECu, ea, gx_f32_to_bits(F0));
+    }
+
+    s.suffix = 15u;
+    // 8028C3F0: lwz     r3, 4(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(4);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 14u;
+    // 8028C3F4: lfs     f0, 24(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(24);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    s.suffix = 13u;
+    // 8028C3F8: stfs     f0, 172(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(172);
+        lf_stp32(&s, 0x8028C3F8u, ea, gx_f32_to_bits(F0));
+    }
+
+    s.suffix = 12u;
+    // 8028C3FC: lwz     r3, 4(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(4);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 11u;
+    // 8028C400: lfs     f0, 32(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(32);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    s.suffix = 10u;
+    // 8028C404: stfs     f0, 120(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(120);
+        lf_stp32(&s, 0x8028C404u, ea, gx_f32_to_bits(F0));
+    }
+
+    s.suffix = 9u;
+    // 8028C408: lwz     r3, 4(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(4);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 8u;
+    // 8028C40C: lfs     f0, 36(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(36);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    s.suffix = 7u;
+    // 8028C410: stfs     f0, 132(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(132);
+        lf_stp32(&s, 0x8028C410u, ea, gx_f32_to_bits(F0));
+    }
+
+    s.suffix = 6u;
+    // 8028C414: lwz     r3, 4(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(4);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 5u;
+    // 8028C418: lfs     f0, 40(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(40);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    s.suffix = 4u;
+    // 8028C41C: stfs     f0, 144(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(144);
+        lf_stp32(&s, 0x8028C41Cu, ea, gx_f32_to_bits(F0));
+    }
+
+    // 8028C420: li      r4, 0
+    g4 = (u32)(s32)(0);
+
+    // 8028C424: li      r0, 3
+    g0 = (u32)(s32)(3);
+
+    s.suffix = 0u;
+    // 8028C428: mtctr    r0
+    ctr = g0;
+
+    goto B_8028C42C;
+    // 8028C430: addi    r0, r4, 98
+    g0 = g4 + (u32)(s32)(98);
+
+    s.suffix = 4u;
+    // 8028C434: lbzx    r3, r3, r0
+    {
+        u32 ea = g3 + g0;
+        g3 = gx_ld8(&s, ea);
+    }
+
+    // 8028C438: addi    r0, r4, 96
+    g0 = g4 + (u32)(s32)(96);
+
+    s.suffix = 2u;
+    // 8028C43C: stbx    r3, r31, r0
+    {
+        u32 ea = g31 + g0;
+        lf_stp8(&s, 0x8028C43Cu, ea, (u8)g3);
+    }
+
+    // 8028C440: addi    r4, r4, 1
+    g4 = g4 + (u32)(s32)(1);
+
+    // 8028C444: bc    16, 0, 0x8028C42C
+    {
+        ctr--;
+        bool ctr_ok = (((ctr != 0) ? 1u : 0u) ^ 0u) != 0;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028C42C;
+        }
+    }
+    goto B_8028C448;
+B_8028C42C: /* 7 cycles */
+    if (!lf_block(&s, lf_floor_, 7u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C42C: lwz     r3, 4(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(4);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 8028C430: addi    r0, r4, 98
+    g0 = g4 + (u32)(s32)(98);
+
+    // 8028C434: lbzx    r3, r3, r0
+    {
+        u32 ea = g3 + g0;
+        g3 = gx_ld8(&s, ea);
+    }
+
+    // 8028C438: addi    r0, r4, 96
+    g0 = g4 + (u32)(s32)(96);
+
+    // 8028C43C: stbx    r3, r31, r0
+    {
+        u32 ea = g31 + g0;
+        lf_st8(&s, 0x8028C43Cu, 2u, ea, (u8)g3);
+    }
+
+    // 8028C440: addi    r4, r4, 1
+    g4 = g4 + (u32)(s32)(1);
+
+    // 8028C444: bc    16, 0, 0x8028C42C
+    {
+        ctr--;
+        bool ctr_ok = (((ctr != 0) ? 1u : 0u) ^ 0u) != 0;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028C42C;
+        }
+    }
+
+    goto B_8028C448;
+B_8028C448: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C448: bl      0x8028AADC
+    {
+            lr = 0x8028C44Cu;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028AADC;
+    }
+    goto B_8028C44C;
+B_8028C44C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C44C: cmpwi   r3, 1
+    {
+        s32 val_a = (s32)(g3);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028C450: bc    12, 2, 0x8028C490
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C490;
+        }
+    }
+    goto B_8028C454;
+B_8028C454: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C454: bc    4, 0, 0x8028C464
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C464;
+        }
+    }
+    goto B_8028C458;
+B_8028C458: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C458: cmpwi   r3, 0
+    {
+        s32 val_a = (s32)(g3);
+        s32 val_b = (s32)(0);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028C45C: bc    4, 0, 0x8028C470
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C470;
+        }
+    }
+    goto B_8028C460;
+B_8028C460: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C460: b       0x8028C51C
+    {
+            goto B_8028C51C;
+    }
+    goto B_8028C464;
+B_8028C464: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C464: cmpwi   r3, 3
+    {
+        s32 val_a = (s32)(g3);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028C468: bc    4, 0, 0x8028C51C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C51C;
+        }
+    }
+    goto B_8028C46C;
+B_8028C46C: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C46C: b       0x8028C4D0
+    {
+            goto B_8028C4D0;
+    }
+    goto B_8028C470;
+B_8028C470: /* 6 cycles */
+    if (!lf_block(&s, lf_floor_, 6u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 5u;
+    // 8028C470: lfs     f31, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F31 = value;
+        P31 = value;
+    }
+
+    s.suffix = 4u;
+    // 8028C474: lfs     f29, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F29 = value;
+        P29 = value;
+    }
+
+    // 8028C478: addi    r3, r31, 124
+    g3 = g31 + (u32)(s32)(124);
+
+    // 8028C47C: addi    r4, r31, 100
+    g4 = g31 + (u32)(s32)(100);
+
+    // 8028C480: lbz     r5, 97(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(97);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 8028C484: bl      0x8028CABC
+    {
+            lr = 0x8028C488u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CABC;
+    }
+    goto B_8028C488;
+B_8028C488: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C488: fmr    f30, f1
+    F30 = F1;
+
+    // 8028C48C: b       0x8028C51C
+    {
+            goto B_8028C51C;
+    }
+B_8028C490: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C490: lbz     r5, 96(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(96);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 8028C494: cmplwi  r5, 0x0000
+    {
+        u32 val_a = (u32)(g5);
+        u32 val_b = (u32)(0x0000u);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028C498: bc    4, 2, 0x8028C4A4
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C4A4;
+        }
+    }
+    goto B_8028C49C;
+B_8028C49C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 1u;
+    // 8028C49C: lfs     f1, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 8028C4A0: b       0x8028C4B0
+    {
+            goto B_8028C4B0;
+    }
+B_8028C4A4: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C4A4: addi    r3, r31, 112
+    g3 = g31 + (u32)(s32)(112);
+
+    // 8028C4A8: addi    r4, r31, 100
+    g4 = g31 + (u32)(s32)(100);
+
+    // 8028C4AC: bl      0x8028CB88
+    {
+            lr = 0x8028C4B0u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CB88;
+    }
+    goto B_8028C4B0;
+B_8028C4B0: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C4B0: fmr    f31, f1
+    F31 = F1;
+
+    // 8028C4B4: addi    r3, r31, 124
+    g3 = g31 + (u32)(s32)(124);
+
+    // 8028C4B8: addi    r4, r31, 100
+    g4 = g31 + (u32)(s32)(100);
+
+    // 8028C4BC: lbz     r5, 97(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(97);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 8028C4C0: bl      0x8028CABC
+    {
+            lr = 0x8028C4C4u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CABC;
+    }
+    goto B_8028C4C4;
+B_8028C4C4: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C4C4: fmr    f30, f1
+    F30 = F1;
+
+    s.suffix = 1u;
+    // 8028C4C8: lfs     f29, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F29 = value;
+        P29 = value;
+    }
+
+    // 8028C4CC: b       0x8028C51C
+    {
+            goto B_8028C51C;
+    }
+B_8028C4D0: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C4D0: lbz     r5, 96(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(96);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 8028C4D4: cmplwi  r5, 0x0000
+    {
+        u32 val_a = (u32)(g5);
+        u32 val_b = (u32)(0x0000u);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028C4D8: bc    4, 2, 0x8028C4E4
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C4E4;
+        }
+    }
+    goto B_8028C4DC;
+B_8028C4DC: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 1u;
+    // 8028C4DC: lfs     f1, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 8028C4E0: b       0x8028C4F0
+    {
+            goto B_8028C4F0;
+    }
+B_8028C4E4: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C4E4: addi    r3, r31, 112
+    g3 = g31 + (u32)(s32)(112);
+
+    // 8028C4E8: addi    r4, r31, 100
+    g4 = g31 + (u32)(s32)(100);
+
+    // 8028C4EC: bl      0x8028CB88
+    {
+            lr = 0x8028C4F0u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CB88;
+    }
+    goto B_8028C4F0;
+B_8028C4F0: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C4F0: fmr    f31, f1
+    F31 = F1;
+
+    // 8028C4F4: addi    r3, r31, 124
+    g3 = g31 + (u32)(s32)(124);
+
+    // 8028C4F8: addi    r4, r31, 100
+    g4 = g31 + (u32)(s32)(100);
+
+    // 8028C4FC: lbz     r5, 97(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(97);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 8028C500: bl      0x8028CABC
+    {
+            lr = 0x8028C504u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CABC;
+    }
+    goto B_8028C504;
+B_8028C504: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C504: fmr    f30, f1
+    F30 = F1;
+
+    // 8028C508: addi    r3, r31, 136
+    g3 = g31 + (u32)(s32)(136);
+
+    // 8028C50C: addi    r4, r31, 100
+    g4 = g31 + (u32)(s32)(100);
+
+    // 8028C510: lbz     r5, 98(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(98);
+        g5 = gx_ld8(&s, ea);
+    }
+
+    // 8028C514: bl      0x8028CABC
+    {
+            lr = 0x8028C518u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CABC;
+    }
+    goto B_8028C518;
+B_8028C518: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C518: fmr    f29, f1
+    F29 = F1;
+    goto B_8028C51C;
+B_8028C51C: /* 9 cycles */
+    if (!lf_block(&s, lf_floor_, 9u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 8u;
+    // 8028C51C: lfs     f2, 172(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(172);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 7u;
+    // 8028C520: lfs     f1, 92(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(92);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    s.suffix = 6u;
+    // 8028C524: lfs     f0, 152(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(152);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028C528: fmuls   f0, f1, f0
+    F0 = P0 = nr_fmuls(&s.fp, F1, F0);
+
+    // 8028C52C: fmuls   f1, f2, f0
+    F1 = P1 = nr_fmuls(&s.fp, F2, F0);
+
+    s.suffix = 3u;
+    // 8028C530: lfs     f2, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    // 8028C534: fcmpo   cr0, f31, f2
+    gx_fcmp(&s.fp, &cr, 0u, F31, F2);
+
+    // 8028C538: cror    2, 0, 2
+    {
+        u32 a = (cr >> (31u - 0u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028C53C: bc    4, 2, 0x8028C544
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C544;
+        }
+    }
+    goto B_8028C540;
+B_8028C540: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C540: b       0x8028C55C
+    {
+            goto B_8028C55C;
+    }
+    goto B_8028C544;
+B_8028C544: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028C544: lfs     f2, -15032(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15032);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    // 8028C548: fcmpo   cr0, f31, f2
+    gx_fcmp(&s.fp, &cr, 0u, F31, F2);
+
+    // 8028C54C: cror    2, 1, 2
+    {
+        u32 a = (cr >> (31u - 1u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028C550: bc    4, 2, 0x8028C558
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C558;
+        }
+    }
+    goto B_8028C554;
+B_8028C554: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C554: b       0x8028C55C
+    {
+            goto B_8028C55C;
+    }
+    goto B_8028C558;
+B_8028C558: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C558: fmr    f2, f31
+    F2 = F31;
+    goto B_8028C55C;
+B_8028C55C: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028C55C: lfs     f3, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F3 = value;
+        P3 = value;
+    }
+
+    // 8028C560: fcmpo   cr0, f30, f3
+    gx_fcmp(&s.fp, &cr, 0u, F30, F3);
+
+    // 8028C564: cror    2, 0, 2
+    {
+        u32 a = (cr >> (31u - 0u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028C568: bc    4, 2, 0x8028C570
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C570;
+        }
+    }
+    goto B_8028C56C;
+B_8028C56C: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C56C: b       0x8028C588
+    {
+            goto B_8028C588;
+    }
+    goto B_8028C570;
+B_8028C570: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028C570: lfs     f3, -15032(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15032);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F3 = value;
+        P3 = value;
+    }
+
+    // 8028C574: fcmpo   cr0, f30, f3
+    gx_fcmp(&s.fp, &cr, 0u, F30, F3);
+
+    // 8028C578: cror    2, 1, 2
+    {
+        u32 a = (cr >> (31u - 1u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028C57C: bc    4, 2, 0x8028C584
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C584;
+        }
+    }
+    goto B_8028C580;
+B_8028C580: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C580: b       0x8028C588
+    {
+            goto B_8028C588;
+    }
+    goto B_8028C584;
+B_8028C584: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C584: fmr    f3, f30
+    F3 = F30;
+    goto B_8028C588;
+B_8028C588: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028C588: lfs     f4, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F4 = value;
+        P4 = value;
+    }
+
+    // 8028C58C: fcmpo   cr0, f29, f4
+    gx_fcmp(&s.fp, &cr, 0u, F29, F4);
+
+    // 8028C590: cror    2, 0, 2
+    {
+        u32 a = (cr >> (31u - 0u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028C594: bc    4, 2, 0x8028C59C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C59C;
+        }
+    }
+    goto B_8028C598;
+B_8028C598: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C598: b       0x8028C5B4
+    {
+            goto B_8028C5B4;
+    }
+    goto B_8028C59C;
+B_8028C59C: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028C59C: lfs     f4, -15032(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15032);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F4 = value;
+        P4 = value;
+    }
+
+    // 8028C5A0: fcmpo   cr0, f29, f4
+    gx_fcmp(&s.fp, &cr, 0u, F29, F4);
+
+    // 8028C5A4: cror    2, 1, 2
+    {
+        u32 a = (cr >> (31u - 1u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028C5A8: bc    4, 2, 0x8028C5B0
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C5B0;
+        }
+    }
+    goto B_8028C5AC;
+B_8028C5AC: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C5AC: b       0x8028C5B4
+    {
+            goto B_8028C5B4;
+    }
+    goto B_8028C5B0;
+B_8028C5B0: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C5B0: fmr    f4, f29
+    F4 = F29;
+    goto B_8028C5B4;
+B_8028C5B4: /* 14 cycles */
+    if (!lf_block(&s, lf_floor_, 14u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 13u;
+    // 8028C5B4: lfs     f7, -15008(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15008);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F7 = value;
+        P7 = value;
+    }
+
+    s.suffix = 12u;
+    // 8028C5B8: lfs     f6, 168(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(168);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F6 = value;
+        P6 = value;
+    }
+
+    s.suffix = 11u;
+    // 8028C5BC: lfs     f5, 88(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(88);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F5 = value;
+        P5 = value;
+    }
+
+    s.suffix = 10u;
+    // 8028C5C0: lfs     f0, 148(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(148);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028C5C4: fmuls   f0, f5, f0
+    F0 = P0 = nr_fmuls(&s.fp, F5, F0);
+
+    // 8028C5C8: fmuls   f0, f6, f0
+    F0 = P0 = nr_fmuls(&s.fp, F6, F0);
+
+    // 8028C5CC: fmuls   f0, f7, f0
+    F0 = P0 = nr_fmuls(&s.fp, F7, F0);
+
+    // 8028C5D0: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 5u;
+    // 8028C5D4: stfd     f0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        lf_stp64(&s, 0x8028C5D4u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8028C5D8: lwz     r0, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    // 8028C5DC: sth     r0, 160(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(160);
+        lf_st16(&s, 0x8028C5DCu, 3u, ea, (u16)g0);
+    }
+
+    // 8028C5E0: lhz     r0, 176(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(176);
+        g0 = gx_ld16(&s, ea);
+    }
+
+    // 8028C5E4: cmplwi  r0, 0xFFFF
+    {
+        u32 val_a = (u32)(g0);
+        u32 val_b = (u32)(0xFFFFu);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028C5E8: bc    12, 2, 0x8028C5F8
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028C5F8;
+        }
+    }
+    goto B_8028C5EC;
+B_8028C5EC: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C5EC: or   r3, r31, r31
+    {
+        g3 = g31 | g31;
+    }
+
+    // 8028C5F0: bl      0x8028CEA8
+    {
+            lr = 0x8028C5F4u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CEA8;
+    }
+    goto B_8028C5F4;
+B_8028C5F4: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C5F4: b       0x8028C600
+    {
+            goto B_8028C600;
+    }
+    goto B_8028C5F8;
+B_8028C5F8: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028C5F8: or   r3, r31, r31
+    {
+        g3 = g31 | g31;
+    }
+
+    // 8028C5FC: bl      0x8028CD90
+    {
+            lr = 0x8028C600u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CD90;
+    }
+    goto B_8028C600;
+B_8028C600: /* 12 cycles */
+    if (!lf_block(&s, lf_floor_, 12u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 11u;
+    // 8028C600: psq_l   f31, 72(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(72);
+        lf_psq_l(&s, &F31, &P31, ea, false);
+    }
+
+    s.suffix = 10u;
+    // 8028C604: lfd     f31, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        F31 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 9u;
+    // 8028C608: psq_l   f30, 56(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(56);
+        lf_psq_l(&s, &F30, &P30, ea, false);
+    }
+
+    s.suffix = 8u;
+    // 8028C60C: lfd     f30, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        F30 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 7u;
+    // 8028C610: psq_l   f29, 40(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(40);
+        lf_psq_l(&s, &F29, &P29, ea, false);
+    }
+
+    s.suffix = 6u;
+    // 8028C614: lfd     f29, 32(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(32);
+        F29 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8028C618: lwz     r31, 28(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(28);
+        g31 = gx_ld32(&s, ea);
+    }
+
+    // 8028C61C: lwz     r0, 84(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(84);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 2u;
+    // 8028C620: mtlr    r0
+    lr = g0;
+
+    // 8028C624: addi    r1, r1, 80
+    g1 = g1 + (u32)(s32)(80);
+
+    // 8028C628: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028CABC: /* 11 cycles */
+    if (!lf_block(&s, lf_floor_, 11u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 10u;
+    // 8028CABC: lfs     f1, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 8028CAC0: rlwinm r0, r5, 0, 24, 31
+    {
+        g0 = gx_rotl32(g5, 0u) & 0x000000FFu;
+    }
+
+    // 8028CAC4: mulli   r6, r0, 3
+    g6 = (u32)((s64)(s32)g0 * (s64)(s32)3);
+
+    // 8028CAC8: lis     r5, -32710
+    g5 = ((u32)(s32)(-32710) << 16);
+
+    // 8028CACC: addi    r0, r5, -29656
+    g0 = g5 + (u32)(s32)(-29656);
+
+    // 8028CAD0: add   r5, r0, r6
+    {
+        u32 a = g0;
+        u32 b = g6;
+        u32 res = a + b;
+        g5 = res;
+    }
+
+    // 8028CAD4: lbz     r0, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CAD8: cmpwi   r0, 1
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CADC: bc    12, 2, 0x8028CAF4
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CAF4;
+        }
+    }
+    goto B_8028CAE0;
+B_8028CAE0: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CAE0: bc    4, 0, 0x8028CAE8
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CAE8;
+        }
+    }
+    goto B_8028CAE4;
+B_8028CAE4: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CAE4: b       0x8028CB10
+    {
+            goto B_8028CB10;
+    }
+    goto B_8028CAE8;
+B_8028CAE8: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CAE8: cmpwi   r0, 3
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CAEC: bc    4, 0, 0x8028CB10
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CB10;
+        }
+    }
+    goto B_8028CAF0;
+B_8028CAF0: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CAF0: b       0x8028CB00
+    {
+            goto B_8028CB00;
+    }
+    goto B_8028CAF4;
+B_8028CAF4: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 2u;
+    // 8028CAF4: lfs     f0, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CAF8: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CAFC: b       0x8028CB10
+    {
+            goto B_8028CB10;
+    }
+B_8028CB00: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028CB00: lfs     f2, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 2u;
+    // 8028CB04: lfs     f0, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CB08: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8028CB0C: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+    goto B_8028CB10;
+B_8028CB10: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB10: lbz     r0, 1(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(1);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CB14: cmpwi   r0, 1
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CB18: bc    12, 2, 0x8028CB30
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CB30;
+        }
+    }
+    goto B_8028CB1C;
+B_8028CB1C: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB1C: bc    4, 0, 0x8028CB24
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CB24;
+        }
+    }
+    goto B_8028CB20;
+B_8028CB20: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB20: b       0x8028CB4C
+    {
+            goto B_8028CB4C;
+    }
+    goto B_8028CB24;
+B_8028CB24: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB24: cmpwi   r0, 3
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CB28: bc    4, 0, 0x8028CB4C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CB4C;
+        }
+    }
+    goto B_8028CB2C;
+B_8028CB2C: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB2C: b       0x8028CB3C
+    {
+            goto B_8028CB3C;
+    }
+    goto B_8028CB30;
+B_8028CB30: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 2u;
+    // 8028CB30: lfs     f0, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CB34: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CB38: b       0x8028CB4C
+    {
+            goto B_8028CB4C;
+    }
+B_8028CB3C: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028CB3C: lfs     f2, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 2u;
+    // 8028CB40: lfs     f0, 4(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(4);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CB44: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8028CB48: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+    goto B_8028CB4C;
+B_8028CB4C: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB4C: lbz     r0, 2(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(2);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CB50: cmpwi   r0, 1
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CB54: bc    12, 2, 0x8028CB68
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CB68;
+        }
+    }
+    goto B_8028CB58;
+B_8028CB58: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB58: bclr  12, 0
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+    goto B_8028CB5C;
+B_8028CB5C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB5C: cmpwi   r0, 3
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CB60: bclr  4, 0
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+    goto B_8028CB64;
+B_8028CB64: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CB64: b       0x8028CB74
+    {
+            goto B_8028CB74;
+    }
+    goto B_8028CB68;
+B_8028CB68: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 2u;
+    // 8028CB68: lfs     f0, 8(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(8);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CB6C: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CB70: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028CB74: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 4u;
+    // 8028CB74: lfs     f2, 8(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(8);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 3u;
+    // 8028CB78: lfs     f0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CB7C: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8028CB80: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CB84: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028CB88: /* 11 cycles */
+    if (!lf_block(&s, lf_floor_, 11u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 10u;
+    // 8028CB88: lfs     f1, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 8028CB8C: rlwinm r0, r5, 0, 24, 31
+    {
+        g0 = gx_rotl32(g5, 0u) & 0x000000FFu;
+    }
+
+    // 8028CB90: mulli   r6, r0, 3
+    g6 = (u32)((s64)(s32)g0 * (s64)(s32)3);
+
+    // 8028CB94: lis     r5, -32710
+    g5 = ((u32)(s32)(-32710) << 16);
+
+    // 8028CB98: addi    r0, r5, -29656
+    g0 = g5 + (u32)(s32)(-29656);
+
+    // 8028CB9C: add   r5, r0, r6
+    {
+        u32 a = g0;
+        u32 b = g6;
+        u32 res = a + b;
+        g5 = res;
+    }
+
+    // 8028CBA0: lbz     r0, 0(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(0);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CBA4: cmpwi   r0, 1
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CBA8: bc    12, 2, 0x8028CBC0
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CBC0;
+        }
+    }
+    goto B_8028CBAC;
+B_8028CBAC: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CBAC: bc    4, 0, 0x8028CBB4
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CBB4;
+        }
+    }
+    goto B_8028CBB0;
+B_8028CBB0: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CBB0: b       0x8028CBEC
+    {
+            goto B_8028CBEC;
+    }
+    goto B_8028CBB4;
+B_8028CBB4: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CBB4: cmpwi   r0, 3
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CBB8: bc    4, 0, 0x8028CBEC
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CBEC;
+        }
+    }
+    goto B_8028CBBC;
+B_8028CBBC: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CBBC: b       0x8028CBD4
+    {
+            goto B_8028CBD4;
+    }
+    goto B_8028CBC0;
+B_8028CBC0: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 4u;
+    // 8028CBC0: lfs     f2, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 3u;
+    // 8028CBC4: lfs     f0, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CBC8: fsubs   f0, f2, f0
+    F0 = P0 = nr_fsubs(&s.fp, F2, F0);
+
+    // 8028CBCC: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CBD0: b       0x8028CBEC
+    {
+            goto B_8028CBEC;
+    }
+B_8028CBD4: /* 6 cycles */
+    if (!lf_block(&s, lf_floor_, 6u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 5u;
+    // 8028CBD4: lfs     f2, 0(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(0);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 4u;
+    // 8028CBD8: lfs     f0, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CBDC: fsubs   f2, f2, f0
+    F2 = P2 = nr_fsubs(&s.fp, F2, F0);
+
+    s.suffix = 2u;
+    // 8028CBE0: lfs     f0, 0(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(0);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CBE4: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8028CBE8: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+    goto B_8028CBEC;
+B_8028CBEC: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CBEC: lbz     r0, 1(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(1);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CBF0: cmpwi   r0, 1
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CBF4: bc    12, 2, 0x8028CC0C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CC0C;
+        }
+    }
+    goto B_8028CBF8;
+B_8028CBF8: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CBF8: bc    4, 0, 0x8028CC00
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CC00;
+        }
+    }
+    goto B_8028CBFC;
+B_8028CBFC: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CBFC: b       0x8028CC38
+    {
+            goto B_8028CC38;
+    }
+    goto B_8028CC00;
+B_8028CC00: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CC00: cmpwi   r0, 3
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CC04: bc    4, 0, 0x8028CC38
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CC38;
+        }
+    }
+    goto B_8028CC08;
+B_8028CC08: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CC08: b       0x8028CC20
+    {
+            goto B_8028CC20;
+    }
+    goto B_8028CC0C;
+B_8028CC0C: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 4u;
+    // 8028CC0C: lfs     f2, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 3u;
+    // 8028CC10: lfs     f0, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CC14: fsubs   f0, f2, f0
+    F0 = P0 = nr_fsubs(&s.fp, F2, F0);
+
+    // 8028CC18: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CC1C: b       0x8028CC38
+    {
+            goto B_8028CC38;
+    }
+B_8028CC20: /* 6 cycles */
+    if (!lf_block(&s, lf_floor_, 6u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 5u;
+    // 8028CC20: lfs     f2, 4(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(4);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 4u;
+    // 8028CC24: lfs     f0, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CC28: fsubs   f2, f2, f0
+    F2 = P2 = nr_fsubs(&s.fp, F2, F0);
+
+    s.suffix = 2u;
+    // 8028CC2C: lfs     f0, 4(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(4);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CC30: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8028CC34: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+    goto B_8028CC38;
+B_8028CC38: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CC38: lbz     r0, 2(r5)
+    {
+        u32 ea = g5 + (u32)(s32)(2);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CC3C: cmpwi   r0, 1
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(1);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CC40: bc    12, 2, 0x8028CC58
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CC58;
+        }
+    }
+    goto B_8028CC44;
+B_8028CC44: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CC44: bc    4, 0, 0x8028CC4C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CC4C;
+        }
+    }
+    goto B_8028CC48;
+B_8028CC48: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CC48: b       0x8028CC84
+    {
+            goto B_8028CC84;
+    }
+    goto B_8028CC4C;
+B_8028CC4C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CC4C: cmpwi   r0, 3
+    {
+        s32 val_a = (s32)(g0);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CC50: bc    4, 0, 0x8028CC84
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CC84;
+        }
+    }
+    goto B_8028CC54;
+B_8028CC54: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CC54: b       0x8028CC6C
+    {
+            goto B_8028CC6C;
+    }
+    goto B_8028CC58;
+B_8028CC58: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 4u;
+    // 8028CC58: lfs     f2, 8(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(8);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 3u;
+    // 8028CC5C: lfs     f0, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CC60: fsubs   f0, f2, f0
+    F0 = P0 = nr_fsubs(&s.fp, F2, F0);
+
+    // 8028CC64: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CC68: b       0x8028CC84
+    {
+            goto B_8028CC84;
+    }
+B_8028CC6C: /* 6 cycles */
+    if (!lf_block(&s, lf_floor_, 6u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 5u;
+    // 8028CC6C: lfs     f2, 8(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(8);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F2 = value;
+        P2 = value;
+    }
+
+    s.suffix = 4u;
+    // 8028CC70: lfs     f0, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CC74: fsubs   f2, f2, f0
+    F2 = P2 = nr_fsubs(&s.fp, F2, F0);
+
+    s.suffix = 2u;
+    // 8028CC78: lfs     f0, 8(r4)
+    {
+        u32 ea = g4 + (u32)(s32)(8);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CC7C: fmuls   f0, f2, f0
+    F0 = P0 = nr_fmuls(&s.fp, F2, F0);
+
+    // 8028CC80: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+    goto B_8028CC84;
+B_8028CC84: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 2u;
+    // 8028CC84: lfs     f0, -15012(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15012);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CC88: fadds   f1, f1, f0
+    F1 = P1 = nr_fadds(&s.fp, F1, F0);
+
+    // 8028CC8C: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028CD90: /* 20 cycles */
+    if (!lf_block(&s, lf_floor_, 20u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CD90: stwu     r1, -128(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-128);
+        lf_st32(&s, 0x8028CD90u, 19u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    s.suffix = 18u;
+    // 8028CD94: mflr    r0
+    g0 = lr;
+
+    // 8028CD98: stw     r0, 132(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(132);
+        lf_st32(&s, 0x8028CD98u, 17u, ea, (u32)g0);
+    }
+
+    s.suffix = 16u;
+    // 8028CD9C: stfd     f31, 112(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(112);
+        lf_stp64(&s, 0x8028CD9Cu, ea, gx_f64_to_bits(F31));
+    }
+
+    s.suffix = 15u;
+    // 8028CDA0: psq_st   f31, 120(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(120);
+        lf_psq_st(&s, 0x8028CDA0u, F31, P31, ea, false);
+    }
+
+    s.suffix = 14u;
+    // 8028CDA4: stfd     f30, 96(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(96);
+        lf_stp64(&s, 0x8028CDA4u, ea, gx_f64_to_bits(F30));
+    }
+
+    s.suffix = 13u;
+    // 8028CDA8: psq_st   f30, 104(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(104);
+        lf_psq_st(&s, 0x8028CDA8u, F30, P30, ea, false);
+    }
+
+    s.suffix = 12u;
+    // 8028CDAC: stfd     f29, 80(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(80);
+        lf_stp64(&s, 0x8028CDACu, ea, gx_f64_to_bits(F29));
+    }
+
+    s.suffix = 11u;
+    // 8028CDB0: psq_st   f29, 88(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(88);
+        lf_psq_st(&s, 0x8028CDB0u, F29, P29, ea, false);
+    }
+
+    s.suffix = 10u;
+    // 8028CDB4: stfd     f28, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        lf_stp64(&s, 0x8028CDB4u, ea, gx_f64_to_bits(F28));
+    }
+
+    s.suffix = 9u;
+    // 8028CDB8: psq_st   f28, 72(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(72);
+        lf_psq_st(&s, 0x8028CDB8u, F28, P28, ea, false);
+    }
+
+    // 8028CDBC: stw     r31, 60(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(60);
+        lf_st32(&s, 0x8028CDBCu, 8u, ea, (u32)g31);
+    }
+
+    // 8028CDC0: or   r31, r3, r3
+    {
+        g31 = g3 | g3;
+    }
+
+    // 8028CDC4: fmr    f28, f2
+    F28 = F2;
+
+    // 8028CDC8: fmr    f29, f3
+    F29 = F3;
+
+    // 8028CDCC: fmr    f30, f4
+    F30 = F4;
+
+    s.suffix = 3u;
+    // 8028CDD0: lfs     f31, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F31 = value;
+        P31 = value;
+    }
+
+    // 8028CDD4: fcmpo   cr0, f1, f31
+    gx_fcmp(&s.fp, &cr, 0u, F1, F31);
+
+    // 8028CDD8: cror    2, 0, 2
+    {
+        u32 a = (cr >> (31u - 0u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028CDDC: bc    4, 2, 0x8028CDE4
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CDE4;
+        }
+    }
+    goto B_8028CDE0;
+B_8028CDE0: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CDE0: b       0x8028CDFC
+    {
+            goto B_8028CDFC;
+    }
+    goto B_8028CDE4;
+B_8028CDE4: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028CDE4: lfs     f31, -15032(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15032);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F31 = value;
+        P31 = value;
+    }
+
+    // 8028CDE8: fcmpo   cr0, f1, f31
+    gx_fcmp(&s.fp, &cr, 0u, F1, F31);
+
+    // 8028CDEC: cror    2, 1, 2
+    {
+        u32 a = (cr >> (31u - 1u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028CDF0: bc    4, 2, 0x8028CDF8
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CDF8;
+        }
+    }
+    goto B_8028CDF4;
+B_8028CDF4: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CDF4: b       0x8028CDFC
+    {
+            goto B_8028CDFC;
+    }
+    goto B_8028CDF8;
+B_8028CDF8: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CDF8: fmr    f31, f1
+    F31 = F1;
+    goto B_8028CDFC;
+B_8028CDFC: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CDFC: bl      0x8028AACC
+    {
+            lr = 0x8028CE00u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028AACC;
+    }
+    goto B_8028CE00;
+B_8028CE00: /* 29 cycles */
+    if (!lf_block(&s, lf_floor_, 29u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CE00: rlwinm r0, r3, 0, 16, 31
+    {
+        g0 = gx_rotl32(g3, 0u) & 0x0000FFFFu;
+    }
+
+    s.suffix = 27u;
+    // 8028CE04: lfd     f1, -15000(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15000);
+        F1 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8028CE08: stw     r0, 12(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(12);
+        lf_st32(&s, 0x8028CE08u, 26u, ea, (u32)g0);
+    }
+
+    // 8028CE0C: lis     r0, 17200
+    g0 = ((u32)(s32)(17200) << 16);
+
+    // 8028CE10: stw     r0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        lf_st32(&s, 0x8028CE10u, 24u, ea, (u32)g0);
+    }
+
+    s.suffix = 23u;
+    // 8028CE14: lfd     f0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8028CE18: fsubs   f0, f0, f1
+    F0 = P0 = nr_fsubs(&s.fp, F0, F1);
+
+    // 8028CE1C: fmuls   f0, f31, f0
+    F0 = P0 = nr_fmuls(&s.fp, F31, F0);
+
+    // 8028CE20: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 19u;
+    // 8028CE24: stfd     f0, 16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(16);
+        lf_stp64(&s, 0x8028CE24u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8028CE28: lwz     r4, 20(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(20);
+        g4 = gx_ld32(&s, ea);
+    }
+
+    // 8028CE2C: lwz     r3, 32(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(32);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    // 8028CE30: lwz     r3, 12(r3)
+    {
+        u32 ea = g3 + (u32)(s32)(12);
+        g3 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 15u;
+    // 8028CE34: lfs     f1, -15004(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15004);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F1 = value;
+        P1 = value;
+    }
+
+    // 8028CE38: fmuls   f0, f1, f28
+    F0 = P0 = nr_fmuls(&s.fp, F1, F28);
+
+    // 8028CE3C: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 12u;
+    // 8028CE40: stfd     f0, 24(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(24);
+        lf_stp64(&s, 0x8028CE40u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8028CE44: lwz     r5, 28(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(28);
+        g5 = gx_ld32(&s, ea);
+    }
+
+    // 8028CE48: fmuls   f0, f1, f30
+    F0 = P0 = nr_fmuls(&s.fp, F1, F30);
+
+    // 8028CE4C: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 8u;
+    // 8028CE50: stfd     f0, 32(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(32);
+        lf_stp64(&s, 0x8028CE50u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8028CE54: lwz     r6, 36(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(36);
+        g6 = gx_ld32(&s, ea);
+    }
+
+    // 8028CE58: fmuls   f0, f1, f29
+    F0 = P0 = nr_fmuls(&s.fp, F1, F29);
+
+    // 8028CE5C: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 4u;
+    // 8028CE60: stfd     f0, 40(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(40);
+        lf_stp64(&s, 0x8028CE60u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8028CE64: lwz     r7, 44(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(44);
+        g7 = gx_ld32(&s, ea);
+    }
+
+    // 8028CE68: lhz     r0, 178(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(178);
+        g0 = gx_ld16(&s, ea);
+    }
+
+    // 8028CE6C: rlwinm r8, r0, 0, 24, 31
+    {
+        g8 = gx_rotl32(g0, 0u) & 0x000000FFu;
+    }
+
+    // 8028CE70: bl      0x8028A740
+    {
+            lr = 0x8028CE74u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028A740;
+    }
+    goto B_8028CE74;
+B_8028CE74: /* 14 cycles */
+    if (!lf_block(&s, lf_floor_, 14u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 13u;
+    // 8028CE74: psq_l   f31, 120(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(120);
+        lf_psq_l(&s, &F31, &P31, ea, false);
+    }
+
+    s.suffix = 12u;
+    // 8028CE78: lfd     f31, 112(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(112);
+        F31 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 11u;
+    // 8028CE7C: psq_l   f30, 104(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(104);
+        lf_psq_l(&s, &F30, &P30, ea, false);
+    }
+
+    s.suffix = 10u;
+    // 8028CE80: lfd     f30, 96(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(96);
+        F30 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 9u;
+    // 8028CE84: psq_l   f29, 88(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(88);
+        lf_psq_l(&s, &F29, &P29, ea, false);
+    }
+
+    s.suffix = 8u;
+    // 8028CE88: lfd     f29, 80(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(80);
+        F29 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 7u;
+    // 8028CE8C: psq_l   f28, 72(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(72);
+        lf_psq_l(&s, &F28, &P28, ea, false);
+    }
+
+    s.suffix = 6u;
+    // 8028CE90: lfd     f28, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        F28 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8028CE94: lwz     r31, 60(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(60);
+        g31 = gx_ld32(&s, ea);
+    }
+
+    // 8028CE98: lwz     r0, 132(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(132);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 2u;
+    // 8028CE9C: mtlr    r0
+    lr = g0;
+
+    // 8028CEA0: addi    r1, r1, 128
+    g1 = g1 + (u32)(s32)(128);
+
+    // 8028CEA4: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+B_8028CEA8: /* 25 cycles */
+    if (!lf_block(&s, lf_floor_, 25u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CEA8: stwu     r1, -208(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(-208);
+        lf_st32(&s, 0x8028CEA8u, 24u, ea, (u32)g1);
+        g1 = ea;
+    }
+
+    s.suffix = 23u;
+    // 8028CEAC: mflr    r0
+    g0 = lr;
+
+    // 8028CEB0: stw     r0, 212(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(212);
+        lf_st32(&s, 0x8028CEB0u, 22u, ea, (u32)g0);
+    }
+
+    s.suffix = 21u;
+    // 8028CEB4: stfd     f31, 192(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(192);
+        lf_stp64(&s, 0x8028CEB4u, ea, gx_f64_to_bits(F31));
+    }
+
+    s.suffix = 20u;
+    // 8028CEB8: psq_st   f31, 200(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(200);
+        lf_psq_st(&s, 0x8028CEB8u, F31, P31, ea, false);
+    }
+
+    s.suffix = 19u;
+    // 8028CEBC: stfd     f30, 176(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(176);
+        lf_stp64(&s, 0x8028CEBCu, ea, gx_f64_to_bits(F30));
+    }
+
+    s.suffix = 18u;
+    // 8028CEC0: psq_st   f30, 184(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(184);
+        lf_psq_st(&s, 0x8028CEC0u, F30, P30, ea, false);
+    }
+
+    s.suffix = 17u;
+    // 8028CEC4: stfd     f29, 160(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(160);
+        lf_stp64(&s, 0x8028CEC4u, ea, gx_f64_to_bits(F29));
+    }
+
+    s.suffix = 16u;
+    // 8028CEC8: psq_st   f29, 168(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(168);
+        lf_psq_st(&s, 0x8028CEC8u, F29, P29, ea, false);
+    }
+
+    s.suffix = 15u;
+    // 8028CECC: stfd     f28, 144(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(144);
+        lf_stp64(&s, 0x8028CECCu, ea, gx_f64_to_bits(F28));
+    }
+
+    s.suffix = 14u;
+    // 8028CED0: psq_st   f28, 152(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(152);
+        lf_psq_st(&s, 0x8028CED0u, F28, P28, ea, false);
+    }
+
+    s.suffix = 13u;
+    // 8028CED4: stfd     f27, 128(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(128);
+        lf_stp64(&s, 0x8028CED4u, ea, gx_f64_to_bits(F27));
+    }
+
+    s.suffix = 12u;
+    // 8028CED8: psq_st   f27, 136(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(136);
+        lf_psq_st(&s, 0x8028CED8u, F27, P27, ea, false);
+    }
+
+    s.suffix = 11u;
+    // 8028CEDC: stfd     f26, 112(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(112);
+        lf_stp64(&s, 0x8028CEDCu, ea, gx_f64_to_bits(F26));
+    }
+
+    s.suffix = 10u;
+    // 8028CEE0: psq_st   f26, 120(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(120);
+        lf_psq_st(&s, 0x8028CEE0u, F26, P26, ea, false);
+    }
+
+    s.suffix = 9u;
+    // 8028CEE4: stfd     f25, 96(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(96);
+        lf_stp64(&s, 0x8028CEE4u, ea, gx_f64_to_bits(F25));
+    }
+
+    s.suffix = 8u;
+    // 8028CEE8: psq_st   f25, 104(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(104);
+        lf_psq_st(&s, 0x8028CEE8u, F25, P25, ea, false);
+    }
+
+    s.suffix = 7u;
+    // 8028CEEC: stfd     f24, 80(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(80);
+        lf_stp64(&s, 0x8028CEECu, ea, gx_f64_to_bits(F24));
+    }
+
+    s.suffix = 6u;
+    // 8028CEF0: psq_st   f24, 88(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(88);
+        lf_psq_st(&s, 0x8028CEF0u, F24, P24, ea, false);
+    }
+
+    s.suffix = 5u;
+    // 8028CEF4: stfd     f23, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        lf_stp64(&s, 0x8028CEF4u, ea, gx_f64_to_bits(F23));
+    }
+
+    s.suffix = 4u;
+    // 8028CEF8: psq_st   f23, 72(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(72);
+        lf_psq_st(&s, 0x8028CEF8u, F23, P23, ea, false);
+    }
+
+    s.suffix = 3u;
+    // 8028CEFC: stfd     f22, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        lf_stp64(&s, 0x8028CEFCu, ea, gx_f64_to_bits(F22));
+    }
+
+    s.suffix = 2u;
+    // 8028CF00: psq_st   f22, 56(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(56);
+        lf_psq_st(&s, 0x8028CF00u, F22, P22, ea, false);
+    }
+
+    // 8028CF04: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 8028CF08: bl      0x80328F3C
+    {
+            lr = 0x8028CF0Cu;
+            if (!(s.downcount - 4 > -s.budget))
+                return lf_decline(&s, LF_CLOCK); /* the routine itself, through the chassis */
+            s.downcount -= 5;
+            const u32 frame = g11;
+            lf_stp32(&s, 0x8028CF08u, frame + (u32)(s32)(-16), (u32)g28);
+            lf_stp32(&s, 0x8028CF08u, frame + (u32)(s32)(-12), (u32)g29);
+            lf_stp32(&s, 0x8028CF08u, frame + (u32)(s32)(-8), (u32)g30);
+            lf_stp32(&s, 0x8028CF08u, frame + (u32)(s32)(-4), (u32)g31);
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CF0C;
+    }
+    goto B_8028CF0C;
+B_8028CF0C: /* 11 cycles */
+    if (!lf_block(&s, lf_floor_, 11u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF0C: or   r29, r3, r3
+    {
+        g29 = g3 | g3;
+    }
+
+    // 8028CF10: fmr    f22, f1
+    F22 = F1;
+
+    // 8028CF14: fmr    f23, f2
+    F23 = F2;
+
+    // 8028CF18: fmr    f24, f3
+    F24 = F3;
+
+    // 8028CF1C: fmr    f25, f4
+    F25 = F4;
+
+    // 8028CF20: li      r30, 0
+    g30 = (u32)(s32)(0);
+
+    // 8028CF24: li      r28, 0
+    g28 = (u32)(s32)(0);
+
+    s.suffix = 3u;
+    // 8028CF28: lfs     f0, -15032(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15032);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F0 = value;
+        P0 = value;
+    }
+
+    // 8028CF2C: fsubs   f30, f0, f23
+    F30 = P30 = nr_fsubs(&s.fp, F0, F23);
+
+    // 8028CF30: fsubs   f29, f0, f24
+    F29 = P29 = nr_fsubs(&s.fp, F0, F24);
+
+    // 8028CF34: fsubs   f28, f0, f25
+    F28 = P28 = nr_fsubs(&s.fp, F0, F25);
+    goto B_8028CF38;
+B_8028CF38: /* 7 cycles */
+    if (!lf_block(&s, lf_floor_, 7u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF38: fmr    f27, f22
+    F27 = F22;
+
+    // 8028CF3C: add   r31, r29, r28
+    {
+        u32 a = g29;
+        u32 b = g28;
+        u32 res = a + b;
+        g31 = res;
+    }
+
+    // 8028CF40: lhz     r0, 176(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(176);
+        g0 = gx_ld16(&s, ea);
+    }
+
+    // 8028CF44: sth     r0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        lf_st16(&s, 0x8028CF44u, 3u, ea, (u16)g0);
+    }
+
+    // 8028CF48: lbz     r0, 8(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(8);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CF4C: cmplwi  r0, 0x0000
+    {
+        u32 val_a = (u32)(g0);
+        u32 val_b = (u32)(0x0000u);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CF50: bc    4, 2, 0x8028CF60
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CF60;
+        }
+    }
+    goto B_8028CF54;
+B_8028CF54: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF54: li      r0, 0
+    g0 = (u32)(s32)(0);
+
+    // 8028CF58: sth     r0, 188(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(188);
+        lf_st16(&s, 0x8028CF58u, 1u, ea, (u16)g0);
+    }
+
+    // 8028CF5C: b       0x8028D0B0
+    {
+            goto B_8028D0B0;
+    }
+B_8028CF60: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF60: lbz     r0, 9(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(9);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CF64: rlwinm. r0, r0, 28, 28, 31
+    {
+        g0 = gx_rotl32(g0, 28u) & 0x0000000Fu;
+        u32 cr_bits = 0;
+        s32 cr_value = (s32)g0;
+        if (cr_value < 0)  cr_bits |= 0x8u;
+        if (cr_value > 0)  cr_bits |= 0x4u;
+        if (cr_value == 0) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
+    }
+
+    // 8028CF68: bc    12, 2, 0x8028CFC4
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CFC4;
+        }
+    }
+    goto B_8028CF6C;
+B_8028CF6C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF6C: cmplwi  r0, 0x0007
+    {
+        u32 val_a = (u32)(g0);
+        u32 val_b = (u32)(0x0007u);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CF70: bc    12, 1, 0x8028CFB8
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028CFB8;
+        }
+    }
+    goto B_8028CF74;
+B_8028CF74: /* 7 cycles */
+    if (!lf_block(&s, lf_floor_, 7u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF74: lis     r3, -32710
+    g3 = ((u32)(s32)(-32710) << 16);
+
+    // 8028CF78: addi    r3, r3, -29540
+    g3 = g3 + (u32)(s32)(-29540);
+
+    // 8028CF7C: rlwinm r0, r0, 2, 0, 29
+    {
+        g0 = gx_rotl32(g0, 2u) & 0xFFFFFFFCu;
+    }
+
+    // 8028CF80: lwzx    r0, r3, r0
+    {
+        u32 ea = g3 + g0;
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 1u;
+    // 8028CF84: mtctr    r0
+    ctr = g0;
+
+    // 8028CF88: bctr
+    {
+        u32 target = ctr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            switch (target) {
+            case 0x8027A9C8u:
+                if (!lf_silent(&s, 0x8027A9C8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8027A9C8;
+            case 0x8027A9F4u:
+                if (!lf_silent(&s, 0x8027A9F4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8027A9F4;
+            case 0x8028A740u:
+                if (!lf_silent(&s, 0x8028A740u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028A740;
+            case 0x8028AAC4u:
+                if (!lf_silent(&s, 0x8028AAC4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028AAC4;
+            case 0x8028AACCu:
+                if (!lf_silent(&s, 0x8028AACCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028AACC;
+            case 0x8028AADCu:
+                if (!lf_silent(&s, 0x8028AADCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028AADC;
+            case 0x8028C3A8u:
+                if (!lf_silent(&s, 0x8028C3A8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C3A8;
+            case 0x8028C3E8u:
+                if (!lf_silent(&s, 0x8028C3E8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C3E8;
+            case 0x8028C448u:
+                if (!lf_silent(&s, 0x8028C448u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C448;
+            case 0x8028C44Cu:
+                if (!lf_silent(&s, 0x8028C44Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C44C;
+            case 0x8028C454u:
+                if (!lf_silent(&s, 0x8028C454u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C454;
+            case 0x8028C458u:
+                if (!lf_silent(&s, 0x8028C458u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C458;
+            case 0x8028C460u:
+                if (!lf_silent(&s, 0x8028C460u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C460;
+            case 0x8028C464u:
+                if (!lf_silent(&s, 0x8028C464u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C464;
+            case 0x8028C46Cu:
+                if (!lf_silent(&s, 0x8028C46Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C46C;
+            case 0x8028C470u:
+                if (!lf_silent(&s, 0x8028C470u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C470;
+            case 0x8028C488u:
+                if (!lf_silent(&s, 0x8028C488u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C488;
+            case 0x8028C490u:
+                if (!lf_silent(&s, 0x8028C490u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C490;
+            case 0x8028C49Cu:
+                if (!lf_silent(&s, 0x8028C49Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C49C;
+            case 0x8028C4A4u:
+                if (!lf_silent(&s, 0x8028C4A4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4A4;
+            case 0x8028C4B0u:
+                if (!lf_silent(&s, 0x8028C4B0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4B0;
+            case 0x8028C4C4u:
+                if (!lf_silent(&s, 0x8028C4C4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4C4;
+            case 0x8028C4D0u:
+                if (!lf_silent(&s, 0x8028C4D0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4D0;
+            case 0x8028C4DCu:
+                if (!lf_silent(&s, 0x8028C4DCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4DC;
+            case 0x8028C4E4u:
+                if (!lf_silent(&s, 0x8028C4E4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4E4;
+            case 0x8028C4F0u:
+                if (!lf_silent(&s, 0x8028C4F0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4F0;
+            case 0x8028C504u:
+                if (!lf_silent(&s, 0x8028C504u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C504;
+            case 0x8028C518u:
+                if (!lf_silent(&s, 0x8028C518u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C518;
+            case 0x8028C51Cu:
+                if (!lf_silent(&s, 0x8028C51Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C51C;
+            case 0x8028C540u:
+                if (!lf_silent(&s, 0x8028C540u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C540;
+            case 0x8028C544u:
+                if (!lf_silent(&s, 0x8028C544u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C544;
+            case 0x8028C554u:
+                if (!lf_silent(&s, 0x8028C554u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C554;
+            case 0x8028C558u:
+                if (!lf_silent(&s, 0x8028C558u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C558;
+            case 0x8028C55Cu:
+                if (!lf_silent(&s, 0x8028C55Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C55C;
+            case 0x8028C56Cu:
+                if (!lf_silent(&s, 0x8028C56Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C56C;
+            case 0x8028C570u:
+                if (!lf_silent(&s, 0x8028C570u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C570;
+            case 0x8028C580u:
+                if (!lf_silent(&s, 0x8028C580u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C580;
+            case 0x8028C584u:
+                if (!lf_silent(&s, 0x8028C584u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C584;
+            case 0x8028C588u:
+                if (!lf_silent(&s, 0x8028C588u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C588;
+            case 0x8028C598u:
+                if (!lf_silent(&s, 0x8028C598u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C598;
+            case 0x8028C59Cu:
+                if (!lf_silent(&s, 0x8028C59Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C59C;
+            case 0x8028C5ACu:
+                if (!lf_silent(&s, 0x8028C5ACu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5AC;
+            case 0x8028C5B0u:
+                if (!lf_silent(&s, 0x8028C5B0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5B0;
+            case 0x8028C5B4u:
+                if (!lf_silent(&s, 0x8028C5B4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5B4;
+            case 0x8028C5ECu:
+                if (!lf_silent(&s, 0x8028C5ECu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5EC;
+            case 0x8028C5F4u:
+                if (!lf_silent(&s, 0x8028C5F4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5F4;
+            case 0x8028C5F8u:
+                if (!lf_silent(&s, 0x8028C5F8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5F8;
+            case 0x8028C600u:
+                if (!lf_silent(&s, 0x8028C600u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C600;
+            case 0x8028CABCu:
+                if (!lf_silent(&s, 0x8028CABCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CABC;
+            case 0x8028CAE0u:
+                if (!lf_silent(&s, 0x8028CAE0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAE0;
+            case 0x8028CAE4u:
+                if (!lf_silent(&s, 0x8028CAE4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAE4;
+            case 0x8028CAE8u:
+                if (!lf_silent(&s, 0x8028CAE8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAE8;
+            case 0x8028CAF0u:
+                if (!lf_silent(&s, 0x8028CAF0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAF0;
+            case 0x8028CAF4u:
+                if (!lf_silent(&s, 0x8028CAF4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAF4;
+            case 0x8028CB00u:
+                if (!lf_silent(&s, 0x8028CB00u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB00;
+            case 0x8028CB10u:
+                if (!lf_silent(&s, 0x8028CB10u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB10;
+            case 0x8028CB1Cu:
+                if (!lf_silent(&s, 0x8028CB1Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB1C;
+            case 0x8028CB20u:
+                if (!lf_silent(&s, 0x8028CB20u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB20;
+            case 0x8028CB24u:
+                if (!lf_silent(&s, 0x8028CB24u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB24;
+            case 0x8028CB2Cu:
+                if (!lf_silent(&s, 0x8028CB2Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB2C;
+            case 0x8028CB30u:
+                if (!lf_silent(&s, 0x8028CB30u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB30;
+            case 0x8028CB3Cu:
+                if (!lf_silent(&s, 0x8028CB3Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB3C;
+            case 0x8028CB4Cu:
+                if (!lf_silent(&s, 0x8028CB4Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB4C;
+            case 0x8028CB58u:
+                if (!lf_silent(&s, 0x8028CB58u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB58;
+            case 0x8028CB5Cu:
+                if (!lf_silent(&s, 0x8028CB5Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB5C;
+            case 0x8028CB64u:
+                if (!lf_silent(&s, 0x8028CB64u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB64;
+            case 0x8028CB68u:
+                if (!lf_silent(&s, 0x8028CB68u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB68;
+            case 0x8028CB74u:
+                if (!lf_silent(&s, 0x8028CB74u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB74;
+            case 0x8028CB88u:
+                if (!lf_silent(&s, 0x8028CB88u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB88;
+            case 0x8028CBACu:
+                if (!lf_silent(&s, 0x8028CBACu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBAC;
+            case 0x8028CBB0u:
+                if (!lf_silent(&s, 0x8028CBB0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBB0;
+            case 0x8028CBB4u:
+                if (!lf_silent(&s, 0x8028CBB4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBB4;
+            case 0x8028CBBCu:
+                if (!lf_silent(&s, 0x8028CBBCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBBC;
+            case 0x8028CBC0u:
+                if (!lf_silent(&s, 0x8028CBC0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBC0;
+            case 0x8028CBD4u:
+                if (!lf_silent(&s, 0x8028CBD4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBD4;
+            case 0x8028CBECu:
+                if (!lf_silent(&s, 0x8028CBECu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBEC;
+            case 0x8028CBF8u:
+                if (!lf_silent(&s, 0x8028CBF8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBF8;
+            case 0x8028CBFCu:
+                if (!lf_silent(&s, 0x8028CBFCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBFC;
+            case 0x8028CC00u:
+                if (!lf_silent(&s, 0x8028CC00u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC00;
+            case 0x8028CC08u:
+                if (!lf_silent(&s, 0x8028CC08u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC08;
+            case 0x8028CC0Cu:
+                if (!lf_silent(&s, 0x8028CC0Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC0C;
+            case 0x8028CC20u:
+                if (!lf_silent(&s, 0x8028CC20u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC20;
+            case 0x8028CC38u:
+                if (!lf_silent(&s, 0x8028CC38u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC38;
+            case 0x8028CC44u:
+                if (!lf_silent(&s, 0x8028CC44u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC44;
+            case 0x8028CC48u:
+                if (!lf_silent(&s, 0x8028CC48u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC48;
+            case 0x8028CC4Cu:
+                if (!lf_silent(&s, 0x8028CC4Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC4C;
+            case 0x8028CC54u:
+                if (!lf_silent(&s, 0x8028CC54u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC54;
+            case 0x8028CC58u:
+                if (!lf_silent(&s, 0x8028CC58u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC58;
+            case 0x8028CC6Cu:
+                if (!lf_silent(&s, 0x8028CC6Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC6C;
+            case 0x8028CC84u:
+                if (!lf_silent(&s, 0x8028CC84u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC84;
+            case 0x8028CD90u:
+                if (!lf_silent(&s, 0x8028CD90u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CD90;
+            case 0x8028CDE0u:
+                if (!lf_silent(&s, 0x8028CDE0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDE0;
+            case 0x8028CDE4u:
+                if (!lf_silent(&s, 0x8028CDE4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDE4;
+            case 0x8028CDF4u:
+                if (!lf_silent(&s, 0x8028CDF4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDF4;
+            case 0x8028CDF8u:
+                if (!lf_silent(&s, 0x8028CDF8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDF8;
+            case 0x8028CDFCu:
+                if (!lf_silent(&s, 0x8028CDFCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDFC;
+            case 0x8028CE00u:
+                if (!lf_silent(&s, 0x8028CE00u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CE00;
+            case 0x8028CE74u:
+                if (!lf_silent(&s, 0x8028CE74u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CE74;
+            case 0x8028CEA8u:
+                if (!lf_silent(&s, 0x8028CEA8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CEA8;
+            case 0x8028CF0Cu:
+                if (!lf_silent(&s, 0x8028CF0Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF0C;
+            case 0x8028CF38u:
+                if (!lf_silent(&s, 0x8028CF38u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF38;
+            case 0x8028CF54u:
+                if (!lf_silent(&s, 0x8028CF54u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF54;
+            case 0x8028CF60u:
+                if (!lf_silent(&s, 0x8028CF60u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF60;
+            case 0x8028CF6Cu:
+                if (!lf_silent(&s, 0x8028CF6Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF6C;
+            case 0x8028CF74u:
+                if (!lf_silent(&s, 0x8028CF74u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF74;
+            case 0x8028CF8Cu:
+                if (!lf_silent(&s, 0x8028CF8Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF8C;
+            case 0x8028CF94u:
+                if (!lf_silent(&s, 0x8028CF94u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF94;
+            case 0x8028CF9Cu:
+                if (!lf_silent(&s, 0x8028CF9Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF9C;
+            case 0x8028CFA4u:
+                if (!lf_silent(&s, 0x8028CFA4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFA4;
+            case 0x8028CFACu:
+                if (!lf_silent(&s, 0x8028CFACu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFAC;
+            case 0x8028CFB4u:
+                if (!lf_silent(&s, 0x8028CFB4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFB4;
+            case 0x8028CFB8u:
+                if (!lf_silent(&s, 0x8028CFB8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFB8;
+            case 0x8028CFC0u:
+                if (!lf_silent(&s, 0x8028CFC0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFC0;
+            case 0x8028CFC4u:
+                if (!lf_silent(&s, 0x8028CFC4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFC4;
+            case 0x8028CFD0u:
+                if (!lf_silent(&s, 0x8028CFD0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFD0;
+            case 0x8028CFD8u:
+                if (!lf_silent(&s, 0x8028CFD8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFD8;
+            case 0x8028CFF0u:
+                if (!lf_silent(&s, 0x8028CFF0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFF0;
+            case 0x8028CFF8u:
+                if (!lf_silent(&s, 0x8028CFF8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFF8;
+            case 0x8028D000u:
+                if (!lf_silent(&s, 0x8028D000u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D000;
+            case 0x8028D008u:
+                if (!lf_silent(&s, 0x8028D008u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D008;
+            case 0x8028D010u:
+                if (!lf_silent(&s, 0x8028D010u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D010;
+            case 0x8028D018u:
+                if (!lf_silent(&s, 0x8028D018u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D018;
+            case 0x8028D01Cu:
+                if (!lf_silent(&s, 0x8028D01Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D01C;
+            case 0x8028D024u:
+                if (!lf_silent(&s, 0x8028D024u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D024;
+            case 0x8028D028u:
+                if (!lf_silent(&s, 0x8028D028u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D028;
+            case 0x8028D030u:
+                if (!lf_silent(&s, 0x8028D030u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D030;
+            case 0x8028D034u:
+                if (!lf_silent(&s, 0x8028D034u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D034;
+            case 0x8028D03Cu:
+                if (!lf_silent(&s, 0x8028D03Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D03C;
+            case 0x8028D044u:
+                if (!lf_silent(&s, 0x8028D044u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D044;
+            case 0x8028D04Cu:
+                if (!lf_silent(&s, 0x8028D04Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D04C;
+            case 0x8028D050u:
+                if (!lf_silent(&s, 0x8028D050u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D050;
+            case 0x8028D060u:
+                if (!lf_silent(&s, 0x8028D060u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D060;
+            case 0x8028D064u:
+                if (!lf_silent(&s, 0x8028D064u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D064;
+            case 0x8028D074u:
+                if (!lf_silent(&s, 0x8028D074u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D074;
+            case 0x8028D078u:
+                if (!lf_silent(&s, 0x8028D078u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D078;
+            case 0x8028D07Cu:
+                if (!lf_silent(&s, 0x8028D07Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D07C;
+            case 0x8028D080u:
+                if (!lf_silent(&s, 0x8028D080u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D080;
+            case 0x8028D0B0u:
+                if (!lf_silent(&s, 0x8028D0B0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D0B0;
+            case 0x8028D0C0u:
+                if (!lf_silent(&s, 0x8028D0C0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D0C0;
+            case 0x8028D118u:
+                if (!lf_silent(&s, 0x8028D118u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D118;
+            default:
+                break;
+            }
+            return lf_decline(&s, LF_PATH);
+        }
+    }
+B_8028CF8C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF8C: fmr    f26, f23
+    F26 = F23;
+
+    // 8028CF90: b       0x8028CFB8
+    {
+            goto B_8028CFB8;
+    }
+B_8028CF94: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF94: fmr    f26, f24
+    F26 = F24;
+
+    // 8028CF98: b       0x8028CFB8
+    {
+            goto B_8028CFB8;
+    }
+B_8028CF9C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CF9C: fmr    f26, f25
+    F26 = F25;
+
+    // 8028CFA0: b       0x8028CFB8
+    {
+            goto B_8028CFB8;
+    }
+B_8028CFA4: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFA4: fmr    f26, f30
+    F26 = F30;
+
+    // 8028CFA8: b       0x8028CFB8
+    {
+            goto B_8028CFB8;
+    }
+B_8028CFAC: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFAC: fmr    f26, f29
+    F26 = F29;
+
+    // 8028CFB0: b       0x8028CFB8
+    {
+            goto B_8028CFB8;
+    }
+B_8028CFB4: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFB4: fmr    f26, f28
+    F26 = F28;
+    goto B_8028CFB8;
+B_8028CFB8: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFB8: fmr    f1, f26
+    F1 = F26;
+
+    // 8028CFBC: bl      0x8027A9C8
+    {
+            lr = 0x8028CFC0u;
+            s.depth++;
+            if (!lf_silent(&s, 0x8027A9C8u) || !lf_silent(&s, 0x8028CFC0u))
+                return lf_decline(&s, LF_HOST);
+            goto B_8027A9C8;
+    }
+    goto B_8028CFC0;
+B_8028CFC0: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFC0: fmuls   f27, f27, f1
+    F27 = P27 = nr_fmuls(&s.fp, F27, F1);
+    goto B_8028CFC4;
+B_8028CFC4: /* 3 cycles */
+    if (!lf_block(&s, lf_floor_, 3u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFC4: lbz     r0, 9(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(9);
+        g0 = gx_ld8(&s, ea);
+    }
+
+    // 8028CFC8: rlwinm. r4, r0, 0, 28, 31
+    {
+        g4 = gx_rotl32(g0, 0u) & 0x0000000Fu;
+        u32 cr_bits = 0;
+        s32 cr_value = (s32)g4;
+        if (cr_value < 0)  cr_bits |= 0x8u;
+        if (cr_value > 0)  cr_bits |= 0x4u;
+        if (cr_value == 0) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & 0x0FFFFFFFu) | (cr_bits << 28);
+    }
+
+    // 8028CFCC: bc    12, 2, 0x8028D050
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028D050;
+        }
+    }
+    goto B_8028CFD0;
+B_8028CFD0: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFD0: cmplwi  r4, 0x0007
+    {
+        u32 val_a = (u32)(g4);
+        u32 val_b = (u32)(0x0007u);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028CFD4: bc    12, 1, 0x8028D01C
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x40000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028D01C;
+        }
+    }
+    goto B_8028CFD8;
+B_8028CFD8: /* 7 cycles */
+    if (!lf_block(&s, lf_floor_, 7u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFD8: lis     r3, -32710
+    g3 = ((u32)(s32)(-32710) << 16);
+
+    // 8028CFDC: addi    r3, r3, -29572
+    g3 = g3 + (u32)(s32)(-29572);
+
+    // 8028CFE0: rlwinm r0, r4, 2, 0, 29
+    {
+        g0 = gx_rotl32(g4, 2u) & 0xFFFFFFFCu;
+    }
+
+    // 8028CFE4: lwzx    r0, r3, r0
+    {
+        u32 ea = g3 + g0;
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 1u;
+    // 8028CFE8: mtctr    r0
+    ctr = g0;
+
+    // 8028CFEC: bctr
+    {
+        u32 target = ctr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            switch (target) {
+            case 0x8027A9C8u:
+                if (!lf_silent(&s, 0x8027A9C8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8027A9C8;
+            case 0x8027A9F4u:
+                if (!lf_silent(&s, 0x8027A9F4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8027A9F4;
+            case 0x8028A740u:
+                if (!lf_silent(&s, 0x8028A740u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028A740;
+            case 0x8028AAC4u:
+                if (!lf_silent(&s, 0x8028AAC4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028AAC4;
+            case 0x8028AACCu:
+                if (!lf_silent(&s, 0x8028AACCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028AACC;
+            case 0x8028AADCu:
+                if (!lf_silent(&s, 0x8028AADCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028AADC;
+            case 0x8028C3A8u:
+                if (!lf_silent(&s, 0x8028C3A8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C3A8;
+            case 0x8028C3E8u:
+                if (!lf_silent(&s, 0x8028C3E8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C3E8;
+            case 0x8028C448u:
+                if (!lf_silent(&s, 0x8028C448u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C448;
+            case 0x8028C44Cu:
+                if (!lf_silent(&s, 0x8028C44Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C44C;
+            case 0x8028C454u:
+                if (!lf_silent(&s, 0x8028C454u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C454;
+            case 0x8028C458u:
+                if (!lf_silent(&s, 0x8028C458u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C458;
+            case 0x8028C460u:
+                if (!lf_silent(&s, 0x8028C460u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C460;
+            case 0x8028C464u:
+                if (!lf_silent(&s, 0x8028C464u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C464;
+            case 0x8028C46Cu:
+                if (!lf_silent(&s, 0x8028C46Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C46C;
+            case 0x8028C470u:
+                if (!lf_silent(&s, 0x8028C470u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C470;
+            case 0x8028C488u:
+                if (!lf_silent(&s, 0x8028C488u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C488;
+            case 0x8028C490u:
+                if (!lf_silent(&s, 0x8028C490u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C490;
+            case 0x8028C49Cu:
+                if (!lf_silent(&s, 0x8028C49Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C49C;
+            case 0x8028C4A4u:
+                if (!lf_silent(&s, 0x8028C4A4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4A4;
+            case 0x8028C4B0u:
+                if (!lf_silent(&s, 0x8028C4B0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4B0;
+            case 0x8028C4C4u:
+                if (!lf_silent(&s, 0x8028C4C4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4C4;
+            case 0x8028C4D0u:
+                if (!lf_silent(&s, 0x8028C4D0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4D0;
+            case 0x8028C4DCu:
+                if (!lf_silent(&s, 0x8028C4DCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4DC;
+            case 0x8028C4E4u:
+                if (!lf_silent(&s, 0x8028C4E4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4E4;
+            case 0x8028C4F0u:
+                if (!lf_silent(&s, 0x8028C4F0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C4F0;
+            case 0x8028C504u:
+                if (!lf_silent(&s, 0x8028C504u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C504;
+            case 0x8028C518u:
+                if (!lf_silent(&s, 0x8028C518u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C518;
+            case 0x8028C51Cu:
+                if (!lf_silent(&s, 0x8028C51Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C51C;
+            case 0x8028C540u:
+                if (!lf_silent(&s, 0x8028C540u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C540;
+            case 0x8028C544u:
+                if (!lf_silent(&s, 0x8028C544u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C544;
+            case 0x8028C554u:
+                if (!lf_silent(&s, 0x8028C554u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C554;
+            case 0x8028C558u:
+                if (!lf_silent(&s, 0x8028C558u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C558;
+            case 0x8028C55Cu:
+                if (!lf_silent(&s, 0x8028C55Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C55C;
+            case 0x8028C56Cu:
+                if (!lf_silent(&s, 0x8028C56Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C56C;
+            case 0x8028C570u:
+                if (!lf_silent(&s, 0x8028C570u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C570;
+            case 0x8028C580u:
+                if (!lf_silent(&s, 0x8028C580u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C580;
+            case 0x8028C584u:
+                if (!lf_silent(&s, 0x8028C584u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C584;
+            case 0x8028C588u:
+                if (!lf_silent(&s, 0x8028C588u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C588;
+            case 0x8028C598u:
+                if (!lf_silent(&s, 0x8028C598u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C598;
+            case 0x8028C59Cu:
+                if (!lf_silent(&s, 0x8028C59Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C59C;
+            case 0x8028C5ACu:
+                if (!lf_silent(&s, 0x8028C5ACu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5AC;
+            case 0x8028C5B0u:
+                if (!lf_silent(&s, 0x8028C5B0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5B0;
+            case 0x8028C5B4u:
+                if (!lf_silent(&s, 0x8028C5B4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5B4;
+            case 0x8028C5ECu:
+                if (!lf_silent(&s, 0x8028C5ECu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5EC;
+            case 0x8028C5F4u:
+                if (!lf_silent(&s, 0x8028C5F4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5F4;
+            case 0x8028C5F8u:
+                if (!lf_silent(&s, 0x8028C5F8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C5F8;
+            case 0x8028C600u:
+                if (!lf_silent(&s, 0x8028C600u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028C600;
+            case 0x8028CABCu:
+                if (!lf_silent(&s, 0x8028CABCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CABC;
+            case 0x8028CAE0u:
+                if (!lf_silent(&s, 0x8028CAE0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAE0;
+            case 0x8028CAE4u:
+                if (!lf_silent(&s, 0x8028CAE4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAE4;
+            case 0x8028CAE8u:
+                if (!lf_silent(&s, 0x8028CAE8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAE8;
+            case 0x8028CAF0u:
+                if (!lf_silent(&s, 0x8028CAF0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAF0;
+            case 0x8028CAF4u:
+                if (!lf_silent(&s, 0x8028CAF4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CAF4;
+            case 0x8028CB00u:
+                if (!lf_silent(&s, 0x8028CB00u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB00;
+            case 0x8028CB10u:
+                if (!lf_silent(&s, 0x8028CB10u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB10;
+            case 0x8028CB1Cu:
+                if (!lf_silent(&s, 0x8028CB1Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB1C;
+            case 0x8028CB20u:
+                if (!lf_silent(&s, 0x8028CB20u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB20;
+            case 0x8028CB24u:
+                if (!lf_silent(&s, 0x8028CB24u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB24;
+            case 0x8028CB2Cu:
+                if (!lf_silent(&s, 0x8028CB2Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB2C;
+            case 0x8028CB30u:
+                if (!lf_silent(&s, 0x8028CB30u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB30;
+            case 0x8028CB3Cu:
+                if (!lf_silent(&s, 0x8028CB3Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB3C;
+            case 0x8028CB4Cu:
+                if (!lf_silent(&s, 0x8028CB4Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB4C;
+            case 0x8028CB58u:
+                if (!lf_silent(&s, 0x8028CB58u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB58;
+            case 0x8028CB5Cu:
+                if (!lf_silent(&s, 0x8028CB5Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB5C;
+            case 0x8028CB64u:
+                if (!lf_silent(&s, 0x8028CB64u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB64;
+            case 0x8028CB68u:
+                if (!lf_silent(&s, 0x8028CB68u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB68;
+            case 0x8028CB74u:
+                if (!lf_silent(&s, 0x8028CB74u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB74;
+            case 0x8028CB88u:
+                if (!lf_silent(&s, 0x8028CB88u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CB88;
+            case 0x8028CBACu:
+                if (!lf_silent(&s, 0x8028CBACu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBAC;
+            case 0x8028CBB0u:
+                if (!lf_silent(&s, 0x8028CBB0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBB0;
+            case 0x8028CBB4u:
+                if (!lf_silent(&s, 0x8028CBB4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBB4;
+            case 0x8028CBBCu:
+                if (!lf_silent(&s, 0x8028CBBCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBBC;
+            case 0x8028CBC0u:
+                if (!lf_silent(&s, 0x8028CBC0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBC0;
+            case 0x8028CBD4u:
+                if (!lf_silent(&s, 0x8028CBD4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBD4;
+            case 0x8028CBECu:
+                if (!lf_silent(&s, 0x8028CBECu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBEC;
+            case 0x8028CBF8u:
+                if (!lf_silent(&s, 0x8028CBF8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBF8;
+            case 0x8028CBFCu:
+                if (!lf_silent(&s, 0x8028CBFCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CBFC;
+            case 0x8028CC00u:
+                if (!lf_silent(&s, 0x8028CC00u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC00;
+            case 0x8028CC08u:
+                if (!lf_silent(&s, 0x8028CC08u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC08;
+            case 0x8028CC0Cu:
+                if (!lf_silent(&s, 0x8028CC0Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC0C;
+            case 0x8028CC20u:
+                if (!lf_silent(&s, 0x8028CC20u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC20;
+            case 0x8028CC38u:
+                if (!lf_silent(&s, 0x8028CC38u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC38;
+            case 0x8028CC44u:
+                if (!lf_silent(&s, 0x8028CC44u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC44;
+            case 0x8028CC48u:
+                if (!lf_silent(&s, 0x8028CC48u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC48;
+            case 0x8028CC4Cu:
+                if (!lf_silent(&s, 0x8028CC4Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC4C;
+            case 0x8028CC54u:
+                if (!lf_silent(&s, 0x8028CC54u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC54;
+            case 0x8028CC58u:
+                if (!lf_silent(&s, 0x8028CC58u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC58;
+            case 0x8028CC6Cu:
+                if (!lf_silent(&s, 0x8028CC6Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC6C;
+            case 0x8028CC84u:
+                if (!lf_silent(&s, 0x8028CC84u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CC84;
+            case 0x8028CD90u:
+                if (!lf_silent(&s, 0x8028CD90u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CD90;
+            case 0x8028CDE0u:
+                if (!lf_silent(&s, 0x8028CDE0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDE0;
+            case 0x8028CDE4u:
+                if (!lf_silent(&s, 0x8028CDE4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDE4;
+            case 0x8028CDF4u:
+                if (!lf_silent(&s, 0x8028CDF4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDF4;
+            case 0x8028CDF8u:
+                if (!lf_silent(&s, 0x8028CDF8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDF8;
+            case 0x8028CDFCu:
+                if (!lf_silent(&s, 0x8028CDFCu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CDFC;
+            case 0x8028CE00u:
+                if (!lf_silent(&s, 0x8028CE00u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CE00;
+            case 0x8028CE74u:
+                if (!lf_silent(&s, 0x8028CE74u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CE74;
+            case 0x8028CEA8u:
+                if (!lf_silent(&s, 0x8028CEA8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CEA8;
+            case 0x8028CF0Cu:
+                if (!lf_silent(&s, 0x8028CF0Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF0C;
+            case 0x8028CF38u:
+                if (!lf_silent(&s, 0x8028CF38u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF38;
+            case 0x8028CF54u:
+                if (!lf_silent(&s, 0x8028CF54u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF54;
+            case 0x8028CF60u:
+                if (!lf_silent(&s, 0x8028CF60u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF60;
+            case 0x8028CF6Cu:
+                if (!lf_silent(&s, 0x8028CF6Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF6C;
+            case 0x8028CF74u:
+                if (!lf_silent(&s, 0x8028CF74u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF74;
+            case 0x8028CF8Cu:
+                if (!lf_silent(&s, 0x8028CF8Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF8C;
+            case 0x8028CF94u:
+                if (!lf_silent(&s, 0x8028CF94u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF94;
+            case 0x8028CF9Cu:
+                if (!lf_silent(&s, 0x8028CF9Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CF9C;
+            case 0x8028CFA4u:
+                if (!lf_silent(&s, 0x8028CFA4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFA4;
+            case 0x8028CFACu:
+                if (!lf_silent(&s, 0x8028CFACu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFAC;
+            case 0x8028CFB4u:
+                if (!lf_silent(&s, 0x8028CFB4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFB4;
+            case 0x8028CFB8u:
+                if (!lf_silent(&s, 0x8028CFB8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFB8;
+            case 0x8028CFC0u:
+                if (!lf_silent(&s, 0x8028CFC0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFC0;
+            case 0x8028CFC4u:
+                if (!lf_silent(&s, 0x8028CFC4u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFC4;
+            case 0x8028CFD0u:
+                if (!lf_silent(&s, 0x8028CFD0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFD0;
+            case 0x8028CFD8u:
+                if (!lf_silent(&s, 0x8028CFD8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFD8;
+            case 0x8028CFF0u:
+                if (!lf_silent(&s, 0x8028CFF0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFF0;
+            case 0x8028CFF8u:
+                if (!lf_silent(&s, 0x8028CFF8u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028CFF8;
+            case 0x8028D000u:
+                if (!lf_silent(&s, 0x8028D000u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D000;
+            case 0x8028D008u:
+                if (!lf_silent(&s, 0x8028D008u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D008;
+            case 0x8028D010u:
+                if (!lf_silent(&s, 0x8028D010u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D010;
+            case 0x8028D018u:
+                if (!lf_silent(&s, 0x8028D018u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D018;
+            case 0x8028D01Cu:
+                if (!lf_silent(&s, 0x8028D01Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D01C;
+            case 0x8028D024u:
+                if (!lf_silent(&s, 0x8028D024u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D024;
+            case 0x8028D028u:
+                if (!lf_silent(&s, 0x8028D028u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D028;
+            case 0x8028D030u:
+                if (!lf_silent(&s, 0x8028D030u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D030;
+            case 0x8028D034u:
+                if (!lf_silent(&s, 0x8028D034u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D034;
+            case 0x8028D03Cu:
+                if (!lf_silent(&s, 0x8028D03Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D03C;
+            case 0x8028D044u:
+                if (!lf_silent(&s, 0x8028D044u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D044;
+            case 0x8028D04Cu:
+                if (!lf_silent(&s, 0x8028D04Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D04C;
+            case 0x8028D050u:
+                if (!lf_silent(&s, 0x8028D050u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D050;
+            case 0x8028D060u:
+                if (!lf_silent(&s, 0x8028D060u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D060;
+            case 0x8028D064u:
+                if (!lf_silent(&s, 0x8028D064u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D064;
+            case 0x8028D074u:
+                if (!lf_silent(&s, 0x8028D074u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D074;
+            case 0x8028D078u:
+                if (!lf_silent(&s, 0x8028D078u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D078;
+            case 0x8028D07Cu:
+                if (!lf_silent(&s, 0x8028D07Cu))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D07C;
+            case 0x8028D080u:
+                if (!lf_silent(&s, 0x8028D080u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D080;
+            case 0x8028D0B0u:
+                if (!lf_silent(&s, 0x8028D0B0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D0B0;
+            case 0x8028D0C0u:
+                if (!lf_silent(&s, 0x8028D0C0u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D0C0;
+            case 0x8028D118u:
+                if (!lf_silent(&s, 0x8028D118u))
+                    return lf_decline(&s, LF_HOST);
+                goto B_8028D118;
+            default:
+                break;
+            }
+            return lf_decline(&s, LF_PATH);
+        }
+    }
+B_8028CFF0: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFF0: fmr    f26, f23
+    F26 = F23;
+
+    // 8028CFF4: b       0x8028D01C
+    {
+            goto B_8028D01C;
+    }
+B_8028CFF8: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028CFF8: fmr    f26, f24
+    F26 = F24;
+
+    // 8028CFFC: b       0x8028D01C
+    {
+            goto B_8028D01C;
+    }
+B_8028D000: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D000: fmr    f26, f25
+    F26 = F25;
+
+    // 8028D004: b       0x8028D01C
+    {
+            goto B_8028D01C;
+    }
+B_8028D008: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D008: fmr    f26, f30
+    F26 = F30;
+
+    // 8028D00C: b       0x8028D01C
+    {
+            goto B_8028D01C;
+    }
+B_8028D010: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D010: fmr    f26, f29
+    F26 = F29;
+
+    // 8028D014: b       0x8028D01C
+    {
+            goto B_8028D01C;
+    }
+B_8028D018: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D018: fmr    f26, f28
+    F26 = F28;
+    goto B_8028D01C;
+B_8028D01C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D01C: cmpwi   r4, 7
+    {
+        s32 val_a = (s32)(g4);
+        s32 val_b = (s32)(7);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028D020: bc    12, 2, 0x8028D034
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028D034;
+        }
+    }
+    goto B_8028D024;
+B_8028D024: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D024: bc    4, 0, 0x8028D044
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028D044;
+        }
+    }
+    goto B_8028D028;
+B_8028D028: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D028: cmpwi   r4, 3
+    {
+        s32 val_a = (s32)(g4);
+        s32 val_b = (s32)(3);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028D02C: bc    12, 2, 0x8028D034
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            goto B_8028D034;
+        }
+    }
+    goto B_8028D030;
+B_8028D030: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D030: b       0x8028D044
+    {
+            goto B_8028D044;
+    }
+    goto B_8028D034;
+B_8028D034: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D034: fmr    f1, f26
+    F1 = F26;
+
+    // 8028D038: bl      0x8027A9F4
+    {
+            lr = 0x8028D03Cu;
+            s.depth++;
+            if (!lf_silent(&s, 0x8027A9F4u) || !lf_silent(&s, 0x8028D03Cu))
+                return lf_decline(&s, LF_HOST);
+            goto B_8027A9F4;
+    }
+    goto B_8028D03C;
+B_8028D03C: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D03C: fmuls   f27, f27, f1
+    F27 = P27 = nr_fmuls(&s.fp, F27, F1);
+
+    // 8028D040: b       0x8028D050
+    {
+            goto B_8028D050;
+    }
+B_8028D044: /* 2 cycles */
+    if (!lf_block(&s, lf_floor_, 2u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D044: fmr    f1, f26
+    F1 = F26;
+
+    // 8028D048: bl      0x8027A9C8
+    {
+            lr = 0x8028D04Cu;
+            s.depth++;
+            if (!lf_silent(&s, 0x8027A9C8u) || !lf_silent(&s, 0x8028D04Cu))
+                return lf_decline(&s, LF_HOST);
+            goto B_8027A9C8;
+    }
+    goto B_8028D04C;
+B_8028D04C: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D04C: fmuls   f27, f27, f1
+    F27 = P27 = nr_fmuls(&s.fp, F27, F1);
+    goto B_8028D050;
+B_8028D050: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028D050: lfs     f31, -15016(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15016);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F31 = value;
+        P31 = value;
+    }
+
+    // 8028D054: fcmpo   cr0, f27, f31
+    gx_fcmp(&s.fp, &cr, 0u, F27, F31);
+
+    // 8028D058: cror    2, 0, 2
+    {
+        u32 a = (cr >> (31u - 0u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028D05C: bc    4, 2, 0x8028D064
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028D064;
+        }
+    }
+    goto B_8028D060;
+B_8028D060: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D060: b       0x8028D07C
+    {
+            goto B_8028D07C;
+    }
+    goto B_8028D064;
+B_8028D064: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 3u;
+    // 8028D064: lfs     f31, -15032(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15032);
+        f64 value = lf_f32_from_bits(gx_ld32(&s, ea));
+        F31 = value;
+        P31 = value;
+    }
+
+    // 8028D068: fcmpo   cr0, f27, f31
+    gx_fcmp(&s.fp, &cr, 0u, F27, F31);
+
+    // 8028D06C: cror    2, 1, 2
+    {
+        u32 a = (cr >> (31u - 1u)) & 1u;
+        u32 b = (cr >> (31u - 2u)) & 1u;
+        u32 mask = 0x80000000u >> 2;
+        u32 value = (a | b) & 1u;
+        cr = (cr & ~mask) | (value ? mask : 0u);
+    }
+
+    // 8028D070: bc    4, 2, 0x8028D078
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x20000000u) != 0) == false);
+        if (ctr_ok && cr_ok) {
+            goto B_8028D078;
+        }
+    }
+    goto B_8028D074;
+B_8028D074: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D074: b       0x8028D07C
+    {
+            goto B_8028D07C;
+    }
+    goto B_8028D078;
+B_8028D078: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D078: fmr    f31, f27
+    F31 = F27;
+    goto B_8028D07C;
+B_8028D07C: /* 1 cycles */
+    if (!lf_block(&s, lf_floor_, 1u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D07C: bl      0x8028AAC4
+    {
+            lr = 0x8028D080u;
+            s.depth++;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028AAC4;
+    }
+    goto B_8028D080;
+B_8028D080: /* 12 cycles */
+    if (!lf_block(&s, lf_floor_, 12u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D080: rlwinm r0, r3, 0, 16, 31
+    {
+        g0 = gx_rotl32(g3, 0u) & 0x0000FFFFu;
+    }
+
+    s.suffix = 10u;
+    // 8028D084: lfd     f1, -15000(r2)
+    {
+        u32 ea = g2 + (u32)(s32)(-15000);
+        F1 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8028D088: stw     r0, 20(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(20);
+        lf_st32(&s, 0x8028D088u, 9u, ea, (u32)g0);
+    }
+
+    // 8028D08C: lis     r0, 17200
+    g0 = ((u32)(s32)(17200) << 16);
+
+    // 8028D090: stw     r0, 16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(16);
+        lf_st32(&s, 0x8028D090u, 7u, ea, (u32)g0);
+    }
+
+    s.suffix = 6u;
+    // 8028D094: lfd     f0, 16(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(16);
+        F0 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8028D098: fsubs   f0, f0, f1
+    F0 = P0 = nr_fsubs(&s.fp, F0, F1);
+
+    // 8028D09C: fmuls   f0, f31, f0
+    F0 = P0 = nr_fmuls(&s.fp, F31, F0);
+
+    // 8028D0A0: fctiwz    f0, f0
+    { u64 result; if (lf_fctiw(&s.fp, F0, true, &result)) F0 = gx_f64_from_bits(result); }
+
+    s.suffix = 2u;
+    // 8028D0A4: stfd     f0, 24(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(24);
+        lf_stp64(&s, 0x8028D0A4u, ea, gx_f64_to_bits(F0));
+    }
+
+    // 8028D0A8: lwz     r0, 28(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(28);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 0u;
+    // 8028D0AC: sth     r0, 188(r31)
+    {
+        u32 ea = g31 + (u32)(s32)(188);
+        lf_stp16(&s, 0x8028D0ACu, ea, (u16)g0);
+    }
+
+    goto B_8028D0B0;
+B_8028D0B0: /* 4 cycles */
+    if (!lf_block(&s, lf_floor_, 4u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D0B0: addi    r30, r30, 1
+    g30 = g30 + (u32)(s32)(1);
+
+    // 8028D0B4: cmplwi  r30, 0x0006
+    {
+        u32 val_a = (u32)(g30);
+        u32 val_b = (u32)(0x0006u);
+        u32 cr_bits = 0;
+        if (val_a < val_b)  cr_bits |= 0x8u;
+        if (val_a > val_b)  cr_bits |= 0x4u;
+        if (val_a == val_b) cr_bits |= 0x2u;
+        cr_bits |= (xer >> 31) & 1u;
+        cr = (cr & ~(0xFu << 28)) | (cr_bits << 28);
+    }
+
+    // 8028D0B8: addi    r28, r28, 2
+    g28 = g28 + (u32)(s32)(2);
+
+    // 8028D0BC: bc    12, 0, 0x8028CF38
+    {
+        bool ctr_ok = true;
+        bool cr_ok = (((cr & 0x80000000u) != 0) == true);
+        if (ctr_ok && cr_ok) {
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028CF38;
+        }
+    }
+    goto B_8028D0C0;
+B_8028D0C0: /* 22 cycles */
+    if (!lf_block(&s, lf_floor_, 22u))
+        return lf_decline(&s, LF_BLOCK);
+    s.suffix = 21u;
+    // 8028D0C0: psq_l   f31, 200(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(200);
+        lf_psq_l(&s, &F31, &P31, ea, false);
+    }
+
+    s.suffix = 20u;
+    // 8028D0C4: lfd     f31, 192(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(192);
+        F31 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 19u;
+    // 8028D0C8: psq_l   f30, 184(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(184);
+        lf_psq_l(&s, &F30, &P30, ea, false);
+    }
+
+    s.suffix = 18u;
+    // 8028D0CC: lfd     f30, 176(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(176);
+        F30 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 17u;
+    // 8028D0D0: psq_l   f29, 168(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(168);
+        lf_psq_l(&s, &F29, &P29, ea, false);
+    }
+
+    s.suffix = 16u;
+    // 8028D0D4: lfd     f29, 160(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(160);
+        F29 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 15u;
+    // 8028D0D8: psq_l   f28, 152(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(152);
+        lf_psq_l(&s, &F28, &P28, ea, false);
+    }
+
+    s.suffix = 14u;
+    // 8028D0DC: lfd     f28, 144(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(144);
+        F28 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 13u;
+    // 8028D0E0: psq_l   f27, 136(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(136);
+        lf_psq_l(&s, &F27, &P27, ea, false);
+    }
+
+    s.suffix = 12u;
+    // 8028D0E4: lfd     f27, 128(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(128);
+        F27 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 11u;
+    // 8028D0E8: psq_l   f26, 120(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(120);
+        lf_psq_l(&s, &F26, &P26, ea, false);
+    }
+
+    s.suffix = 10u;
+    // 8028D0EC: lfd     f26, 112(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(112);
+        F26 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 9u;
+    // 8028D0F0: psq_l   f25, 104(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(104);
+        lf_psq_l(&s, &F25, &P25, ea, false);
+    }
+
+    s.suffix = 8u;
+    // 8028D0F4: lfd     f25, 96(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(96);
+        F25 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 7u;
+    // 8028D0F8: psq_l   f24, 88(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(88);
+        lf_psq_l(&s, &F24, &P24, ea, false);
+    }
+
+    s.suffix = 6u;
+    // 8028D0FC: lfd     f24, 80(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(80);
+        F24 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 5u;
+    // 8028D100: psq_l   f23, 72(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(72);
+        lf_psq_l(&s, &F23, &P23, ea, false);
+    }
+
+    s.suffix = 4u;
+    // 8028D104: lfd     f23, 64(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(64);
+        F23 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    s.suffix = 3u;
+    // 8028D108: psq_l   f22, 56(r1), 0, 0
+    {
+        u32 ea = g1 + (u32)(s32)(56);
+        lf_psq_l(&s, &F22, &P22, ea, false);
+    }
+
+    s.suffix = 2u;
+    // 8028D10C: lfd     f22, 48(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(48);
+        F22 = gx_f64_from_bits(gx_ld64(&s, ea));
+    }
+
+    // 8028D110: addi    r11, r1, 48
+    g11 = g1 + (u32)(s32)(48);
+
+    // 8028D114: bl      0x80328F88
+    {
+            lr = 0x8028D118u;
+            if (!(s.downcount - 4 > -s.budget))
+                return lf_decline(&s, LF_CLOCK); /* the routine itself, through the chassis */
+            s.downcount -= 5;
+            const u32 frame = g11;
+            g28 = gx_ld32(&s, frame + (u32)(s32)(-16));
+            g29 = gx_ld32(&s, frame + (u32)(s32)(-12));
+            g30 = gx_ld32(&s, frame + (u32)(s32)(-8));
+            g31 = gx_ld32(&s, frame + (u32)(s32)(-4));
+            s.suffix = 0u;
+            if (!gx_live(&s))
+                return lf_decline(&s, LF_CLOCK);
+            goto B_8028D118;
+    }
+    goto B_8028D118;
+B_8028D118: /* 5 cycles */
+    if (!lf_block(&s, lf_floor_, 5u))
+        return lf_decline(&s, LF_BLOCK);
+    // 8028D118: lwz     r0, 212(r1)
+    {
+        u32 ea = g1 + (u32)(s32)(212);
+        g0 = gx_ld32(&s, ea);
+    }
+
+    s.suffix = 2u;
+    // 8028D11C: mtlr    r0
+    lr = g0;
+
+    // 8028D120: addi    r1, r1, 208
+    g1 = g1 + (u32)(s32)(208);
+
+    // 8028D124: blr
+    {
+        u32 target = lr & ~3u;
+        bool ctr_ok = true;
+        bool cr_ok = true;
+        if (ctr_ok && cr_ok) {
+            gx_t = target;
+            goto GX_RETURN;
+        }
+    }
+GX_RETURN:
+    if (s.depth == 0u)
+        goto GX_DONE; /* the function's own blr: the hook's return dispatch takes it on */
+    s.depth--;
+    if (!gx_live(&s))
+        return lf_decline(&s, LF_CLOCK);
+    switch (gx_t) {
+    case 0x8028C44Cu: goto B_8028C44C;
+    case 0x8028C488u: goto B_8028C488;
+    case 0x8028C4B0u: goto B_8028C4B0;
+    case 0x8028C4C4u: goto B_8028C4C4;
+    case 0x8028C4F0u: goto B_8028C4F0;
+    case 0x8028C504u: goto B_8028C504;
+    case 0x8028C518u: goto B_8028C518;
+    case 0x8028C5F4u: goto B_8028C5F4;
+    case 0x8028C600u: goto B_8028C600;
+    case 0x8028CE00u: goto B_8028CE00;
+    case 0x8028CE74u: goto B_8028CE74;
+    case 0x8028CFC0u: goto B_8028CFC0;
+    case 0x8028D03Cu: goto B_8028D03C;
+    case 0x8028D04Cu: goto B_8028D04C;
+    case 0x8028D080u: goto B_8028D080;
+    default: return lf_decline(&s, LF_PATH);
+    }
+GX_DONE:
+    if (s.bad || s.fp.bad)
+        return lf_decline(&s, LF_BLOCK);
+    lf_commit(&s);
+    cpu->gpr[0] = g0;
+    cpu->gpr[1] = g1;
+    cpu->gpr[3] = g3;
+    cpu->gpr[4] = g4;
+    cpu->gpr[5] = g5;
+    cpu->gpr[6] = g6;
+    cpu->gpr[7] = g7;
+    cpu->gpr[8] = g8;
+    cpu->gpr[11] = g11;
+    cpu->gpr[28] = g28;
+    cpu->gpr[29] = g29;
+    cpu->gpr[30] = g30;
+    cpu->gpr[31] = g31;
+    cpu->fpr[0] = F0;
+    cpu->fpr[1] = F1;
+    cpu->fpr[2] = F2;
+    cpu->fpr[3] = F3;
+    cpu->fpr[4] = F4;
+    cpu->fpr[5] = F5;
+    cpu->fpr[6] = F6;
+    cpu->fpr[7] = F7;
+    cpu->fpr[22] = F22;
+    cpu->fpr[23] = F23;
+    cpu->fpr[24] = F24;
+    cpu->fpr[25] = F25;
+    cpu->fpr[26] = F26;
+    cpu->fpr[27] = F27;
+    cpu->fpr[28] = F28;
+    cpu->fpr[29] = F29;
+    cpu->fpr[30] = F30;
+    cpu->fpr[31] = F31;
+    cpu->ps1[0] = P0;
+    cpu->ps1[1] = P1;
+    cpu->ps1[2] = P2;
+    cpu->ps1[3] = P3;
+    cpu->ps1[4] = P4;
+    cpu->ps1[5] = P5;
+    cpu->ps1[6] = P6;
+    cpu->ps1[7] = P7;
+    cpu->ps1[22] = P22;
+    cpu->ps1[23] = P23;
+    cpu->ps1[24] = P24;
+    cpu->ps1[25] = P25;
+    cpu->ps1[26] = P26;
+    cpu->ps1[27] = P27;
+    cpu->ps1[28] = P28;
+    cpu->ps1[29] = P29;
+    cpu->ps1[30] = P30;
+    cpu->ps1[31] = P31;
+    cpu->cr = cr;
+    cpu->ctr = ctr;
     cpu->lr = lr;
     cpu->pc = gx_t;
     return 1;

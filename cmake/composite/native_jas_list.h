@@ -5,6 +5,7 @@
 
 #define JAS_NATIVES(X) \
     X(0x8028DF2Cu, lfn_8028DF2C, "JASystem::TOscillator::getOffset", 8028DF2C) \
-    X(0x8028E238u, lfn_8028E238, "JASystem::TOscillator::calc", 8028E238)
+    X(0x8028E238u, lfn_8028E238, "JASystem::TOscillator::calc", 8028E238) \
+    X(0x8028C3A8u, lfn_8028C3A8, "JASystem::TChannel::updateEffectorParam", 8028C3A8)
 
 #endif

@@ -149,6 +149,8 @@ class LeafGen(Gen):
         out = out.replace(start, start + "    const s64 lf_floor_ = lf_floor(&s);\n")
         out = re.sub(r"\bgx_block\(&s, (\d+)u\)", r"lf_block(&s, lf_floor_, \1u)", out)
         out = self.tag_declines(out)
+        # The boundaries' test with the host's half asked once a run (lf_silent).
+        out = re.sub(r"\bgx_silent\(", "lf_silent(", out)
         for bad in ("gx_put", "gx_commit", "gx_start", "s_gx_log", "gx_decline", "lf_decline(&s)", "gx_block"):
             if bad in out:
                 raise SystemExit(f"{native.name}: `{bad}` left in the native")
@@ -227,6 +229,16 @@ OSC_GET_OFFSET = (0x8028DF2C, 0x8028E070)     # JASystem::TOscillator::getOffset
 OSC_CALC = (0x8028E238, 0x8028E5EC)
 DRIVER_UPDATE_INTERVAL = (0x8028AAE4, 0x8028AAEC)  # JASystem::Driver::getUpdateInterval (chunk 0162)
 CVT_FP2UNSIGNED = (0x80328E10, 0x80328E6C)    # __cvt_fp2unsigned (chunk 0201)
+CH_UPDATE_EFFECTOR = (0x8028C3A8, 0x8028C62C)  # JASystem::TChannel::updateEffectorParam (chunk 0162)
+CH_CALC_EFFECT = (0x8028CABC, 0x8028CB88)
+CH_CALC_PAN = (0x8028CB88, 0x8028CC90)
+CH_UPDATE_AUTO_MIXER = (0x8028CD90, 0x8028CEA8)
+CH_UPDATE_MIXER = (0x8028CEA8, 0x8028D128)
+CALC_SINF_T = (0x8027A9C8, 0x8027A9F4)        # JASystem::Calc::sinfT, sinfDolby2 (chunk 0158)
+CALC_SINF_DOLBY2 = (0x8027A9F4, 0x8027AA20)
+DSP_SET_AUTO_MIXER = (0x8028A740, 0x8028A764)  # DSPInterface::DSPBuffer::setAutoMixer
+DRIVER_LEVELS = [(0x8028AAC4, 0x8028AACC), (0x8028AACC, 0x8028AAD4), (0x8028AADC, 0x8028AAE4)]
+                                               # Driver::getChannelLevel, getAutoLevel, getOutputMode
 
 
 GROUPS = {
@@ -273,6 +285,10 @@ GROUPS = {
         Native("JASystem::TOscillator::getOffset", 0x8028DF2C, [OSC_GET_OFFSET, OSC_CALC, DRIVER_UPDATE_INTERVAL,
                                                                  CVT_FP2UNSIGNED]),
         Native("JASystem::TOscillator::calc", 0x8028E238, [OSC_CALC, DRIVER_UPDATE_INTERVAL, CVT_FP2UNSIGNED]),
+        # A channel's pan, effect and surround sends and its mixer's volumes.
+        Native("JASystem::TChannel::updateEffectorParam", 0x8028C3A8,
+               [CH_UPDATE_EFFECTOR, CH_CALC_EFFECT, CH_CALC_PAN, CH_UPDATE_AUTO_MIXER, CH_UPDATE_MIXER, CALC_SINF_T,
+                CALC_SINF_DOLBY2, DSP_SET_AUTO_MIXER] + DRIVER_LEVELS),
     ],
 }
 

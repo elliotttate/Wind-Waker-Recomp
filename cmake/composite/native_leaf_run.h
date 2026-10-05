@@ -98,6 +98,22 @@ GX_RUN bool lf_block(GxRun* s, s64 floor, u32 cycles) {
     return !(s->bad | s->fp.bad) && s->downcount >= floor;
 }
 
+/* A boundary between chunks that passes without the host: native_gx_run.h's
+ * gx_silent (the edge filter's own test), with the host's half of it - the
+ * filter on, the watch list ready, the host quiet - asked once a run and kept
+ * (in the run's checkpoint field, which only the sixth set's natives use: 0
+ * not yet asked, 1 silent, 2 not). Nothing of the host's runs during a run;
+ * a flag the host raises in the meantime is one raised a moment later, as
+ * for the earlier sets' natives. The address's half, the watch list, is the
+ * same lookup. A native that crosses a boundary per loop iteration (a call to
+ * a leaf in another chunk, a jump table's bctr) asks the host once instead of
+ * at each crossing. */
+GX_RUN bool lf_silent(GxRun* s, u32 address) {
+    if (__builtin_expect(s->checkpoint == 0u, 0))
+        s->checkpoint = bw_edge_filter_enabled && bw_edge_watch_ready && bw_host_quiet(s->cpu) ? 1u : 2u;
+    return s->checkpoint == 1u && bw_edge_unwatched(address);
+}
+
 /* Decline: every byte the run stored put back, the reason kept. A block's
  * test fails for the clock unless the run went bad before it. */
 GX_RUN int lf_decline(GxRun* s, unsigned why) {
