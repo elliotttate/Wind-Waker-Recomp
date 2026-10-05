@@ -956,9 +956,8 @@ int main(void) {
         exe = self.build_app()
         start = time.monotonic()
         # At -O1, not -O0: the counters are the source's regions either way, so the
-        # profile is the same, and -O0's module (over 1.7 GB with its counters)
-        # neared the 2 GB a Windows image can be: one with the straight prepaid
-        # copies (2.05 GB) would not load. -O1 takes it to about half, and the
+        # profile is the same. With the straight prepaid copies the -O0 module was
+        # 2.05 GB, past what Windows loads (error 193); at -O1 it is 1.0 GB, and the
         # playbacks run faster.
         module = self.compile_composite(work / "composite", "1", ["-fprofile-instr-generate"],
                                         ["-fprofile-instr-generate"], "training-composite")
