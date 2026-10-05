@@ -299,7 +299,7 @@ GROUPS = {
         Native("dKyw_pntwind_get_info", 0x8008A230, [PNTWIND_GET_INFO, DKYR_GET_VECTLE_CALC, GET_VECTLE_CALC,
                                                        VECTLE_CALC, PSVEC_SQUARE_DISTANCE]),
     ],
-    # JASystem's leaves: an envelope oscillator's value, a pitch's cents.
+    # JASystem's leaves: an envelope oscillator's value, a channel's effects.
     "jas": [
         Native("JASystem::TOscillator::getOffset", 0x8028DF2C, [OSC_GET_OFFSET, OSC_CALC, DRIVER_UPDATE_INTERVAL,
                                                                  CVT_FP2UNSIGNED]),

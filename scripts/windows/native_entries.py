@@ -654,8 +654,10 @@ ENTRIES[0x8009A5C4] = ("drawWave@8009A5C4", "draw", _DRAW_8009A094, "a8dbdca998f
 # --- The seventh set (tests/native_leaf_test.c): leaf compute code, each
 # function's translation replayed on local registers (native_leaf_run.h,
 # scripts/windows/native_leaf_gen.py): libm's fmod and the random numbers and
-# angle built on it, the collision blocks' bounds, the Euler quaternions, the
-# planes, polar coordinates and point winds. A group per switch
+# angle built on it and its sin, cos and tan, the collision blocks' bounds,
+# the Euler quaternions, the arc tangents, the planes, polar coordinates and
+# point winds, JASystem's envelope oscillators and a channel's effector
+# parameters. A group per switch
 # (BLUEWAKE_NATIVE_<GROUP>=0). An entry's hash covers every function its
 # native replays, callees in other chunks included, and every loop the
 # translator extracted from them (below). ---

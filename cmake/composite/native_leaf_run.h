@@ -2,7 +2,7 @@
 #define BLUEWAKE_NATIVE_LEAF_RUN_H
 
 /* The seventh set of natives' shared pieces (native_libm.c, native_bgblk.c,
- * native_rot.c): leaf compute code - functions that run to their return
+ * native_rot.c, native_calc.c, native_geom.c, native_jas.c): leaf compute code - functions that run to their return
  * without calling anything not replayed with them - each its translation
  * replayed on local registers, as the fifth set's (native_gx_run.h, whose
  * clock, loads, conversions and FP arithmetic these use as they are), for

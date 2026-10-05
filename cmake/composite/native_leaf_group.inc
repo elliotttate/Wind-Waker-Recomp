@@ -1,5 +1,5 @@
 /* One group of the seventh set's natives (native_libm.c, native_bgblk.c,
- * native_rot.c, native_geom.c): each native's own entry point - what its
+ * native_rot.c, native_calc.c, native_geom.c, native_jas.c): each native's own entry point - what its
  * hook calls - with the decline gate, the counts by reason, the report, and
  * the entry by address the tests call. The group's file defines, before
  * including this after its natives (native_<group>_gen.inc):
