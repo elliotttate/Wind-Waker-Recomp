@@ -1,3 +1,43 @@
+## 2026-10-05 Vertices the GPU already holds are not sent again: the frame's upload 87-93 percent below this morning's
+
+**What repeats.** A diagnostic hashing each draw's decoded vertices found 94-98 percent of a frame's vertex bytes
+identical to a draw of the frame before (Forest Haven 96, Dragon Roost 96, Hyrule Castle's room 98, the Deku
+Tree's glade 94), and 81-91 percent identical **at the same place** in the frame's vertex buffer: Wind Waker draws
+the same static geometry in the same order frame after frame, and the vertices are in object space.
+
+**The change** (RecompCore 0145, 39dcacb): a CPU shadow of the GPU vertex buffer, as the recorded frames' copies
+leave it. A push whose bytes are already at its place is neither written to upload memory nor copied; each op
+copies only the ranges its frame wrote since the op before (in whole 4-byte words, the shared ones staged from the
+shadow; ranges less than 1 KB apart joined across the gap, staged from the shadow). Copies still run in recording
+order, so nothing reads a buffer state it did not before.
+
+**What it does** (the same tour; KB per frame, and GPU busy per frame on the RTX 5090, before -> after):
+
+| Place | Vertices | GPU busy | Staging copies |
+| --- | --- | --- | --- |
+| Forest Haven | 5,954 -> 492 | - | - |
+| Dragon Roost | 4,038 -> 501 | 1.60 -> 0.61 ms | 1.44 -> 0.41 ms |
+| The sea by the Fortress | 3,765 -> 730 | 1.36 -> 0.54 | 1.22 -> 0.38 |
+| Hyrule | 4,481 -> 469 | 0.64 -> 0.10 | 0.57 -> 0.05 |
+| Hyrule Castle's room | 5,424 -> 298 | 0.31 -> 0.13 | 0.28 -> 0.07 |
+| The Earth Temple's boss | 3,607 -> 1,496 | 0.16 -> 0.07 | 0.14 -> 0.04 |
+
+With 0138's compact vertices, 0139's texture identities and 0142's three-part constant block, a frame now uploads
+0.9-2.3 MB where it uploaded 9.4-17.3 MB this morning. The CPU is level (the comparison against the shadow costs
+about what the writes to upload memory did): four E-cores, two runs each, game thread and GX worker within noise.
+
+**Exact.** Smooth Motion dumps at the sea by the Fortress, Forest Haven, Dragon Roost, Hyrule, the Earth Temple's
+boss, the Forbidden Woods and Hyrule Castle's room identical, real and in-between frames. The Deku Tree's glade
+(`Omori`) differs by a few of its floating spores in one to three of five frames - as two runs of the same build
+do (39 pixels in one frame): those particles are not deterministic from run to run, before this change as after.
+
+**Also:**
+- The app's own profile (windows/pgo/app.profdata) is trained again on RecompCore 11c1369
+  (`scripts/windows/train_app_profile.py` now takes an .rvz through the builder's disc step and starts from a fresh
+  folder); level with the old one in play.
+- With the decline gate, the sixth natives set is level with it off (Forest Haven 19.69 vs 19.99 ms a game frame,
+  Dragon Roost 20.94 vs 20.63, Hyrule Castle's room 16.69 vs 16.93): it stays opt-in.
+
 ## 2026-10-05 The GX worker's vertex decode, and the sixth natives set taken back out of the default
 
 **The GX worker** (four E-cores at the sea, host samples symbolized with the app's PDB): busy about a third of the

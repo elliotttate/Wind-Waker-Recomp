@@ -1,0 +1,198 @@
+From 39dcacb2e72546bb41b6eaf25b73aa0382742381 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Mon, 5 Oct 2026 03:23:08 -0400
+Subject: [PATCH] aurora: vertices the GPU buffer already holds are neither
+ staged nor copied
+
+Wind Waker draws the same geometry at the same place in the vertex
+buffer frame after frame: 81 to 91 percent of its vertex bytes are the
+bytes already there (2026-10-05), and every frame copied them all again
+from upload memory. A CPU shadow of the GPU vertex buffer, as the
+recorded frames' copies leave it, now decides: a push whose bytes are
+already at its place is neither written to staging nor copied; the
+others are, and each op copies only its packet's ranges since the op
+before (whole 4-byte words, the shared ones staged from the shadow;
+ranges within 1 KB joined across the clean gap, staged from the
+shadow). Copies still run in recording order, so nothing reads a
+buffer state it did not before.
+
+Vertex upload per frame: Forest Haven 5,954 -> 492 KB, Dragon Roost
+4,038 -> 501, the sea by the Fortress 3,765 -> 730, Hyrule 4,481 -> 469,
+Hyrule Castle's room 5,424 -> 298. GPU busy per frame (RTX 5090): Dragon
+Roost 1.60 -> 0.61 ms, the sea by the Fortress 1.36 -> 0.54, Hyrule
+0.64 -> 0.10. CPU level. Smooth Motion dumps identical at seven places;
+Forest Haven's Deku Tree glade differs by a few spores, as two runs of
+the same build do.
+---
+ GXRuntime/graphics/aurora/lib/gfx/common.cpp | 99 ++++++++++++++++++--
+ 1 file changed, 92 insertions(+), 7 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.cpp b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+index 04041b2e..4e7ceb14 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+@@ -64,6 +64,13 @@ constexpr uint64_t StagingBufferSize = UniformBufferSize + VertexBufferSize + In
+ constexpr size_t FrameSlotCount = 2;
+ constexpr size_t StagingBufferCount = FrameSlotCount + 3;
+ 
++// A byte range of the frame's vertex area that its copies must carry
++// (push_verts_delta).
++struct VertexDirtyRange {
++  uint32_t begin;
++  uint32_t end;
++};
++
+ struct StagingHighWater {
+   uint32_t verts = 0;
+   uint32_t uniforms = 0;
+@@ -239,11 +246,17 @@ struct FrameOp {
+   TextureCopy* textureCopy = nullptr;
+   StagingHighWater highWater;
+   std::vector<const TextureUpload*> textureUploads;
++  // The vertex ranges this op's copy carries (the packet's since the op before).
++  std::vector<VertexDirtyRange> vertDirty;
+ };
+ 
+ using RenderPassList = std::deque<RenderPass>;
+ struct FramePacket {
+   RenderPassList renderPasses;
++  // The vertex area's ranges whose bytes the GPU buffer does not hold yet, in
++  // push order, and how many of them ops have taken (capture_frame_op).
++  std::vector<VertexDirtyRange> vertDirty;
++  size_t vertDirtyCaptured = 0;
+   std::deque<TextureCopy> textureCopies;
+   std::deque<FrameOp> ops;
+   std::deque<TextureUpload> textureUploads;
+@@ -658,6 +671,9 @@ static FrameOp capture_frame_op(FramePacket& frame, FrameOpType type, uint32_t i
+   for (size_t i = 0; i < op.highWater.textureUploadCount; ++i) {
+     op.textureUploads.push_back(&frame.textureUploads[i]);
+   }
++  op.vertDirty.assign(frame.vertDirty.begin() + static_cast<std::ptrdiff_t>(frame.vertDirtyCaptured),
++                      frame.vertDirty.end());
++  frame.vertDirtyCaptured = frame.vertDirty.size();
+   return op;
+ }
+ 
+@@ -677,6 +693,7 @@ static void render(wgpu::CommandEncoder& cmd, FramePacket& frame, RenderPass& pa
+ static void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, const RenderPass& passInfo);
+ static void expire_cached_bind_groups();
+ static void push_command(CommandType type, const Command::Data& data);
++static void reset_vertex_shadow();
+ 
+ static void enqueue_op(FramePacket& frame, size_t frameSlot, uint32_t opIndex) {
+   if (opIndex >= frame.ops.size()) {
+@@ -1214,6 +1231,7 @@ void initialize() {
+     };
+     out = g_device.CreateBuffer(&descriptor);
+   };
++  reset_vertex_shadow();
+   createBuffer(g_uniformBuffer, wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst, UniformBufferSize,
+                "Shared Uniform Buffer");
+   createBuffer(g_vertexBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::Vertex | wgpu::BufferUsage::CopyDst,
+@@ -1916,11 +1934,19 @@ static void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& f
+   const auto& highWater = op.highWater;
+   using webgpu::gpu_prof::CopyKind;
+   const auto delta = [](uint64_t highWater, uint64_t copied) { return highWater > copied ? highWater - copied : 0; };
+-  webgpu::gpu_prof::count_copy(CopyKind::Vertices, delta(highWater.verts, frame.copied.verts));
+   webgpu::gpu_prof::count_copy(CopyKind::Uniforms, delta(highWater.uniforms, frame.copied.uniforms));
+   webgpu::gpu_prof::count_copy(CopyKind::Indices, delta(highWater.indices, frame.copied.indices));
+   webgpu::gpu_prof::count_copy(CopyKind::Storage, delta(highWater.storage, frame.copied.storage));
+-  copy_staging_buffer_range(cmd, frame, frame.copied.verts, highWater.verts, VertexStagingOffset, g_vertexBuffer);
++  // Vertices: only the ranges the GPU buffer does not already hold
++  // (push_verts_delta); 4-byte aligned there.
++  uint64_t vertBytes = 0;
++  for (const VertexDirtyRange& range : op.vertDirty) {
++    cmd.CopyBufferToBuffer(g_stagingBuffers[frame.stagingBuffer], VertexStagingOffset + range.begin, g_vertexBuffer,
++                           range.begin, range.end - range.begin);
++    vertBytes += range.end - range.begin;
++  }
++  webgpu::gpu_prof::count_copy(CopyKind::Vertices, vertBytes);
++  frame.copied.verts = std::max(frame.copied.verts, highWater.verts);
+   copy_staging_buffer_range(cmd, frame, frame.copied.uniforms, highWater.uniforms, UniformStagingOffset,
+                             g_uniformBuffer);
+   copy_staging_buffer_range(cmd, frame, frame.copied.indices, highWater.indices, IndexStagingOffset, g_indexBuffer);
+@@ -2701,17 +2727,76 @@ static Range map(ByteBuffer& target, size_t length, size_t alignment) {
+   return {static_cast<uint32_t>(begin), static_cast<uint32_t>(length)};
+ }
+ 
++// The GPU vertex buffer's contents as the recorded frames' copies leave it
++// (recording thread). A push whose bytes are already at its place there is
++// neither staged nor copied: Wind Waker draws the same geometry at the same
++// place in the buffer frame after frame, 81 to 91 percent of its vertex bytes
++// (2026-10-05), which every frame copied again over the bus. Copies run in
++// recording order and the in-between frames read a frame's vertices before
++// the next frame's copies, as before; a new buffer starts zeroed, as this.
++static std::vector<uint8_t> g_vertexShadow;
++// A dirty range is joined to the one before across a clean gap up to this
++// long, the gap's bytes staged from the shadow, rather than copied apart.
++static constexpr uint32_t kVertexDirtyJoin = 1024;
++
++static void reset_vertex_shadow() {
++  g_vertexShadow.assign(VertexBufferSize, 0);
++}
++
++static Range push_verts_delta(FramePacket& frame, const uint8_t* data, size_t length) {
++  ByteBuffer& target = frame.verts;
++  const size_t begin = target.size();
++  target.append_zeroes(length); // its place, written below only where it changed
++  if (length == 0)
++    return {static_cast<uint32_t>(begin), 0};
++  if (g_vertexShadow.size() != VertexBufferSize)
++    reset_vertex_shadow();
++  uint8_t* const shadow = g_vertexShadow.data();
++  if (std::memcmp(shadow + begin, data, length) == 0)
++    return {static_cast<uint32_t>(begin), static_cast<uint32_t>(length)};
++  std::memcpy(shadow + begin, data, length);
++  uint8_t* const staging = target.data();
++  std::memcpy(staging + begin, data, length);
++  // Copies are of whole 4-byte words: the words this range shares with its
++  // neighbours are staged whole, from the shadow, so a copy carries the bytes
++  // the buffer must hold in them.
++  const uint32_t first = static_cast<uint32_t>(begin) & ~3u;
++  const uint32_t last = AURORA_ALIGN(static_cast<uint32_t>(begin + length), 4u);
++  if (first < begin)
++    std::memcpy(staging + first, shadow + first, begin - first);
++  if (last > begin + length)
++    std::memcpy(staging + begin + length, shadow + begin + length, last - (begin + length));
++  if (frame.vertDirty.size() > frame.vertDirtyCaptured) {
++    VertexDirtyRange& before = frame.vertDirty.back();
++    if (first <= before.end + kVertexDirtyJoin) {
++      if (first > before.end)
++        std::memcpy(staging + before.end, shadow + before.end, first - before.end);
++      before.end = std::max(before.end, last);
++      return {static_cast<uint32_t>(begin), static_cast<uint32_t>(length)};
++    }
++  }
++  frame.vertDirty.push_back({first, last});
++  return {static_cast<uint32_t>(begin), static_cast<uint32_t>(length)};
++}
++
+ Range push_verts_strided(const uint8_t* data, size_t length, size_t stride) {
+-  auto& target = current_frame_packet().verts;
+-  const size_t pad = (stride - target.size() % stride) % stride;
++  auto& frame = current_frame_packet();
++  const size_t pad = (stride - frame.verts.size() % stride) % stride;
+   if (pad > 0)
+-    target.append_zeroes(pad);
+-  return push(target, data, length, 0);
++    frame.verts.append_zeroes(pad);
++  return push_verts_delta(frame, data, length);
+ }
+ 
+ Range push_verts(const uint8_t* data, size_t length, size_t alignment) {
+   ZoneScoped;
+-  return push(current_frame_packet().verts, data, length, alignment);
++  auto& frame = current_frame_packet();
++  if (alignment != 0) {
++    const size_t begin = frame.verts.size();
++    const size_t alignedBegin = AURORA_ALIGN(begin, alignment);
++    if (alignedBegin > begin)
++      frame.verts.append_zeroes(alignedBegin - begin);
++  }
++  return push_verts_delta(frame, data, length);
+ }
+ 
+ Range push_indices(const uint8_t* data, size_t length, size_t alignment) {
+-- 
+2.45.2.windows.1
+
