@@ -1,0 +1,226 @@
+diff --git a/chunks_dol/chunk_0034_text1_800896E0.c b/chunks_dol/chunk_0034_text1_800896E0.c
+index 18b755c..3e04154 100644
+--- a/chunks_dol/chunk_0034_text1_800896E0.c
++++ b/chunks_dol/chunk_0034_text1_800896E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_geom.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -14772,4 +14774,6 @@ bwend_148: ;
+ 
+ label_8008A230:
++    if (bluewake_native_geom_enabled && bluewake_native_geom_8008A230(ctx))
++        goto return_dispatch_800896E0;
+     ctx->pc = 0x8008A230u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+diff --git a/chunks_dol/chunk_0145_text1_802456E0.c b/chunks_dol/chunk_0145_text1_802456E0.c
+index 22492d7..a2ecd05 100644
+--- a/chunks_dol/chunk_0145_text1_802456E0.c
++++ b/chunks_dol/chunk_0145_text1_802456E0.c
+@@ -4,4 +4,7 @@
+ #include "../generated.h"
+ /* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_bgblk.h"
++#include "native_calc.h"
++#include "native_libm.h"
+ #include "native_bg.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+@@ -13276,4 +13279,6 @@ bwend_86: ;
+ 
+ label_80246044:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_80246044(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x80246044u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+@@ -13760,4 +13765,6 @@ bwend_93: ;
+ 
+ label_802460D0:
++    if (bluewake_native_calc_enabled && bluewake_native_calc_802460D0(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x802460D0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -14966,4 +14973,6 @@ bwend_125: ;
+ 
+ label_80246270:
++    if (bluewake_native_calc_enabled && bluewake_native_calc_80246270(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x80246270u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);
+@@ -15289,4 +15298,6 @@ bwend_128: ;
+ 
+ label_802462C8:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_802462C8(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x802462C8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 234u);
+@@ -16004,4 +16015,6 @@ bwend_130: ;
+ 
+ label_802463B0:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_802463B0(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x802463B0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -16219,4 +16232,6 @@ bwend_132: ;
+ 
+ label_802463E8:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_802463E8(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x802463E8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 7u);
+@@ -37578,4 +37593,6 @@ bwend_487: ;
+ 
+ label_80247C4C:
++    if (bluewake_native_bgblk_enabled && bluewake_native_bgblk_80247C4C(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x80247C4Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+@@ -38169,4 +38186,6 @@ bwend_499: ;
+ 
+ label_80247CD4:
++    if (bluewake_native_bgblk_enabled && bluewake_native_bgblk_80247CD4(ctx))
++        goto return_dispatch_802456E0;
+     ctx->pc = 0x80247CD4u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+diff --git a/chunks_dol/chunk_0146_text1_802496E0.c b/chunks_dol/chunk_0146_text1_802496E0.c
+index d842a27..ffe51e8 100644
+--- a/chunks_dol/chunk_0146_text1_802496E0.c
++++ b/chunks_dol/chunk_0146_text1_802496E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_geom.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -17571,4 +17573,6 @@ bwend_175: ;
+ 
+ label_8024A6F0:
++    if (bluewake_native_geom_enabled && bluewake_native_geom_8024A6F0(ctx))
++        goto return_dispatch_802496E0;
+     ctx->pc = 0x8024A6F0u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 5u);
+diff --git a/chunks_dol/chunk_0148_text1_802516E0.c b/chunks_dol/chunk_0148_text1_802516E0.c
+index c146efd..f76e808 100644
+--- a/chunks_dol/chunk_0148_text1_802516E0.c
++++ b/chunks_dol/chunk_0148_text1_802516E0.c
+@@ -6,4 +6,5 @@
+ #include "../generated.h"
+ /* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_geom.h"
+ #include "native_cc.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+@@ -43029,4 +43030,6 @@ bwend_618: ;
+ 
+ label_80254214:
++    if (bluewake_native_geom_enabled && bluewake_native_geom_80254214(ctx))
++        goto return_dispatch_802516E0;
+     ctx->pc = 0x80254214u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 20u);
+diff --git a/chunks_dol/chunk_0162_text1_802896E0.c b/chunks_dol/chunk_0162_text1_802896E0.c
+index 330214e..3115ccd 100644
+--- a/chunks_dol/chunk_0162_text1_802896E0.c
++++ b/chunks_dol/chunk_0162_text1_802896E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_jas.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -44982,4 +44984,6 @@ bwend_712: ;
+ 
+ label_8028C3A8:
++    if (bluewake_native_jas_enabled && bluewake_native_jas_8028C3A8(ctx))
++        goto return_dispatch_802896E0;
+     ctx->pc = 0x8028C3A8u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 16u);
+diff --git a/chunks_dol/chunk_0163_text1_8028D6E0.c b/chunks_dol/chunk_0163_text1_8028D6E0.c
+index 55429f2..0440663 100644
+--- a/chunks_dol/chunk_0163_text1_8028D6E0.c
++++ b/chunks_dol/chunk_0163_text1_8028D6E0.c
+@@ -3,4 +3,6 @@
+ #include "gather_pipe.h"
+ #include "../generated.h"
++/* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_jas.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+ /* bluewake: prepaid block copies (scripts/windows/fast_blocks.py) */
+@@ -12364,4 +12366,6 @@ bwend_185: ;
+ 
+ label_8028DF2C:
++    if (bluewake_native_jas_enabled && bluewake_native_jas_8028DF2C(ctx))
++        goto return_dispatch_8028D6E0;
+     ctx->pc = 0x8028DF2Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 8u);
+@@ -15366,4 +15370,6 @@ bwend_231: ;
+ 
+ label_8028E238:
++    if (bluewake_native_jas_enabled && bluewake_native_jas_8028E238(ctx))
++        goto return_dispatch_8028D6E0;
+     ctx->pc = 0x8028E238u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 9u);
+diff --git a/chunks_dol/chunk_0191_text1_802FD6E0.c b/chunks_dol/chunk_0191_text1_802FD6E0.c
+index 715503e..069c912 100644
+--- a/chunks_dol/chunk_0191_text1_802FD6E0.c
++++ b/chunks_dol/chunk_0191_text1_802FD6E0.c
+@@ -4,4 +4,5 @@
+ #include "../generated.h"
+ /* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_rot.h"
+ #include "native_anim.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+@@ -56700,4 +56701,6 @@ bwend_955: ;
+ 
+ label_80301150:
++    if (bluewake_native_rot_enabled && bluewake_native_rot_80301150(ctx))
++        goto return_dispatch_802FD6E0;
+     ctx->pc = 0x80301150u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 50u);
+diff --git a/chunks_dol/chunk_0203_text1_8032D6E0.c b/chunks_dol/chunk_0203_text1_8032D6E0.c
+index e914bf2..90b076e 100644
+--- a/chunks_dol/chunk_0203_text1_8032D6E0.c
++++ b/chunks_dol/chunk_0203_text1_8032D6E0.c
+@@ -4,4 +4,5 @@
+ #include "../generated.h"
+ /* bluewake: certified native entries (scripts/windows/native_entries.py) */
++#include "native_libm.h"
+ #include "native_search.h"
+ /* bluewake: return dispatch range tests (scripts/windows/return_ranges.py) */
+@@ -25568,4 +25569,6 @@ bwend_378: ;
+ 
+ label_8032EC1C:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_8032EC1C(ctx))
++        goto return_dispatch_8032D6E0;
+     ctx->pc = 0x8032EC1Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 12u);
+@@ -47874,4 +47877,6 @@ bwend_670: ;
+ 
+ label_8033071C:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_8033071C(ctx))
++        goto return_dispatch_8032D6E0;
+     ctx->pc = 0x8033071Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 10u);
+@@ -52785,4 +52790,6 @@ bwend_773: ;
+ 
+ label_80330C84:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_80330C84(ctx))
++        goto return_dispatch_8032D6E0;
+     ctx->pc = 0x80330C84u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 10u);
+@@ -53589,4 +53596,6 @@ bwend_794: ;
+ 
+ label_80330D5C:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_80330D5C(ctx))
++        goto return_dispatch_8032D6E0;
+     ctx->pc = 0x80330D5Cu;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 10u);
+@@ -54387,4 +54396,6 @@ bwend_808: ;
+ 
+ label_80330E34:
++    if (bluewake_native_libm_enabled && bluewake_native_libm_80330E34(ctx))
++        goto return_dispatch_8032D6E0;
+     ctx->pc = 0x80330E34u;
+     cycle_block_prepaid = dolrecomp_block_can_precharge(ctx, 4u);

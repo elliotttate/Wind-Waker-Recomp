@@ -42,6 +42,31 @@ int bluewake_native_bgblk_enabled;
  * runs inside another). Static, so a native's frame stays small. */
 static GxLog s_lf_log;
 
+/* MakeBlckBnd's room: a block of n triangles (where its vertices are
+ * transformed: MakeBlckTransMinMax's short path otherwise) takes at most
+ * 74 + 135 n cycles - its own blocks, the inline register save and restore,
+ * and per triangle three MakeBlckMinMax calls of at most 36. Where the clock's
+ * floor would come first, the native declines before it starts, and the
+ * translation, with MakeBlckMinMax's own native at each call, runs the block
+ * as before. Anything not plain RAM here is left to the replay, which
+ * declines on it itself. */
+static inline bool lf_room_80247CD4(const CPUState* cpu, s64 floor) {
+    const u32 self = cpu->gpr[3];
+    if (!nr_ram(cpu, self + 109u, 1u) || !nr_ram(cpu, self + 148u, 4u) || nr_at(cpu, self + 109u)[0] == 0u)
+        return true;
+    const u32 bgd = nr_word(cpu, self + 148u), i = cpu->gpr[4];
+    if (!nr_ram(cpu, bgd + 8u, 16u))
+        return true;
+    const u32 blocks = nr_word(cpu, bgd + 20u);
+    if (!nr_ram(cpu, blocks + 2u * i, 4u))
+        return true;
+    const s32 first = (s32)nr_half(cpu, blocks + 2u * i);
+    const s32 last = i != nr_word(cpu, bgd + 16u) - 1u ? (s32)nr_half(cpu, blocks + 2u * i + 2u) - 1
+                                                         : (s32)nr_word(cpu, bgd + 8u) - 1;
+    const s64 count = last >= first ? (s64)last - first + 1 : 0;
+    return cpu->downcount - (74 + 135 * count) >= floor;
+}
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-label"
 #pragma clang diagnostic ignored "-Wunused-variable"

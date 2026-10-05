@@ -345,6 +345,8 @@ static int lfn_80247CD4(CPUState* cpu, u32 at) {
     if (!lf_start(&s, &s_lf_log, cpu))
         return lf_decline(&s, LF_STATE);
     const s64 lf_floor_ = lf_floor(&s);
+    if (!lf_room_80247CD4(cpu, lf_floor_))
+        return lf_decline(&s, LF_CLOCK); /* the clock: no room for the run */
     if (!gx_fp_ready(cpu))
         return lf_decline(&s, LF_STATE);
     if (!gx_fp_arith_ready(cpu))

@@ -147,6 +147,16 @@ class LeafGen(Gen):
         if out.count(start) != 1:
             raise SystemExit(f"{native.name}: no entry test")
         out = out.replace(start, start + "    const s64 lf_floor_ = lf_floor(&s);\n")
+        # A native whose work can outlast the clock by far (a loop over a
+        # block's triangles): its group's room test first, which declines at
+        # once where the whole run cannot fit (lf_room_<entry>, written by
+        # hand beside the natives: nothing has changed yet, so it is always
+        # exact; it only spares the replay a run it would undo).
+        if getattr(native, "room", False):
+            room = (f"    if (!lf_room_{native.entry:08X}(cpu, lf_floor_))\n"
+                    "        return gx_decline(&s); /* the clock: no room for the run */\n")
+            out = out.replace("    const s64 lf_floor_ = lf_floor(&s);\n",
+                              "    const s64 lf_floor_ = lf_floor(&s);\n" + room, 1)
         out = re.sub(r"\bgx_block\(&s, (\d+)u\)", r"lf_block(&s, lf_floor_, \1u)", out)
         out = self.tag_declines(out)
         # The boundaries' test with the host's half asked once a run (lf_silent).
@@ -162,6 +172,7 @@ class LeafGen(Gen):
         test it follows."""
         d = r"\n( +)return gx_decline\(&s\);"
         rules = [
+            (r"(if \(!lf_room_[0-9A-F]{8}\(cpu, lf_floor_\)\))" + d, "LF_CLOCK"),
             (r"(if \(!(?:lf_start\(&s, &s_lf_log, cpu\)|gx_fp_ready\(cpu\)|gx_fp_arith_ready\(cpu\)|"
              r"gx_psq_ready\([^\n]*\))\))" + d, "LF_STATE"),
             (r"(if \(!lf_block\(&s, lf_floor_, \d+u\)\))" + d, "LF_BLOCK"),
@@ -174,6 +185,12 @@ class LeafGen(Gen):
             out = re.sub(pattern, rf"\1\n\2return lf_decline(&s, {why});", out)
         # Anything else: a call, a jump or a return the native does not replay.
         return out.replace("return gx_decline(&s);", "return lf_decline(&s, LF_PATH);")
+
+
+def roomy(native):
+    """A native with a room test (LeafGen.generate_once)."""
+    native.room = True
+    return native
 
 
 # --- The natives ---------------------------------------------------------
@@ -257,7 +274,8 @@ GROUPS = {
     # The collision blocks' bounds (a moving background's, every frame).
     "bgblk": [
         Native("cBgW::MakeBlckMinMax", 0x80247C4C, [MAKE_BLCK_MIN_MAX]),
-        Native("cBgW::MakeBlckBnd", 0x80247CD4, [MAKE_BLCK_BND, MAKE_BLCK_MIN_MAX, MAKE_BLCK_TRANS_MIN_MAX, PSVEC_ADD]),
+        roomy(Native("cBgW::MakeBlckBnd", 0x80247CD4, [MAKE_BLCK_BND, MAKE_BLCK_MIN_MAX, MAKE_BLCK_TRANS_MIN_MAX,
+                                                     PSVEC_ADD])),
     ],
     # Rotations.
     "rot": [
