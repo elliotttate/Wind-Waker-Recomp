@@ -175,6 +175,16 @@ class LeafGen(Gen):
 
 
 # --- The natives ---------------------------------------------------------
+# Made, tested exact and dropped as no faster than their translation (or not
+# by 25 percent in every run): cM3dGAab::SetMinMax (1.26x through the
+# dispatcher), SetMin and SetMax (1.0x: a dozen instructions each, the native's
+# entry and exit cost what the blocks save), JASystem::Player::pitchToCent
+# (0.94x); cXyz::operator- (with PSVECSubtract) and mDoLib_project (with
+# PSMTXMultVec), 1.6-1.8x against a translation whose leaf runs translated but
+# 1.22-1.24x through the hooked chunks, where the leaf is native_vec.c's or
+# native_math.c's as in play. Left out unmade: cLib_addCalc and cLib_addCalc2 (60 Hz simulation
+# sites, rewritten by frame-rate mode), dKyw_pntwind_get_vecpow (its
+# cXyz::operator* is a game-math entry whose hook sits before its leader).
 # (function ranges from tww's config/GZLE01/symbols.txt)
 IEEE754_FMOD = (0x8032EC1C, 0x8032EF58)  # __ieee754_fmod (chunk 0203)
 FMOD = (0x80330E34, 0x80330E54)          # fmod: __ieee754_fmod's wrapper
@@ -213,6 +223,11 @@ CSPOLAR_FORMAL = (0x802540F0, 0x802541B0)     # cSPolar::Formal: cSAngle's
 CSANGLE = [(0x80253BE0, 0x80253C10), (0x80253E14, 0x80253E44), (0x80253C40, 0x80253C4C), (0x80253D30, 0x80253D40),
            (0x80253DB8, 0x80253DE4)]               # cSAngle(s16), operator-, Val(cSAngle), Inv, unary -
 VECTLE_CALC = (0x8008AA30, 0x8008AB3C)        # vectle_calc (chunk 0034)
+OSC_GET_OFFSET = (0x8028DF2C, 0x8028E070)     # JASystem::TOscillator::getOffset (chunk 0163): calc
+OSC_CALC = (0x8028E238, 0x8028E5EC)
+DRIVER_UPDATE_INTERVAL = (0x8028AAE4, 0x8028AAEC)  # JASystem::Driver::getUpdateInterval (chunk 0162)
+CVT_FP2UNSIGNED = (0x80328E10, 0x80328E6C)    # __cvt_fp2unsigned (chunk 0201)
+
 
 GROUPS = {
     # libm's fmod, and the random numbers and the angle conversion built on it.
@@ -252,6 +267,12 @@ GROUPS = {
                                               CSPOLAR_FORMAL] + CSANGLE),
         Native("dKyw_pntwind_get_info", 0x8008A230, [PNTWIND_GET_INFO, DKYR_GET_VECTLE_CALC, GET_VECTLE_CALC,
                                                        VECTLE_CALC, PSVEC_SQUARE_DISTANCE]),
+    ],
+    # JASystem's leaves: an envelope oscillator's value, a pitch's cents.
+    "jas": [
+        Native("JASystem::TOscillator::getOffset", 0x8028DF2C, [OSC_GET_OFFSET, OSC_CALC, DRIVER_UPDATE_INTERVAL,
+                                                                 CVT_FP2UNSIGNED]),
+        Native("JASystem::TOscillator::calc", 0x8028E238, [OSC_CALC, DRIVER_UPDATE_INTERVAL, CVT_FP2UNSIGNED]),
     ],
 }
 

@@ -32,6 +32,7 @@
 #include "native_rot.h"
 #include "native_calc.h"
 #include "native_geom.h"
+#include "native_jas.h"
 #include <stdlib.h>
 #include <stdio.h>
 static int s_native_math;
@@ -303,11 +304,12 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
             /* The seventh set: leaf compute code - libm's fmod with the
              * random numbers and angle built on it, and its sin, cos and
              * tan; the collision blocks' bounds; the Euler quaternions; the
-             * arc tangents; the planes, polar coordinates and point winds -
-             * with the same switch, and one per group:
+             * arc tangents; the planes, polar coordinates and point winds;
+             * JASystem's envelope oscillators - with the
+             * same switch, and one per group:
              * BLUEWAKE_NATIVE_LIBM=0, BLUEWAKE_NATIVE_BGBLK=0,
              * BLUEWAKE_NATIVE_ROT=0, BLUEWAKE_NATIVE_CALC=0,
-             * BLUEWAKE_NATIVE_GEOM=0 leave that group
+             * BLUEWAKE_NATIVE_GEOM=0, BLUEWAKE_NATIVE_JAS=0 leave that group
              * to the translation. */
             {
                 static const struct {
@@ -320,6 +322,7 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
                     {"BLUEWAKE_NATIVE_ROT", &bluewake_native_rot_enabled, bluewake_native_rot_report},
                     {"BLUEWAKE_NATIVE_CALC", &bluewake_native_calc_enabled, bluewake_native_calc_report},
                     {"BLUEWAKE_NATIVE_GEOM", &bluewake_native_geom_enabled, bluewake_native_geom_report},
+                    {"BLUEWAKE_NATIVE_JAS", &bluewake_native_jas_enabled, bluewake_native_jas_report},
                 };
                 for (unsigned g = 0; g < sizeof groups / sizeof groups[0]; ++g) {
                     const char* value = getenv(groups[g].name);

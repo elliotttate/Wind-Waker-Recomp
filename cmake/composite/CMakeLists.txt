@@ -91,6 +91,7 @@ add_library(${MODULE_NAME} SHARED
   native_rot.c
   native_calc.c
   native_geom.c
+  native_jas.c
   ${GXRUNTIME_DIR}/src/core/cpu.c
   ${GXRUNTIME_DIR}/src/core/cpu_exception.c
   ${GXRUNTIME_DIR}/src/core/cpu_interpreter.c

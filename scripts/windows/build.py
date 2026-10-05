@@ -937,7 +937,7 @@ int main(void) {
         # native_entries.py's, above; native_leaf_gen.py writes each group's
         # native_<group>_gen.inc and native_<group>_list.h).
         for name in ("native_leaf_run.h", "native_leaf_group.inc") + tuple(
-                f"native_{group}{suffix}" for group in ("libm", "bgblk", "rot", "calc", "geom")
+                f"native_{group}{suffix}" for group in ("libm", "bgblk", "rot", "calc", "geom", "jas")
                 for suffix in (".c", ".h", "_list.h", "_gen.inc")):
             path = ROOT / "cmake/composite" / name
             key.update(path.relative_to(ROOT).as_posix().encode())

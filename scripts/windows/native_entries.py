@@ -659,7 +659,7 @@ ENTRIES[0x8009A5C4] = ("drawWave@8009A5C4", "draw", _DRAW_8009A094, "a8dbdca998f
 # (BLUEWAKE_NATIVE_<GROUP>=0). An entry's hash covers every function its
 # native replays, callees in other chunks included, and every loop the
 # translator extracted from them (below). ---
-SEVENTH_GROUPS = ("libm", "bgblk", "rot", "calc", "geom")
+SEVENTH_GROUPS = ("libm", "bgblk", "rot", "calc", "geom", "jas")
 for _group in SEVENTH_GROUPS:
     GROUPS[_group] = (f"native_{_group}.h", f"bluewake_native_{_group}_enabled",
                       f"bluewake_native_{_group}_{{entry:08X}}(ctx)")
@@ -706,6 +706,11 @@ ENTRIES[0x8008A230] = ("dKyw_pntwind_get_info", "geom",
                        [(0x800896E0, 0x8008A230, 0x8008A4C8), (0x800896E0, 0x8008AB94, 0x8008ABB4),
                         (0x800896E0, 0x8008AB3C, 0x8008AB94), (0x800896E0, 0x8008AA30, 0x8008AB3C),
                         (0x8030D6E0, 0x8030E0B4, 0x8030E0DC)], "75a157aa0ed5da750247a1ffa39350fa1a0458d6a6946f34fed0ec9c23ca0931")
+_N7_OSC_CALC = [(0x8028D6E0, 0x8028E238, 0x8028E5EC), (0x802896E0, 0x8028AAE4, 0x8028AAEC),
+                (0x803256E0, 0x80328E10, 0x80328E6C)]
+ENTRIES[0x8028DF2C] = ("JASystem::TOscillator::getOffset", "jas",
+                       [(0x8028D6E0, 0x8028DF2C, 0x8028E070)] + _N7_OSC_CALC, "7cb77832418511d9ad74d93d9d9657cb8c7c6040f215e6193208099688495c3f")
+ENTRIES[0x8028E238] = ("JASystem::TOscillator::calc", "jas", _N7_OSC_CALC, "da25f5b3a551431910c890ed98403ad4064be6e8b563ff40961e1dee7f78f280")
 _entry_hash_sixth = entry_hash
 
 
