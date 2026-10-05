@@ -1,0 +1,608 @@
+From c680b4e3c84dfaef0081fb8d87c4e90e0159f4f7 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Mon, 5 Oct 2026 01:09:07 -0400
+Subject: [PATCH] gxcore: a fast path for the vertex decode
+
+build_draw_plan_into's vertex loop interprets the walk for every element
+of every vertex: the entry's kind, its index width, the format of each
+component, the array lookup and the payload bounds, each a branch. It
+was the largest part of the GX worker's busy time at the sea (about 30
+percent, 2026-10-05). decode_vertices_fast first reduces each entry to
+an op (format and component count in one code, the array's base,
+stride and last valid offset), checks the payload's size once for the
+draw, and decodes with the same expressions, so the same floats. A draw
+it does not take (normal+binormal+tangent, an unknown format, an
+unresolved array, a short payload) or an index outside its array's
+bounds goes to the interpreting loop, which decodes it as before, with
+its counters. DOL_GXCORE_FAST_DECODE=0 leaves every draw to that loop;
+=verify decodes each draw both ways and reports a difference.
+
+gxcore_tests pass with it on, off and verifying (no difference); a tour
+of nine places verifying found only a skinned mesh the game rewrote
+between the two decodes. Smooth Motion dumps at six places: real and
+in-between frames identical.
+---
+ GXRuntime/graphics/gxcore/src/gxcore.cpp | 546 +++++++++++++++++------
+ 1 file changed, 404 insertions(+), 142 deletions(-)
+
+diff --git a/GXRuntime/graphics/gxcore/src/gxcore.cpp b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+index a07b7ee5..98b52b9f 100644
+--- a/GXRuntime/graphics/gxcore/src/gxcore.cpp
++++ b/GXRuntime/graphics/gxcore/src/gxcore.cpp
+@@ -572,6 +572,230 @@ const ar::ConsumedArrayInput* find_array(const ar::ConsumedDraw& draw,
+   return nullptr;
+ }
+ 
++// --- The vertex decode's fast path ---------------------------------------------
++//
++// build_draw_plan_into's vertex loop interprets the walk for every element of
++// every vertex: the entry's kind, its index width, its format per component,
++// the array lookup and the payload bounds, each a branch (a third of the GX
++// worker's busy time at the sea, 2026-10-05). For the common draws this
++// decodes the same values once each entry is reduced to an op: the format and
++// component count in one code, the array's base, stride and last valid
++// offset, the payload's bounds checked once for the draw. A draw it does not
++// take (normal+binormal+tangent, an unknown format, an unresolved array, a
++// payload too short) or an index out of its array's bounds returns false, and
++// the interpreting loop decodes the draw as before, with its counters.
++// DOL_GXCORE_FAST_DECODE=0 leaves every draw to that loop; =verify decodes
++// each draw both ways and reports a difference (debug).
++struct FastOp {
++  enum Code : std::uint8_t {
++    kPosMtx,  // the PNMTXIDX byte
++    kTexMtx,  // a TEXMTXIDX byte, for texgen `aux`
++    kSkip,    // an attribute this layout has no room for: consumed only
++    kColor,   // a colour of format `aux`
++    kComps,   // `count` components of format `aux`, times `scale`
++  };
++  Code code = kSkip;
++  std::uint8_t aux = 0;
++  std::uint8_t count = 0;
++  std::uint8_t index = 0;   // 0 direct, 1 an 8-bit index, 2 a 16-bit one
++  std::uint32_t advance = 0; // payload bytes the entry takes
++  std::uint32_t dst = 0;     // the output's first float in the vertex
++  const std::uint8_t* base = nullptr;
++  std::uint32_t stride = 0;
++  std::uint32_t last = 0;    // the last offset an element may start at
++  float scale = 1.f;
++};
++
++template <std::uint32_t Format>
++inline float fast_component(const std::uint8_t* p, float scale) {
++  if constexpr (Format == 0u)
++    return static_cast<float>(p[0]) * scale;
++  else if constexpr (Format == 1u)
++    return static_cast<float>(static_cast<std::int8_t>(p[0])) * scale;
++  else if constexpr (Format == 2u)
++    return static_cast<float>(load_be16(p)) * scale;
++  else if constexpr (Format == 3u)
++    return static_cast<float>(static_cast<std::int16_t>(load_be16(p))) * scale;
++  else {
++    const std::uint32_t v = load_be32(p);
++    float f;
++    std::memcpy(&f, &v, sizeof f);
++    return f;
++  }
++}
++
++template <std::uint32_t Format>
++inline void fast_components(const std::uint8_t* p, std::uint32_t count, float scale, float* dst) {
++  constexpr std::uint32_t size = Format <= 1u ? 1u : Format <= 3u ? 2u : 4u;
++  dst[0] = fast_component<Format>(p, scale);
++  if (count > 1u)
++    dst[1] = fast_component<Format>(p + size, scale);
++  if (count > 2u)
++    dst[2] = fast_component<Format>(p + 2u * size, scale);
++}
++
++const std::array<float, 256>& unorm8_table() {
++  static const auto table = [] {
++    std::array<float, 256> t{};
++    for (std::uint32_t i = 0; i < 256u; ++i)
++      t[i] = static_cast<float>(i) / 255.f;
++    return t;
++  }();
++  return table;
++}
++
++// The draw's vertices into `out` (zeroed, vertex_count * vertex_floats), as
++// the interpreting loop makes them; false to leave the draw to it.
++bool decode_vertices_fast(const WalkLayout& walk, const ar::ConsumedDraw& draw,
++                          const ar::ConsumedArrayInput* const entry_arrays[24], const float entry_scales[24],
++                          bool full_layout, std::uint32_t vertex_floats, float* out) {
++  if (walk.has_nbt || walk.entry_count > 24u ||
++      static_cast<std::uint64_t>(draw.vertex_count) * walk.vertex_size > draw.vertex_payload.size())
++    return false;
++  FastOp ops[24];
++  std::uint32_t normals = 0;
++  for (std::uint32_t e = 0; e < walk.entry_count; ++e) {
++    const WalkEntry& entry = walk.entries[e];
++    FastOp& op = ops[e];
++    if (entry.kind == WalkEntry::kPosMtxIdx || entry.kind == WalkEntry::kTexMtxIdx) {
++      op.code = entry.kind == WalkEntry::kPosMtxIdx ? FastOp::kPosMtx : FastOp::kTexMtx;
++      op.aux = entry.out_slot;
++      op.advance = 1u;
++      continue;
++    }
++    if (entry.vcd_type == 1u) {
++      op.advance = entry.element_size;
++    } else {
++      const ar::ConsumedArrayInput* array = entry_arrays[e];
++      if (array == nullptr || !array->resolved || array->host_data == nullptr ||
++          array->host_available < entry.element_size)
++        return false;
++      op.index = entry.vcd_type == 2u ? 1u : 2u;
++      op.advance = op.index;
++      op.base = static_cast<const std::uint8_t*>(array->host_data);
++      op.stride = array->stride;
++      op.last = array->host_available - entry.element_size;
++    }
++    op.scale = entry_scales[e];
++    switch (entry.kind) {
++    case WalkEntry::kPos:
++      if (entry.format > 4u || entry.count < 1u || entry.count > 3u)
++        return false;
++      op.code = FastOp::kComps;
++      op.aux = entry.format;
++      op.count = entry.count;
++      op.dst = kVertexPosOffset / 4u;
++      break;
++    case WalkEntry::kNormal:
++      if (entry.format > 4u || entry.count != 3u || ++normals > 1u)
++        return false;
++      op.code = FastOp::kComps;
++      op.aux = entry.format;
++      op.count = 3u;
++      op.dst = kVertexNormalOffset / 4u;
++      break;
++    case WalkEntry::kColor:
++      if (entry.format > 5u)
++        return false;
++      if (entry.out_slot == 0u || full_layout) {
++        op.code = FastOp::kColor;
++        op.aux = entry.format;
++        op.dst = (entry.out_slot == 0u ? kVertexColor0Offset : kVertexColor1Offset) / 4u;
++      }
++      break;
++    case WalkEntry::kTex:
++      if (entry.format > 4u || entry.count < 1u || entry.count > 2u)
++        return false;
++      if (entry.out_slot < kMaxTexGens && (entry.out_slot < 2u || full_layout)) {
++        op.code = FastOp::kComps;
++        op.aux = entry.format;
++        op.count = entry.count;
++        op.dst = vertex_uv_offset(entry.out_slot) / 4u;
++      }
++      break;
++    default:
++      return false;
++    }
++  }
++  const std::array<float, 256>& unorm8 = unorm8_table();
++  const std::uint8_t* payload = draw.vertex_payload.data();
++  const std::uint32_t entry_count = walk.entry_count;
++  const std::uint32_t default_row = draw.current_pn_matrix * 3u;
++  for (std::uint32_t v = 0; v < draw.vertex_count; ++v) {
++    float* const vertex = out + static_cast<std::size_t>(v) * vertex_floats;
++    float* const color0 = vertex + kVertexColor0Offset / 4u;
++    color0[0] = color0[1] = color0[2] = color0[3] = 1.f;
++    if (full_layout) {
++      float* const color1 = vertex + kVertexColor1Offset / 4u;
++      color1[0] = color1[1] = color1[2] = color1[3] = 1.f;
++    }
++    std::uint32_t posmtx_row = default_row;
++    std::uint32_t texmtx_lo = 0;
++    std::uint32_t texmtx_hi = 0;
++    const std::uint8_t* p = payload + static_cast<std::size_t>(v) * walk.vertex_size;
++    for (std::uint32_t e = 0; e < entry_count; ++e) {
++      const FastOp& op = ops[e];
++      if (op.code == FastOp::kPosMtx) {
++        posmtx_row = p[0];
++        p += 1;
++        continue;
++      }
++      if (op.code == FastOp::kTexMtx) {
++        if (op.aux < 4u)
++          texmtx_lo |= static_cast<std::uint32_t>(p[0]) << (8u * op.aux);
++        else if (op.aux < 8u)
++          texmtx_hi |= static_cast<std::uint32_t>(p[0]) << (8u * (op.aux - 4u));
++        p += 1;
++        continue;
++      }
++      const std::uint8_t* element = p;
++      if (op.index != 0u) {
++        const std::uint32_t index = op.index == 1u ? p[0] : load_be16(p);
++        const std::uint64_t offset = static_cast<std::uint64_t>(index) * op.stride;
++        if (offset > op.last)
++          return false;
++        element = op.base + offset;
++      }
++      p += op.advance;
++      float* const dst = vertex + op.dst;
++      switch (op.code) {
++      case FastOp::kComps:
++        switch (op.aux) {
++        case 0u: fast_components<0u>(element, op.count, op.scale, dst); break;
++        case 1u: fast_components<1u>(element, op.count, op.scale, dst); break;
++        case 2u: fast_components<2u>(element, op.count, op.scale, dst); break;
++        case 3u: fast_components<3u>(element, op.count, op.scale, dst); break;
++        default: fast_components<4u>(element, op.count, op.scale, dst); break;
++        }
++        break;
++      case FastOp::kColor:
++        if (op.aux == 5u) { // RGBA8888
++          dst[0] = unorm8[element[0]];
++          dst[1] = unorm8[element[1]];
++          dst[2] = unorm8[element[2]];
++          dst[3] = unorm8[element[3]];
++        } else if (op.aux == 1u || op.aux == 2u) { // RGB888, RGB888x
++          dst[0] = unorm8[element[0]];
++          dst[1] = unorm8[element[1]];
++          dst[2] = unorm8[element[2]];
++          dst[3] = 1.f;
++        } else {
++          decode_color(element, op.aux, dst);
++        }
++        break;
++      default:
++        break;
++      }
++    }
++    std::memcpy(vertex + kVertexPosMtxOffset / 4u, &posmtx_row, sizeof posmtx_row);
++    if (full_layout) {
++      std::memcpy(vertex + kVertexTexMtxIdxOffset / 4u, &texmtx_lo, sizeof texmtx_lo);
++      std::memcpy(vertex + kVertexTexMtxIdxHiOffset / 4u, &texmtx_hi, sizeof texmtx_hi);
++    }
++  }
++  return true;
++}
++
+ // Matrix-memory row -> 4 floats, from the draw's captured XF matrix state.
+ // Rows 0-29 live in position_matrices (3 rows per matrix), rows 30-62 in
+ // tex_matrices. Returns false when any word of the row was never written.
+@@ -1344,162 +1568,200 @@ void GxCoreState::build_draw_plan_into(const ar::ConsumedDraw& draw,
+       entry_arrays[e] = find_array(draw, entry.attr);
+     entry_scales[e] = 1.f / static_cast<float>(1u << entry.frac);
+   }
+-  for (std::uint32_t v = 0; v < draw.vertex_count; ++v) {
+-    float* out_vertex = plan.vertices.data() +
+-                        static_cast<std::size_t>(v) * vertex_floats;
+-    // Defaults: color0/1 white, uv 0, posmtx = current matrix's first row.
+-    // (A compact draw's pipeline reads color1's white from the default stream.)
+-    float* const color0 = out_vertex + kVertexColor0Offset / 4u;
+-    color0[0] = color0[1] = color0[2] = color0[3] = 1.f;
+-    if (full_layout) {
+-      float* const color1 = out_vertex + kVertexColor1Offset / 4u;
+-      color1[0] = color1[1] = color1[2] = color1[3] = 1.f;
++  // The fast path first (decode_vertices_fast); the interpreting loop for
++  // the draws it does not take, and to check it (=verify).
++  static const int fast_decode = [] {
++    const char* env = std::getenv("DOL_GXCORE_FAST_DECODE");
++    if (env != nullptr && std::strcmp(env, "verify") == 0)
++      return 2;
++    return env != nullptr && env[0] == '0' ? 0 : 1;
++  }();
++  static thread_local std::vector<float> fast_copy;
++  bool decoded = false;
++  bool verify_decode = false;
++  if (fast_decode != 0) {
++    decoded = decode_vertices_fast(walk, draw, entry_arrays, entry_scales, full_layout, vertex_floats,
++                                   plan.vertices.data());
++    if (decoded && fast_decode == 2) {
++      fast_copy.assign(plan.vertices.begin(), plan.vertices.end());
++      decoded = false;
++      verify_decode = true;
+     }
+-    // NBT part ordinal for index3 (three separate normal/binormal/tangent
+-    // entries); a single 9-component entry decodes all three at once.
+-    std::uint32_t normal_part = 0;
+-    std::uint32_t posmtx_row = draw.current_pn_matrix * 3u;
+-    std::uint32_t texmtxidx_packed = 0; // texgens 0..3, one byte each
+-    std::uint32_t texmtxidx_packed_hi = 0; // texgens 4..7, one byte each
+-    std::size_t offset =
+-        static_cast<std::size_t>(v) * walk.vertex_size;
+-    for (std::uint32_t e = 0; e < walk.entry_count; ++e) {
+-      const WalkEntry& entry = walk.entries[e];
+-      if (offset >= payload_size) {
+-        ++counters.vertex_decode_failures;
+-        ++counters.vertex_payload_overrun;
+-        return skip("payload overrun");
+-      }
+-      const std::uint8_t* p = payload + offset;
+-      const std::uint8_t* element = nullptr;
+-      std::uint32_t advance = 0;
+-      if (entry.kind == WalkEntry::kPosMtxIdx) {
+-        posmtx_row = p[0];
+-        offset += 1;
+-        continue;
+-      }
+-      if (entry.kind == WalkEntry::kTexMtxIdx) {
+-        // GX per-vertex TEXMTXIDX: the byte is a matrix-memory row index (GX
+-        // pre-multiplies by 3, same convention as PNMTXIDX). Pack one byte per
+-        // texgen so the VS can select transformmatrices[row] per vertex.
+-        if (entry.out_slot < 4u) {
+-          texmtxidx_packed |= static_cast<std::uint32_t>(p[0])
+-                              << (8u * entry.out_slot);
+-        } else if (entry.out_slot < 8u) {
+-          texmtxidx_packed_hi |= static_cast<std::uint32_t>(p[0])
+-                                 << (8u * (entry.out_slot - 4u));
+-        }
+-        offset += 1;
+-        continue;
++    if (!decoded) // what it wrote before it gave up, or its copy (=verify)
++      std::fill(plan.vertices.begin(), plan.vertices.end(), 0.f);
++  }
++  if (!decoded) {
++    for (std::uint32_t v = 0; v < draw.vertex_count; ++v) {
++      float* out_vertex = plan.vertices.data() +
++                          static_cast<std::size_t>(v) * vertex_floats;
++      // Defaults: color0/1 white, uv 0, posmtx = current matrix's first row.
++      // (A compact draw's pipeline reads color1's white from the default stream.)
++      float* const color0 = out_vertex + kVertexColor0Offset / 4u;
++      color0[0] = color0[1] = color0[2] = color0[3] = 1.f;
++      if (full_layout) {
++        float* const color1 = out_vertex + kVertexColor1Offset / 4u;
++        color1[0] = color1[1] = color1[2] = color1[3] = 1.f;
+       }
+-      if (entry.vcd_type == 1u) {
+-        element = p;
+-        advance = entry.element_size;
+-      } else {
+-        const std::uint32_t idx_size = entry.vcd_type == 2u ? 1u : 2u;
+-        const std::uint32_t index = idx_size == 1u ? p[0] : load_be16(p);
+-        advance = idx_size;
+-        const ar::ConsumedArrayInput* array = entry_arrays[e];
+-        if (array == nullptr || !array->resolved ||
+-            array->host_data == nullptr) {
++      // NBT part ordinal for index3 (three separate normal/binormal/tangent
++      // entries); a single 9-component entry decodes all three at once.
++      std::uint32_t normal_part = 0;
++      std::uint32_t posmtx_row = draw.current_pn_matrix * 3u;
++      std::uint32_t texmtxidx_packed = 0; // texgens 0..3, one byte each
++      std::uint32_t texmtxidx_packed_hi = 0; // texgens 4..7, one byte each
++      std::size_t offset =
++          static_cast<std::size_t>(v) * walk.vertex_size;
++      for (std::uint32_t e = 0; e < walk.entry_count; ++e) {
++        const WalkEntry& entry = walk.entries[e];
++        if (offset >= payload_size) {
+           ++counters.vertex_decode_failures;
+-          ++counters.vertex_array_unresolved;
+-          return skip("indexed attr has no resolved array");
++          ++counters.vertex_payload_overrun;
++          return skip("payload overrun");
+         }
+-        const std::uint64_t element_offset =
+-            static_cast<std::uint64_t>(index) * array->stride;
+-        if (element_offset + entry.element_size > array->host_available) {
+-          ++counters.vertex_decode_failures;
+-          ++counters.vertex_array_out_of_bounds;
+-          return skip("indexed element outside resolved array");
++        const std::uint8_t* p = payload + offset;
++        const std::uint8_t* element = nullptr;
++        std::uint32_t advance = 0;
++        if (entry.kind == WalkEntry::kPosMtxIdx) {
++          posmtx_row = p[0];
++          offset += 1;
++          continue;
+         }
+-        element =
+-            static_cast<const std::uint8_t*>(array->host_data) +
+-            element_offset;
+-      }
+-      offset += advance;
+-
+-      switch (entry.kind) {
+-      case WalkEntry::kPos: {
+-        std::uint32_t scalar = 0;
+-        component_scalar_size(entry.format, &scalar);
+-        const float scale = entry_scales[e];
+-        for (std::uint32_t c = 0; c < entry.count && c < 3u; ++c)
+-          out_vertex[c] = decode_scaled(element + c * scalar, entry.format, scale);
+-        if (entry.count == 2u)
+-          out_vertex[2] = 0.f;
+-        break;
+-      }
+-      case WalkEntry::kColor: {
+-        float rgba[4];
+-        decode_color(element, entry.format, rgba);
+-        // color1 is only in the full layout, which a format with it gets.
+-        if (entry.out_slot == 0u || full_layout) {
+-          float* dst = out_vertex + (entry.out_slot == 0u ? kVertexColor0Offset : kVertexColor1Offset) / 4u;
+-          for (int c = 0; c < 4; ++c)
+-            dst[c] = rgba[c];
++        if (entry.kind == WalkEntry::kTexMtxIdx) {
++          // GX per-vertex TEXMTXIDX: the byte is a matrix-memory row index (GX
++          // pre-multiplies by 3, same convention as PNMTXIDX). Pack one byte per
++          // texgen so the VS can select transformmatrices[row] per vertex.
++          if (entry.out_slot < 4u) {
++            texmtxidx_packed |= static_cast<std::uint32_t>(p[0])
++                                << (8u * entry.out_slot);
++          } else if (entry.out_slot < 8u) {
++            texmtxidx_packed_hi |= static_cast<std::uint32_t>(p[0])
++                                   << (8u * (entry.out_slot - 4u));
++          }
++          offset += 1;
++          continue;
+         }
+-        break;
+-      }
+-      case WalkEntry::kTex: {
+-        // uv2-4 are only in the full layout, which a format with them gets.
+-        if (entry.out_slot < kMaxTexGens && (entry.out_slot < 2u || full_layout)) {
++        if (entry.vcd_type == 1u) {
++          element = p;
++          advance = entry.element_size;
++        } else {
++          const std::uint32_t idx_size = entry.vcd_type == 2u ? 1u : 2u;
++          const std::uint32_t index = idx_size == 1u ? p[0] : load_be16(p);
++          advance = idx_size;
++          const ar::ConsumedArrayInput* array = entry_arrays[e];
++          if (array == nullptr || !array->resolved ||
++              array->host_data == nullptr) {
++            ++counters.vertex_decode_failures;
++            ++counters.vertex_array_unresolved;
++            return skip("indexed attr has no resolved array");
++          }
++          const std::uint64_t element_offset =
++              static_cast<std::uint64_t>(index) * array->stride;
++          if (element_offset + entry.element_size > array->host_available) {
++            ++counters.vertex_decode_failures;
++            ++counters.vertex_array_out_of_bounds;
++            return skip("indexed element outside resolved array");
++          }
++          element =
++              static_cast<const std::uint8_t*>(array->host_data) +
++              element_offset;
++        }
++        offset += advance;
++
++        switch (entry.kind) {
++        case WalkEntry::kPos: {
+           std::uint32_t scalar = 0;
+           component_scalar_size(entry.format, &scalar);
+-          float* dst = out_vertex + vertex_uv_offset(entry.out_slot) / 4u;
+           const float scale = entry_scales[e];
+-          dst[0] = decode_scaled(element, entry.format, scale);
+-          dst[1] = entry.count == 2u
+-                       ? decode_scaled(element + scalar, entry.format, scale)
+-                       : 0.f;
++          for (std::uint32_t c = 0; c < entry.count && c < 3u; ++c)
++            out_vertex[c] = decode_scaled(element + c * scalar, entry.format, scale);
++          if (entry.count == 2u)
++            out_vertex[2] = 0.f;
++          break;
+         }
+-        break;
+-      }
+-      case WalkEntry::kNormal: {
+-        // Normal (+ NBT binormal/tangent for emboss texgens). A single 9-part
+-        // entry (direct or non-index3 indexed) holds N,B,T contiguously; index3
+-        // arrives as three count==3 entries routed by normal_part.
+-        std::uint32_t scalar = 0;
+-        component_scalar_size(entry.format, &scalar);
+-        const float scale = entry_scales[e];
+-        auto decode3 = [&](const std::uint8_t* src, std::uint32_t dst_off) {
+-          // Binormal and tangent are in the full layout only (N/B/T makes a
+-          // draw full).
+-          if (dst_off >= kCompactVertexStrideBytes && !full_layout)
+-            return;
+-          float* dst = out_vertex + dst_off / 4u;
+-          for (std::uint32_t c = 0; c < 3u; ++c)
+-            dst[c] = decode_scaled(src + c * scalar, entry.format, scale);
+-        };
+-        if (entry.count >= 9u) {
+-          decode3(element, kVertexNormalOffset);
+-          decode3(element + 3u * scalar, kVertexBinormalOffset);
+-          decode3(element + 6u * scalar, kVertexTangentOffset);
+-          normal_part = 3;
+-        } else if (normal_part == 0u) {
+-          decode3(element, kVertexNormalOffset);
+-          normal_part = 1;
+-        } else if (normal_part == 1u) {
+-          decode3(element, kVertexBinormalOffset);
+-          normal_part = 2;
+-        } else if (normal_part == 2u) {
+-          decode3(element, kVertexTangentOffset);
+-          normal_part = 3;
++        case WalkEntry::kColor: {
++          float rgba[4];
++          decode_color(element, entry.format, rgba);
++          // color1 is only in the full layout, which a format with it gets.
++          if (entry.out_slot == 0u || full_layout) {
++            float* dst = out_vertex + (entry.out_slot == 0u ? kVertexColor0Offset : kVertexColor1Offset) / 4u;
++            for (int c = 0; c < 4; ++c)
++              dst[c] = rgba[c];
++          }
++          break;
++        }
++        case WalkEntry::kTex: {
++          // uv2-4 are only in the full layout, which a format with them gets.
++          if (entry.out_slot < kMaxTexGens && (entry.out_slot < 2u || full_layout)) {
++            std::uint32_t scalar = 0;
++            component_scalar_size(entry.format, &scalar);
++            float* dst = out_vertex + vertex_uv_offset(entry.out_slot) / 4u;
++            const float scale = entry_scales[e];
++            dst[0] = decode_scaled(element, entry.format, scale);
++            dst[1] = entry.count == 2u
++                         ? decode_scaled(element + scalar, entry.format, scale)
++                         : 0.f;
++          }
++          break;
++        }
++        case WalkEntry::kNormal: {
++          // Normal (+ NBT binormal/tangent for emboss texgens). A single 9-part
++          // entry (direct or non-index3 indexed) holds N,B,T contiguously; index3
++          // arrives as three count==3 entries routed by normal_part.
++          std::uint32_t scalar = 0;
++          component_scalar_size(entry.format, &scalar);
++          const float scale = entry_scales[e];
++          auto decode3 = [&](const std::uint8_t* src, std::uint32_t dst_off) {
++            // Binormal and tangent are in the full layout only (N/B/T makes a
++            // draw full).
++            if (dst_off >= kCompactVertexStrideBytes && !full_layout)
++              return;
++            float* dst = out_vertex + dst_off / 4u;
++            for (std::uint32_t c = 0; c < 3u; ++c)
++              dst[c] = decode_scaled(src + c * scalar, entry.format, scale);
++          };
++          if (entry.count >= 9u) {
++            decode3(element, kVertexNormalOffset);
++            decode3(element + 3u * scalar, kVertexBinormalOffset);
++            decode3(element + 6u * scalar, kVertexTangentOffset);
++            normal_part = 3;
++          } else if (normal_part == 0u) {
++            decode3(element, kVertexNormalOffset);
++            normal_part = 1;
++          } else if (normal_part == 1u) {
++            decode3(element, kVertexBinormalOffset);
++            normal_part = 2;
++          } else if (normal_part == 2u) {
++            decode3(element, kVertexTangentOffset);
++            normal_part = 3;
++          }
++          break;
++        }
++        default:
++          break;
+         }
+-        break;
+       }
+-      default:
+-        break;
++      std::memcpy(out_vertex + kVertexPosMtxOffset / 4u, &posmtx_row, sizeof posmtx_row);
++      // The tex-matrix indices (zero without a TEXMTXIDX, which makes a draw
++      // full) are in the full layout only.
++      if (full_layout) {
++        std::memcpy(out_vertex + kVertexTexMtxIdxOffset / 4u, &texmtxidx_packed,
++                    sizeof texmtxidx_packed);
++        std::memcpy(out_vertex + kVertexTexMtxIdxHiOffset / 4u,
++                    &texmtxidx_packed_hi, sizeof texmtxidx_packed_hi);
+       }
+     }
+-    std::memcpy(out_vertex + kVertexPosMtxOffset / 4u, &posmtx_row, sizeof posmtx_row);
+-    // The tex-matrix indices (zero without a TEXMTXIDX, which makes a draw
+-    // full) are in the full layout only.
+-    if (full_layout) {
+-      std::memcpy(out_vertex + kVertexTexMtxIdxOffset / 4u, &texmtxidx_packed,
+-                  sizeof texmtxidx_packed);
+-      std::memcpy(out_vertex + kVertexTexMtxIdxHiOffset / 4u,
+-                  &texmtxidx_packed_hi, sizeof texmtxidx_packed_hi);
++  }
++  if (verify_decode &&
++      std::memcmp(fast_copy.data(), plan.vertices.data(), fast_copy.size() * sizeof(float)) != 0) {
++    static int reported = 0;
++    if (reported++ < 20) {
++      std::size_t at = 0;
++      while (at < fast_copy.size() &&
++             std::memcmp(&fast_copy[at], &plan.vertices[at], sizeof(float)) == 0)
++        ++at;
++      std::fprintf(stderr,
++                   "[fast-decode] differs: vtx_fmt=%u vertices=%u floats=%u at vertex %zu float %zu: %a, interpreted %a\n",
++                   draw.vtx_fmt, draw.vertex_count, vertex_floats, at / vertex_floats, at % vertex_floats,
++                   fast_copy[at], plan.vertices[at]);
+     }
+   }
+ 
+-- 
+2.45.2.windows.1
+

@@ -1,0 +1,114 @@
+From 11c1369c56a04de086a053de491f365b7d0274a8 Mon Sep 17 00:00:00 2001
+From: elliotttate <elliotttate@gmail.com>
+Date: Mon, 5 Oct 2026 01:09:07 -0400
+Subject: [PATCH] aurora: passes' command lists keep their capacity from frame
+ to frame
+
+Each frame's render passes took new command lists (an EFB pass reserves
+2,048 commands, about half a megabyte), which the heap handed out as
+fresh pages that the GX worker's first stores faulted in on every frame.
+A frame packet's lists now go back to a pool, emptied, when the packet
+is reset, and new passes take them from there.
+---
+ GXRuntime/graphics/aurora/lib/gfx/common.cpp | 40 +++++++++++++++++++-
+ 1 file changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/GXRuntime/graphics/aurora/lib/gfx/common.cpp b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+index 0799bafc..04041b2e 100644
+--- a/GXRuntime/graphics/aurora/lib/gfx/common.cpp
++++ b/GXRuntime/graphics/aurora/lib/gfx/common.cpp
+@@ -601,6 +601,37 @@ static FramePacket& current_frame_packet() {
+ 
+ static RenderPassList& current_render_passes() { return current_frame_packet().renderPasses; }
+ 
++// Passes' command lists keep their capacity from frame to frame. Each frame's
++// passes took new ones (an EFB pass reserves 2,048 commands, half a megabyte),
++// which the heap handed out as fresh pages, faulted in on every frame by the
++// GX worker's first stores.
++static std::mutex g_commandListPoolMutex;
++static std::vector<CommandList> g_commandListPool;
++
++static CommandList take_command_list(size_t reserve) {
++  CommandList list;
++  {
++    std::lock_guard lock{g_commandListPoolMutex};
++    if (!g_commandListPool.empty()) {
++      list = std::move(g_commandListPool.back());
++      g_commandListPool.pop_back();
++    }
++  }
++  list.reserve(reserve);
++  return list;
++}
++
++// Before a packet is reset: its passes' command lists, emptied, to the pool.
++static void recycle_command_lists(FramePacket& packet) {
++  std::lock_guard lock{g_commandListPoolMutex};
++  for (auto& pass : packet.renderPasses) {
++    if (pass.commands.capacity() == 0 || g_commandListPool.size() >= 64)
++      continue;
++    pass.commands.clear();
++    g_commandListPool.push_back(std::move(pass.commands));
++  }
++}
++
+ static StagingHighWater current_high_water(const FramePacket& frame) noexcept {
+   return {
+       .verts = static_cast<uint32_t>(frame.verts.size()),
+@@ -769,7 +800,7 @@ void begin_color_pass(const ColorPassDescriptor& desc) {
+       .hasStencil = desc.hasStencil,
+       .observable = desc.observable,
+   };
+-  pass.commands.reserve(128);
++  pass.commands = take_command_list(128);
+   frame.renderPasses.emplace_back(std::move(pass));
+   g_currentRenderPass = static_cast<uint32_t>(frame.renderPasses.size() - 1);
+ 
+@@ -895,7 +926,7 @@ void resolve_pass(TextureHandle texture, ClipRect rect, bool clearColor, bool cl
+       .hasDepth = prevPass.hasDepth,
+       .hasStencil = prevPass.hasStencil,
+   };
+-  newPass.commands.reserve(2048);
++  newPass.commands = take_command_list(2048);
+   current_render_passes().emplace_back(std::move(newPass));
+   ++g_currentRenderPass;
+ 
+@@ -1552,6 +1583,7 @@ bool begin_frame(bool preserveEfb) {
+   }
+ 
+   auto& frame = g_framePackets[frameSlot];
++  recycle_command_lists(frame);
+   frame = {};
+   frame.frameId = g_nextFrameId++;
+   frame.frameIndex = g_frameIndex;
+@@ -1590,6 +1622,7 @@ bool begin_frame(bool preserveEfb) {
+ 
+   current_render_passes().emplace_back();
+   auto& pass = current_render_passes()[0];
++  pass.commands = take_command_list(2048);
+   pass.label = pass_label("EFB");
+   set_efb_targets(pass);
+   pass.clearColorValue = gx::g_gxState.clearColor;
+@@ -1781,6 +1814,7 @@ void end_frame(EndFrameCallback callback) {
+       hold = !interpolate && callback && periodKnown && frame_interp::enabled();
+     }
+     if (!interpolate) {
++      recycle_command_lists(packet);
+       packet = {};
+     }
+     g_stats.drawCallCount = stats.drawCallCount;
+@@ -1803,9 +1837,11 @@ void end_frame(EndFrameCallback callback) {
+       run_deferred_present();
+     if (clocked) {
+       present_steps(packet, frameSlot, encoder, callback, steps);
++      recycle_command_lists(packet);
+       packet = {};
+     } else if (interpolate) {
+       present_with_in_between(packet, frameSlot, encoder, callback);
++      recycle_command_lists(packet);
+       packet = {};
+     } else if (hold) {
+       present_held(encoder, callback, steps);
+-- 
+2.45.2.windows.1
+
