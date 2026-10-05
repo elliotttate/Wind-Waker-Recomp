@@ -145,7 +145,7 @@ static void clock_edges(CPUState* c, unsigned scenario, s64 cycles) {
 /* What a pipe hands the host, in order: 'W' size value for a word to the
  * writer, 'B' length bytes for a run of bytes. */
 typedef struct PipeLog {
-    u8 data[65536];
+    u8 data[1u << 20];
     u32 length;
 } PipeLog;
 static PipeLog log_module, log_native, log_model;
@@ -219,12 +219,17 @@ static u32 log_stream(const PipeLog* log, u8* out) {
  * translation's (gather_pipe_batch.h: a run of bytes through the batch entry
  * point is the same stream). */
 static bool same_logs(const PipeLog* a, const PipeLog* b) {
-    static u8 sa[65536], sb[65536];
+    static u8 sa[1u << 20], sb[1u << 20];
     const u32 na = log_stream(a, sa), nb = log_stream(b, sb);
     return na == nb && memcmp(sa, sb, na) == 0;
 }
 
 static u32 log_words(const PipeLog* log) { return log->length / 10u; }
+
+static void copy_log(PipeLog* to, const PipeLog* from) {
+    to->length = from->length;
+    memcpy(to->data, from->data, from->length);
+}
 
 /* --- The module. --------------------------------------------------------- */
 
@@ -539,7 +544,8 @@ static int harness_case(Harness* h, NativeFn native_fn, u32 entry, const char* n
         report_ram(h->native_ram, h->reference_ram);
         exit(1);
     }
-    const PipeLog native_log = log_native;
+    static PipeLog native_log;
+    copy_log(&native_log, &log_native);
     pipe_model(pipe->mode, pipe->prefill);
     if (!same_logs(&native_log, &log_model)) {
         fprintf(stderr, "case %u (%s, seed %08X, mode %u, prefill %u): the pipe differs (%u translation stores)\n",
