@@ -20,6 +20,11 @@ tangent 1.4 million, the quaternions 1.5 million) but each saves tens of nanosec
 mostly declines: the turn's budget cannot hold its loop (`clock` declines), so the decline gate leaves it to the
 translation. A native that must finish inside the turn cannot take a function longer than the turn's slice.
 
+**Tried and dropped:** the delta upload (0145) extended to constant blocks and indices. Exact (dumps identical at
+seven places), and constant uploads 3-27 percent smaller (most blocks change as the camera moves), but comparing
+every block with the shadow cost the GX worker 3-5 percent (four E-cores), more than the upload it saved is worth
+on a CPU-bound PC. Not committed.
+
 ## 2026-10-05 Vertices the GPU already holds are not sent again: the frame's upload 87-93 percent below this morning's
 
 **What repeats.** A diagnostic hashing each draw's decoded vertices found 94-98 percent of a frame's vertex bytes
