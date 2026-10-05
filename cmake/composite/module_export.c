@@ -26,7 +26,7 @@
  * (native_draw.c). */
 #include "native_draw.h"
 /* Certified native entries, the seventh set: leaf compute code (native_libm.c, native_bgblk.c,
- * native_rot.c, native_geom.c). */
+ * native_rot.c, native_calc.c, native_geom.c, native_jas.c). */
 #include "native_libm.h"
 #include "native_bgblk.h"
 #include "native_rot.h"
@@ -305,8 +305,8 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
              * random numbers and angle built on it, and its sin, cos and
              * tan; the collision blocks' bounds; the Euler quaternions; the
              * arc tangents; the planes, polar coordinates and point winds;
-             * JASystem's envelope oscillators - with the
-             * same switch, and one per group:
+             * JASystem's envelope oscillators and a channel's effector
+             * parameters - with the same switch, and one per group:
              * BLUEWAKE_NATIVE_LIBM=0, BLUEWAKE_NATIVE_BGBLK=0,
              * BLUEWAKE_NATIVE_ROT=0, BLUEWAKE_NATIVE_CALC=0,
              * BLUEWAKE_NATIVE_GEOM=0, BLUEWAKE_NATIVE_JAS=0 leave that group

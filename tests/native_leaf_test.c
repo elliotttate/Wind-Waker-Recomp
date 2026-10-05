@@ -1,5 +1,6 @@
 /* The seventh set (cmake/composite/native_libm.c, native_bgblk.c, native_rot.c,
- * native_geom.c: leaf compute code) against the translations it stands in for.
+ * native_calc.c, native_geom.c, native_jas.c: leaf compute code) against the
+ * translations it stands in for.
  *
  * Build and run from the worktree root (x64; the Visual Studio environment;
  * SNAP = E:\Github\Wind-Waker-Recomp-natives7-snap), each command started
