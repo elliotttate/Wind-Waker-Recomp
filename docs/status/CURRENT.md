@@ -1,3 +1,46 @@
+## 2026-10-05 The GX worker's vertex decode, and the sixth natives set taken back out of the default
+
+**The GX worker** (four E-cores at the sea, host samples symbolized with the app's PDB): busy about a third of the
+time, and a third of that in `build_draw_plan_into`'s vertex loop, which interpreted the walk for every element
+of every vertex (the entry's kind, its index width, each component's format, the array lookup and the payload's
+bounds, each a branch). RecompCore 0143 (c680b4e3) reduces each entry to an op once per draw and decodes with
+the same expressions; the draws it does not take (normal+binormal+tangent, an unknown format, an unresolved
+array, a short payload, an index outside its array) go to the old loop, with its counters.
+`DOL_GXCORE_FAST_DECODE=verify` decodes every draw both ways: gxcore_tests show no difference, and a nine-place
+tour only a skinned mesh the game rewrote between the two decodes. 0144 keeps render passes' command lists from
+frame to frame (each frame's passes allocated new ones, an EFB pass half a megabyte of fresh pages).
+
+**The sixth natives set** (the particle draw code, 2026-10-04) is exact, but in play it did not pay: on four
+E-cores the module with it ran 4-8 percent behind the one before it at the sea with all natives on, and within 1-3
+percent with all off. Measured set by set in one module (new switches `BLUEWAKE_NATIVE_DRAW` and
+`BLUEWAKE_NATIVE_GX`), the sixth set cost Forest Haven 4 percent and saved nothing at Dragon Roost or in Hyrule,
+and the fifth set came out level. Both sets replay a function with an undo log and put everything back when they
+decline, after which the translation does the whole call again, and some entries mostly decline: GXBegin three
+calls in four, the stripe draws nearly all. So:
+- the sixth set runs only with `BLUEWAKE_NATIVE_DRAW=1`;
+- an entry of either set that declines 160 or more of 256 tries declines the next 16,384 at once, which is always
+  exact, then is tried again (`native_replay.h`'s gate; the natives tests turn it off). In play it takes GXBegin,
+  GXLoadTexObjPreLoaded and __GXXfVtxSpecs, and leaves the other 32 GX natives running as before.
+
+**Exact.** Link's position at all 621 probes identical to the module before the sixth set (W-n5), and Smooth Motion
+dumps at the sea by the Fortress, Forest Haven, Dragon Roost, Hyrule, the Earth Temple's boss and the Forbidden
+Woods identical (real and in-between frames), for the decode fast path and for this build.
+
+**What it does** (four E-cores, uncapped, Smooth Motion off, three runs each, interleaved; CPU per game frame in ms,
+against W-n5, the module before the sixth set, with RecompCore 6f52a68):
+
+| Place | Game thread before -> after | GX worker before -> after |
+| --- | --- | --- |
+| Forest Haven | 19.43 -> 19.41 | 11.42 -> 10.44 (-9%) |
+| Dragon Roost | 20.73 -> 20.80 | 9.61 -> 7.95 (-17%) |
+| The sea by the Fortress | 21.77 -> 21.88 | 6.49 -> 5.93 (-9%) |
+| Outset | 16.04 -> 15.99 | 5.78 -> 5.57 (-4%) |
+| Hyrule Castle's room | 16.74 -> 16.59 | 8.23 -> 7.27 (-12%) |
+
+Against the build with the sixth set on (W-n7), the game thread is about 5 percent faster at the sea.
+The app's own optimization profile (windows/pgo/app.profdata, 2026-10-02) predates the decode fast path and the
+three-part vertex block: functions changed since compile without counts until it is trained again.
+
 ## 2026-10-05 The GPU's work is the upload: what each frame sends, 53-59 percent smaller
 
 **Where the GPU's time goes** (RTX 5090, `DOL_AURORA_GPU_PROF=1`, whose `[gpu-prof]` lines give each pass's GPU time
@@ -46,8 +89,8 @@ uv2); they now build full-layout draws, and all pass (0141).
   the build and exact (621 of 621 positions, dumps identical), but on four E-cores the game thread is 4-8
   percent slower than with the fifth round alone: with all natives off the two modules are within 1-3
   percent, and the natives save 0.7 ms at the sea by the Fortress instead of 1.8. The round's particle draw
-  natives take over calls the fifth round's GX and math natives made (GXBegin's native count halves); being
-  measured set by set (`BLUEWAKE_NATIVE_GX=0`, `BLUEWAKE_NATIVE_DRAW=0`).
+  natives take over calls the fifth round's GX and math natives made (GXBegin's native count halves). Settled in
+  the entry above: the sixth set is opt-in now.
 
 ## 2026-10-04 Faster lfs, early returns out of the dispatch, the GX SDK's FIFO writers native: 5-7 percent of the game thread
 
