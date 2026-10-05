@@ -630,4 +630,31 @@ NR bool nr_pairs_plain(const CPUState* cpu) {
     return (cpu->hid2 & PPC_HID2_LSQE) != 0u && (cpu->gqr[0] & 0x00070007u) == 0u;
 }
 
+/* The decline gate of the fifth and sixth sets (native_gx.c). */
+#define NATIVE_GATE_WINDOW 256u
+#define NATIVE_GATE_DECLINES 160u
+#define NATIVE_GATE_SKIP 16384u
+
+typedef struct NativeGate {
+    unsigned tries, declines, skip;
+} NativeGate;
+
+extern int bluewake_native_gate_enabled;
+
+static inline __attribute__((always_inline)) int native_gate_skips(NativeGate* gate) {
+    if (gate->skip == 0u)
+        return 0;
+    gate->skip--;
+    return 1;
+}
+
+static inline __attribute__((always_inline)) void native_gate_note(NativeGate* gate, int declined) {
+    gate->declines += (unsigned)declined;
+    if (++gate->tries < NATIVE_GATE_WINDOW)
+        return;
+    if (gate->declines >= NATIVE_GATE_DECLINES && bluewake_native_gate_enabled)
+        gate->skip = NATIVE_GATE_SKIP;
+    gate->tries = gate->declines = 0u;
+}
+
 #endif

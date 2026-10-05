@@ -276,16 +276,22 @@ RECOMP_MODULE_EXPORT const StaticRecompModuleDesc* staticrecomp_get_module(void)
              * texture loads, the TEV colours and order, the vertex arrays,
              * texture coordinates, lighting channels and fog, GXBegin's
              * dirty-state callees, GXBegin and GXCallDisplayList, J3D's GD
-             * and GF fog and TEV writers), with the same switch. */
-            bluewake_native_gx_enabled = on;
-            if (on)
+             * and GF fog and TEV writers), with the same switch;
+             * BLUEWAKE_NATIVE_GX=0 leaves this set alone to the translation. */
+            const char* gx = getenv("BLUEWAKE_NATIVE_GX");
+            bluewake_native_gx_enabled = on && !(gx && strcmp(gx, "0") == 0);
+            if (bluewake_native_gx_enabled)
                 atexit(bluewake_native_gx_report);
             /* The sixth set: JPA's particle draw and calc visitors,
              * JPADraw::calcParticle and drawWave's loop, stopping before
-             * the calls they do not make and resuming after them, with the
-             * same switch. */
-            bluewake_native_draw_enabled = on;
-            if (on)
+             * the calls they do not make and resuming after them: only with
+             * BLUEWAKE_NATIVE_DRAW=1. Exact, but in play on four E-cores
+             * (2026-10-05) it saved nothing at Dragon Roost or in Hyrule and
+             * cost Forest Haven 4 percent of the game thread (its stripe
+             * draws mostly decline). */
+            const char* draw = getenv("BLUEWAKE_NATIVE_DRAW");
+            bluewake_native_draw_enabled = on && draw && strcmp(draw, "1") == 0;
+            if (bluewake_native_draw_enabled)
                 atexit(bluewake_native_draw_report);
         }
         if (s_native_math) {

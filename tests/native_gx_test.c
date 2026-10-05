@@ -526,6 +526,7 @@ static void bench(Harness* h, unsigned calls) {
 }
 
 int main(int argc, char** argv) {
+    bluewake_native_gate_enabled = 0; /* every call tried */
     if (argc < 2) {
         fprintf(stderr, "usage: native_gx_test MODULE.dll [CASES_PER_FUNCTION] [BENCH_CALLS]\n");
         return 2;

@@ -93,14 +93,17 @@ static const char* const k_draw_names[DRAW_COUNT] = {
 
 /* [0] declined, [1] done, [2] stopped */
 static unsigned long long s_draw_counts[DRAW_COUNT][3];
+/* Calls left to the translation by the decline gate (native_replay.h). */
+static unsigned long long s_draw_skipped[DRAW_COUNT];
+static NativeGate s_draw_gates[DRAW_COUNT];
 
 void bluewake_native_draw_report(void) {
     fprintf(stderr, "[native-draw]");
     for (unsigned i = 0; i < DRAW_COUNT; ++i)
         if (s_draw_counts[i][0] + s_draw_counts[i][1] + s_draw_counts[i][2] != 0u)
-            fprintf(stderr, " %s=%llu/%llu/%llu", k_draw_names[i], s_draw_counts[i][1], s_draw_counts[i][2],
-                    s_draw_counts[i][0]);
-    fprintf(stderr, " (done/stopped/declined; entries and resumes that ran)\n");
+            fprintf(stderr, " %s=%llu/%llu/%llu/%llu", k_draw_names[i], s_draw_counts[i][1], s_draw_counts[i][2],
+                    s_draw_counts[i][0], s_draw_skipped[i]);
+    fprintf(stderr, " (done/stopped/declined/left to the translation; entries and resumes that ran)\n");
 }
 
 /* The counts over every entry and resume (for tests/native_draw_test.c). */
@@ -113,8 +116,14 @@ void bluewake_native_draw_totals(unsigned long long totals[3]) {
 
 #define DRAW_ENTRY(entry, fn, name, id)            \
     int bluewake_native_draw_##id(CPUState* cpu) { \
+        NativeGate* gate = &s_draw_gates[DRI_##id]; \
+        if (native_gate_skips(gate)) {             \
+            s_draw_skipped[DRI_##id]++;            \
+            return 0;                              \
+        }                                          \
         const int r = fn(cpu, entry);              \
         s_draw_counts[DRI_##id][r]++;              \
+        native_gate_note(gate, r == 0);            \
         return r;                                  \
     }
 DRAW_NATIVES(DRAW_ENTRY)

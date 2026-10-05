@@ -102,23 +102,42 @@ static const char* const k_gx_names[GX_COUNT] = {
 #undef GX_NAME
 };
 
-static unsigned long long s_gx_runs[GX_COUNT], s_gx_declined[GX_COUNT];
+static unsigned long long s_gx_runs[GX_COUNT], s_gx_declined[GX_COUNT], s_gx_skipped[GX_COUNT];
+
+/* An entry that keeps declining stops being tried for a while. A native
+ * here that declines has replayed its function as far as it got and put
+ * every byte back, and the translation then does all of it again, so an
+ * entry that mostly declines costs more than it saves: in play GXBegin
+ * declined three calls in four, the stripe draws nearly all (2026-10-05).
+ * After a window of NATIVE_GATE_WINDOW tries with NATIVE_GATE_DECLINES or
+ * more declines, the next NATIVE_GATE_SKIP calls decline at once (always
+ * exact: the translation runs from an unchanged state), then the entry is
+ * tried again. bluewake_native_gate_enabled = 0 tries every call (the
+ * tests). */
+int bluewake_native_gate_enabled = 1;
+static NativeGate s_gx_gates[GX_COUNT];
 
 void bluewake_native_gx_report(void) {
     fprintf(stderr, "[native-gx]");
     for (unsigned i = 0; i < GX_COUNT; ++i)
-        fprintf(stderr, " %s=%llu/%llu", k_gx_names[i], s_gx_runs[i], s_gx_declined[i]);
-    fprintf(stderr, " (native/declined)\n");
+        fprintf(stderr, " %s=%llu/%llu/%llu", k_gx_names[i], s_gx_runs[i], s_gx_declined[i], s_gx_skipped[i]);
+    fprintf(stderr, " (native/declined/left to the translation)\n");
 }
 
-#define GX_ENTRY(entry, fn, name, id)            \
-    int bluewake_native_gx_##id(CPUState* cpu) { \
-        const int done = fn(cpu, entry);         \
-        if (done)                                \
-            s_gx_runs[GXI_##id]++;               \
-        else                                     \
-            s_gx_declined[GXI_##id]++;           \
-        return done;                             \
+#define GX_ENTRY(entry, fn, name, id)                    \
+    int bluewake_native_gx_##id(CPUState* cpu) {         \
+        NativeGate* gate = &s_gx_gates[GXI_##id];        \
+        if (native_gate_skips(gate)) {                   \
+            s_gx_skipped[GXI_##id]++;                    \
+            return 0;                                    \
+        }                                                \
+        const int done = fn(cpu, entry);                 \
+        if (done)                                        \
+            s_gx_runs[GXI_##id]++;                       \
+        else                                             \
+            s_gx_declined[GXI_##id]++;                   \
+        native_gate_note(gate, !done);                   \
+        return done;                                     \
     }
 GX_NATIVES(GX_ENTRY)
 #undef GX_ENTRY

@@ -23,6 +23,9 @@
 #include "native_gx_list.h"
 
 extern int bluewake_native_gx_enabled;
+/* Whether an entry of this set or the sixth that keeps declining is left to
+ * the translation for a while (native_gx.c); 1 unless a test clears it. */
+extern int bluewake_native_gate_enabled;
 
 /* The function at `address`, entered with the return address in LR, through
  * its blr: nonzero with every register, flag, cycle, byte of RAM and byte

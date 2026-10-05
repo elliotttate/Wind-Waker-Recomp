@@ -1126,6 +1126,7 @@ static LONG WINAPI on_fault(EXCEPTION_POINTERS* e) {
 }
 
 int main(int argc, char** argv) {
+    bluewake_native_gate_enabled = 0; /* every call tried */
     AddVectoredExceptionHandler(1, on_fault);
     if (argc < 2) {
         fprintf(stderr, "usage: native_draw_test MODULE.dll [CASES_PER_FUNCTION] [BENCH_CALLS] [NAME_PREFIX,...]\n");
